@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
-import type { ChatMessage, ContentItem, Platform } from '../types/spark';
+import type { ChatMessage, ContentItem } from '../types/spark';
 import ContentCard from './ContentCard';
 
 function SparkAvatar({ size = 32 }: { size?: number }) {
@@ -114,7 +114,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 export default function SparkChat() {
   const {
     messages, addMessage, isGenerating, setIsGenerating,
-    contents, setContents, setSelectedContentId,
+    setContents, setSelectedContentId,
   } = useAppStore();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -158,7 +158,7 @@ export default function SparkChat() {
     }
   };
 
-  const handleChat = async (text: string) => {
+  const handleChat = async (_text: string) => {
     const currentMessages = useAppStore.getState().messages;
     const history = currentMessages
       .filter(m => m.id !== 'welcome')

@@ -1,4 +1,4 @@
-import { FileText, X } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 
