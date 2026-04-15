@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
-import type { ChatMessage, ContentItem } from '../types/spark';
+import type { ChatMessage, ContentItem, ChoiceOption } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
 
@@ -113,7 +113,11 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, onSend, onCardAction }: {
+  msg: ChatMessage;
+  onSend: (text: string) => void;
+  onCardAction: (action: string, item?: ContentItem) => void;
+}) {
   const isUser = msg.role === 'user';
 
   // Content card message
@@ -127,7 +131,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <ContentCard item={msg.contentItem} />
+          <ContentCard item={msg.contentItem} onAction={(action, item) => onCardAction(action, item)} />
         </div>
       </div>
     );
@@ -144,7 +148,10 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <DataReportCard data={msg.reportData as unknown as ReportData} />
+          <DataReportCard
+            data={msg.reportData as unknown as ReportData}
+            onAction={(action) => onCardAction(action)}
+          />
         </div>
       </div>
     );
@@ -163,8 +170,46 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   return (
     <div className="flex items-start gap-3">
       <SparkAvatar size={32} />
-      <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
-        <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+      <div className="flex-1 min-w-0 max-w-[80%]">
+        <div className="chat-bubble-assistant px-4 py-3">
+          <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+        </div>
+
+        {/* Choice pills */}
+        {msg.choices && msg.choices.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {msg.choices.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSend(c.label)}
+                className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+              >
+                {c.emoji && <span className="mr-1">{c.emoji}</span>}
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Quick action buttons */}
+        {msg.actions && msg.actions.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {msg.actions.map(a => (
+              <button
+                key={a.value}
+                onClick={() => onSend(a.value)}
+                className={`px-3 py-1.5 rounded-lg text-[13px] transition-colors ${
+                  a.variant === 'primary'
+                    ? 'bg-spark-orange text-white hover:opacity-90'
+                    : 'bg-[#F5F5F3] text-[#666] hover:bg-[#EEEDEB]'
+                }`}
+              >
+                {a.icon && <span className="mr-1">{a.icon}</span>}
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
