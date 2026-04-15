@@ -12,8 +12,8 @@ serve(async (req) => {
 
   try {
     const { title, content, platform, style } = await req.json();
-    const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const API_KEY = Deno.env.get("AIPAIBOX_API_KEY");
+    if (!API_KEY) throw new Error("AIPAIBOX_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -22,16 +22,16 @@ serve(async (req) => {
 
     const prompt = `Generate an image: A beautiful cover photo for a ${platformName} social media article titled "${title}". ${(content || "").substring(0, 200)}. Style: ${style || "Modern, clean, vibrant colors, professional photography style"}. Do NOT include any text or letters in the image. Clean composition, harmonious colors, visually striking hero image.`;
 
-    console.log("Calling Lovable AI Gateway for image generation (Google gemini-2.5-flash-image)");
+    console.log("Calling aipaibox API with gemini-3.1-pro-preview for image generation");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.aipaibox.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_KEY}`,
+        Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "gemini-3.1-pro-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -43,16 +43,10 @@ serve(async (req) => {
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (response.status === 402) {
-      return new Response(
-        JSON.stringify({ error: "AI 额度不足，请充值后重试" }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("AI Gateway error:", response.status, t);
+      console.error("API error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "图片生成暂不可用，请稍后重试" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -60,10 +54,12 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const images = result.choices?.[0]?.message?.images;
+    console.log("API response keys:", JSON.stringify(Object.keys(result)));
 
+    // Try OpenAI-compatible image format
+    const images = result.choices?.[0]?.message?.images;
     if (images && images.length > 0) {
-      const imageUrl = images[0].image_url?.url;
+      const imageUrl = images[0].image_url?.url || images[0].url;
       if (imageUrl) {
         return new Response(
           JSON.stringify({ imageUrl }),
@@ -72,7 +68,31 @@ serve(async (req) => {
       }
     }
 
-    console.error("No image in response:", JSON.stringify(result).substring(0, 500));
+    // Try inline base64 in content
+    const msgContent = result.choices?.[0]?.message?.content;
+    if (msgContent && typeof msgContent === "string" && msgContent.includes("data:image")) {
+      const match = msgContent.match(/(data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)/);
+      if (match) {
+        return new Response(
+          JSON.stringify({ imageUrl: match[1] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Try multipart content array
+    if (Array.isArray(msgContent)) {
+      for (const part of msgContent) {
+        if (part.type === "image_url" && part.image_url?.url) {
+          return new Response(
+            JSON.stringify({ imageUrl: part.image_url.url }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
+    console.error("No image found in response:", JSON.stringify(result).substring(0, 1000));
     return new Response(
       JSON.stringify({ error: "图片生成失败，请重试" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
