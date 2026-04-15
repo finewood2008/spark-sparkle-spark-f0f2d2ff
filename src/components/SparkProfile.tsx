@@ -220,6 +220,26 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
         </div>
 
         {/* Deep memory locked section */}
+        <style>{`
+          @keyframes float-gentle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+          }
+          @keyframes glow-breathe {
+            0%, 100% { box-shadow: 0 0 8px rgba(255,140,66,0.15), 0 0 20px rgba(255,140,66,0.05); }
+            50% { box-shadow: 0 0 16px rgba(255,140,66,0.35), 0 0 40px rgba(255,140,66,0.12); }
+          }
+          @keyframes dot-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.4); }
+          }
+          .float-icon-1 { animation: float-gentle 3s ease-in-out infinite; }
+          .float-icon-2 { animation: float-gentle 3s ease-in-out 0.4s infinite; }
+          .float-icon-3 { animation: float-gentle 3s ease-in-out 0.8s infinite; }
+          .glow-btn { animation: glow-breathe 2.5s ease-in-out infinite; }
+          .dot-anim-1 { animation: dot-pulse 2s ease-in-out 0.2s infinite; }
+          .dot-anim-2 { animation: dot-pulse 2s ease-in-out 0.6s infinite; }
+        `}</style>
         <div className="mt-6 mx-6 mb-6 relative rounded-2xl overflow-hidden border border-[#E2E8F0]">
           {/* Blurred background feature list */}
           <div className="px-5 pt-5 pb-16 space-y-3 select-none" style={{ filter: 'blur(2px)', opacity: 0.45 }}>
@@ -239,17 +259,17 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
 
           {/* Overlay */}
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-transparent via-[#FAFAF8]/80 to-[#FAFAF8]/95 px-6">
-            {/* Icon cluster */}
+            {/* Floating icon cluster */}
             <div className="flex items-center gap-1.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <div className="float-icon-1 w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                 <Monitor size={20} className="text-orange-500" />
               </div>
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-300" />
-              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <div className="dot-anim-1 w-1.5 h-1.5 rounded-full bg-orange-300" />
+              <div className="float-icon-2 w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                 <Brain size={20} className="text-orange-500" />
               </div>
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-300" />
-              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <div className="dot-anim-2 w-1.5 h-1.5 rounded-full bg-orange-300" />
+              <div className="float-icon-3 w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                 <HardDrive size={20} className="text-orange-500" />
               </div>
             </div>
@@ -258,7 +278,7 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
               开启<span className="font-semibold text-[#333]">深层本地记忆系统</span>，火花将通过你的本地硬盘资料完成终极进化。
             </p>
 
-            <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-400 text-white text-[14px] font-medium shadow-md shadow-orange-200/50 hover:shadow-lg hover:shadow-orange-200/60 hover:brightness-105 transition-all">
+            <button className="glow-btn flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-400 text-white text-[14px] font-medium hover:brightness-105 transition-all">
               <Download size={16} />
               下载桌面版开启
             </button>
