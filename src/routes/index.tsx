@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import SparkSidebar from "../components/SparkSidebar";
-import SparkAssistant from "../components/SparkAssistant";
-import StudioPage from "../pages/StudioPage";
+import IconNav from "../components/IconNav";
+import AICommandPanel from "../components/AICommandPanel";
+import EditorCanvas from "../components/EditorCanvas";
+import PreviewPanel from "../components/PreviewPanel";
 import DashboardPage from "../pages/DashboardPage";
 import MemoryPage from "../pages/MemoryPage";
 import SettingsPage from "../pages/SettingsPage";
@@ -21,24 +22,28 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { activeTab } = useAppStore();
 
-  const renderPage = () => {
-    switch (activeTab) {
-      case 'studio': return <StudioPage />;
-      case 'schedule': return <SchedulePage />;
-      case 'dashboard': return <DashboardPage />;
-      case 'memory': return <MemoryPage />;
-      case 'settings': return <SettingsPage />;
-      default: return <StudioPage />;
-    }
-  };
+  // Studio tab gets the special 3-column layout
+  if (activeTab === 'studio') {
+    return (
+      <div className="flex h-screen bg-background overflow-hidden">
+        <IconNav />
+        <AICommandPanel />
+        <EditorCanvas />
+        <PreviewPanel />
+      </div>
+    );
+  }
 
+  // Other tabs get icon nav + full page
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <SparkSidebar />
+      <IconNav />
       <main className="flex-1 min-w-0 overflow-hidden">
-        {renderPage()}
+        {activeTab === 'schedule' && <SchedulePage />}
+        {activeTab === 'dashboard' && <DashboardPage />}
+        {activeTab === 'memory' && <MemoryPage />}
+        {activeTab === 'settings' && <SettingsPage />}
       </main>
-      <SparkAssistant />
     </div>
   );
 }
