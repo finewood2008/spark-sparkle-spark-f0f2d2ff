@@ -315,8 +315,7 @@ export default function ContentCard({ item, onAction }: ContentCardProps) {
     setTitleLoading(false);
   };
 
-
-    const updated = contents.map(c =>
+  const handleSave = () => {
       c.id === item.id
         ? { ...c, title: editTitle, content: editContent, updatedAt: new Date().toISOString() }
         : c
