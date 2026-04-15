@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Settings } from 'lucide-react';
+import { FileText, Settings, Brain } from 'lucide-react';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
@@ -16,10 +16,7 @@ export default function ChatLayout() {
     <div className="h-screen flex flex-col bg-[#FAFAF8]">
       {/* Top nav */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-[#EEEDEB]">
-        <button
-          onClick={() => setProfileOpen(true)}
-          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
-        >
+        <div className="flex items-center gap-2.5">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
@@ -27,7 +24,7 @@ export default function ChatLayout() {
             <span className="text-[14px]">✨</span>
           </div>
           <span className="text-[16px] font-semibold text-[#333]">火花</span>
-        </button>
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setDrawerOpen(true)}
@@ -35,6 +32,13 @@ export default function ChatLayout() {
             title="草稿箱"
           >
             <FileText size={18} />
+          </button>
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+            title="火花记忆"
+          >
+            <Brain size={18} />
           </button>
           <button
             onClick={() => setActiveTab('settings')}
