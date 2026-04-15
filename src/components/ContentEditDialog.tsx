@@ -35,11 +35,21 @@ export default function ContentEditDialog({ item: itemProp, open, onClose }: Con
 
   // Sync when item changes externally (e.g. cover image generated)
   useEffect(() => {
+    if (!open) return;
     setEditTitle(item.title);
     setEditContent(item.content);
     setEditCta(item.cta || '');
     setEditTags(item.tags || []);
-  }, [item.title, item.content, item.cta, item.tags]);
+  }, [item.title, item.content, item.cta, item.tags, open]);
+
+  const handleSelect = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    if (s === e) { setSelRange(null); setSelectedText(''); return; }
+    setSelRange({ start: s, end: e });
+    setSelectedText(editContent.substring(s, e));
+  }, [editContent]);
 
   if (!open) return null;
 
