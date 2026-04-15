@@ -181,6 +181,101 @@ function AccountPage() {
             ))}
           </div>
         </div>
+
+        {/* Preferences card */}
+        <div className="rounded-2xl bg-card shadow-lg border border-border overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+              <Palette size={16} className="text-primary" />
+              个人偏好
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">设置你的默认写作偏好，生成内容时自动应用</p>
+          </div>
+          <div className="px-6 py-4 space-y-4">
+            {/* Default platform */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">默认发布平台</label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'xiaohongshu', label: '小红书' },
+                  { value: 'wechat', label: '公众号' },
+                  { value: 'douyin', label: '抖音' },
+                ] as const).map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => setPrefs(prev => ({ ...prev, defaultPlatform: p.value }))}
+                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
+                      prefs.defaultPlatform === p.value
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Writing style */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">写作风格</label>
+              <select
+                value={prefs.writingStyle}
+                onChange={e => setPrefs(prev => ({ ...prev, writingStyle: e.target.value }))}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+              >
+                <option value="专业严谨">专业严谨</option>
+                <option value="轻松活泼">轻松活泼</option>
+                <option value="种草安利">种草安利</option>
+                <option value="知识科普">知识科普</option>
+                <option value="故事叙述">故事叙述</option>
+              </select>
+            </div>
+
+            {/* Writing tone */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">语气偏好</label>
+              <select
+                value={prefs.writingTone}
+                onChange={e => setPrefs(prev => ({ ...prev, writingTone: e.target.value }))}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+              >
+                <option value="友好亲切">友好亲切</option>
+                <option value="权威专业">权威专业</option>
+                <option value="幽默风趣">幽默风趣</option>
+                <option value="温暖感性">温暖感性</option>
+                <option value="简洁直接">简洁直接</option>
+              </select>
+            </div>
+
+            {/* Signature */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
+                <PenLine size={12} />
+                个性签名
+              </label>
+              <input
+                value={prefs.signature}
+                onChange={e => setPrefs(prev => ({ ...prev, signature: e.target.value }))}
+                placeholder="一句话介绍自己..."
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+              />
+            </div>
+
+            {/* Save */}
+            <button
+              onClick={() => {
+                savePrefs(prefs);
+                setPrefsSaved(true);
+                setTimeout(() => setPrefsSaved(false), 2000);
+              }}
+              className="spark-btn-primary w-full text-sm gap-1.5"
+            >
+              {prefsSaved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+              {prefsSaved ? '已保存' : '保存偏好'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
