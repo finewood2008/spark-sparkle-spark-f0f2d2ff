@@ -22,11 +22,38 @@ const providerIcons: Record<string, React.ReactNode> = {
   google: <Globe size={20} />,
 };
 
+interface UserPreferences {
+  defaultPlatform: 'xiaohongshu' | 'wechat' | 'douyin';
+  writingStyle: string;
+  writingTone: string;
+  signature: string;
+}
+
+const defaultPrefs: UserPreferences = {
+  defaultPlatform: 'xiaohongshu',
+  writingStyle: '专业严谨',
+  writingTone: '友好亲切',
+  signature: '',
+};
+
+function loadPrefs(): UserPreferences {
+  try {
+    const s = localStorage.getItem('spark-user-prefs');
+    return s ? { ...defaultPrefs, ...JSON.parse(s) } : defaultPrefs;
+  } catch { return defaultPrefs; }
+}
+
+function savePrefs(p: UserPreferences) {
+  localStorage.setItem('spark-user-prefs', JSON.stringify(p));
+}
+
 function AccountPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthStore();
   const [bindings, setBindings] = useState<BindingStatus[]>([]);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState<UserPreferences>(defaultPrefs);
+  const [prefsSaved, setPrefsSaved] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -34,6 +61,7 @@ function AccountPage() {
       return;
     }
     getBindingStatus(user!.id).then(setBindings);
+    setPrefs(loadPrefs());
   }, [isAuthenticated, navigate, user]);
 
   const handleBind = async (provider: SocialProvider) => {
