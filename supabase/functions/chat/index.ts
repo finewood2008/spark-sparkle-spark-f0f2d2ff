@@ -12,21 +12,16 @@ serve(async (req) => {
 
   try {
     const { messages, mode, platform, brandContext } = await req.json();
-    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GEMINI_KEY)
-      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const API_KEY = Deno.env.get("AIPAIBOX_API_KEY");
+    if (!API_KEY) throw new Error("AIPAIBOX_API_KEY is not configured");
 
     let systemPrompt: string;
 
     if (mode === "generate") {
       const platformName =
-        platform === "xiaohongshu"
-          ? "小红书"
-          : platform === "wechat"
-            ? "微信公众号"
-            : platform === "douyin"
-              ? "抖音"
-              : "社交媒体";
+        platform === "xiaohongshu" ? "小红书" :
+        platform === "wechat" ? "微信公众号" :
+        platform === "douyin" ? "抖音" : "社交媒体";
 
       systemPrompt = `你是"火花"，一个专业的社交媒体内容创作助手。
 用户正在请求你为${platformName}平台生成一篇完整文章。
@@ -61,24 +56,21 @@ ${brandContext || ""}`;
 ${brandContext || ""}`;
     }
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages,
-          ],
-          stream: true,
-        }),
-      }
-    );
+    const response = await fetch("https://api.aipaibox.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages,
+        ],
+        stream: true,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -94,7 +86,7 @@ ${brandContext || ""}`;
         );
       }
       const t = await response.text();
-      console.error("Gemini API error:", response.status, t);
+      console.error("API error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "AI 服务暂时不可用" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
