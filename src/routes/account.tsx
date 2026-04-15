@@ -37,7 +37,8 @@ function AccountPage() {
       return;
     }
     getBindingStatus(user!.id).then(setBindings);
-    setPrefs(loadUserPrefs());
+    // Load prefs from cloud first, fallback to local
+    syncPrefsFromCloud().then(setPrefs);
   }, [isAuthenticated, navigate, user]);
 
   const handleBind = async (provider: SocialProvider) => {
