@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { loadSettings } from '../lib/settings';
 import { generateContent } from '../functions/generate.functions';
-import { generateContent } from '../functions/generate.functions';
 import type { ScheduleConfig, Platform, ContentItem } from '../types/spark';
 import {
   Calendar,
