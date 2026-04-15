@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, Heart, MessageCircle, Bookmark } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Heart, MessageCircle, Bookmark, PenLine, TrendingUp } from 'lucide-react';
 import type { Platform } from '../types/spark';
 
 export interface ReportData {
@@ -30,7 +30,7 @@ const metricIcons = [
   { key: 'saves' as const, icon: Bookmark, label: '收藏' },
 ];
 
-export default function DataReportCard({ data }: { data: ReportData }) {
+export default function DataReportCard({ data, onAction }: { data: ReportData; onAction?: (action: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const pl = platformLabel[data.platform];
 
@@ -92,6 +92,24 @@ export default function DataReportCard({ data }: { data: ReportData }) {
               <p className="text-[13px] text-[#555] leading-relaxed">{data.sparkAdvice}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {expanded && onAction && (
+        <div className="flex items-center gap-2 px-4 pb-2" style={{ animation: 'spark-fade-in 0.2s ease' }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAction('write_sequel'); }}
+            className="content-card-btn text-spark-orange"
+          >
+            <PenLine size={13} /> 针对这篇写续集
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAction('analyze_trend'); }}
+            className="content-card-btn"
+          >
+            <TrendingUp size={13} /> 分析趋势
+          </button>
         </div>
       )}
 
