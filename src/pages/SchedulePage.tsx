@@ -441,17 +441,11 @@ export default function SchedulePage() {
     for (let i = 0; i < newLogs.length; i++) {
       const log = newLogs[i];
       try {
-        const result = await generateContent({
-          data: {
-            platform: log.platform,
-            topic: log.topic,
-            style: config.style,
-            brandContext: brandCtx || undefined,
-            provider,
-            apiKey: settings.apiKey,
-            baseUrl,
-            model: settings.model,
-          },
+        const result = await generateArticle({
+          platform: log.platform,
+          topic: log.topic,
+          style: config.style,
+          brandContext: brandCtx || undefined,
         });
 
         const contentItem: ContentItem = {
