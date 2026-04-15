@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { FileText, Settings, Brain } from 'lucide-react';
+import { FileText, User, Brain } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { useAuthStore } from '../store/authStore';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
@@ -41,11 +43,14 @@ export default function ChatLayout() {
             <Brain size={18} />
           </button>
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => {
+              const { isAuthenticated } = useAuthStore.getState();
+              window.location.href = isAuthenticated ? '/account' : '/auth';
+            }}
             className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="设置"
+            title="个人中心"
           >
-            <Settings size={18} />
+            <User size={18} />
           </button>
         </div>
       </header>
