@@ -70,6 +70,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
