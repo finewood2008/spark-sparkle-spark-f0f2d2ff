@@ -50,13 +50,13 @@ const mockReport: ReportData = {
   title: '5个让你皮肤发光的晨间习惯',
   platform: 'xiaohongshu',
   metrics: { views: 12800, likes: 986, comments: 234, saves: 567 },
-  sparkComment: '这篇笔记的互动率达到了 13.9%，远超行业平均水平，收藏率尤其突出。',
+  sparkComment: '这篇笔记的互动率达到了 13.9%，远超行业平均水平。',
   topComments: [
     { user: '小美同学', text: '第三个方法真的有用！已经坚持一周了' },
     { user: '护肤达人Lisa', text: '请问用的什么牌子的洁面？求推荐' },
     { user: '早起打卡', text: '收藏了，明天开始试试看' },
   ],
-  sparkAdvice: '评论区对产品推荐有强烈需求，建议下一篇可以做一个「晨间护肤好物清单」，趁热度做系列内容。',
+  sparkAdvice: '收藏率远超平均值，说明干货密度很高。评论区都在问工具清单，建议针对工具做一期衍生内容。',
 };
 
 function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }) {

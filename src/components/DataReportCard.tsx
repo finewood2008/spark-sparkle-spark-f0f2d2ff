@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, Heart, MessageCircle, Bookmark, PenLine, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import type { Platform } from '../types/spark';
 
 export interface ReportData {
@@ -11,112 +10,70 @@ export interface ReportData {
   sparkAdvice?: string;
 }
 
-const platformLabel: Record<Platform, { name: string; color: string }> = {
-  xiaohongshu: { name: '小红书', color: '#FF2442' },
-  wechat: { name: '公众号', color: '#07C160' },
-  douyin: { name: '抖音', color: '#111' },
-};
-
 function formatNum(n: number) {
   if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
   return n.toString();
 }
 
-const metricIcons = [
-  { key: 'views' as const, icon: Eye, label: '阅读' },
-  { key: 'likes' as const, icon: Heart, label: '点赞' },
-  { key: 'comments' as const, icon: MessageCircle, label: '评论' },
-  { key: 'saves' as const, icon: Bookmark, label: '收藏' },
+const metricConfig = [
+  { key: 'views' as const, label: '阅读量', threshold: 10000 },
+  { key: 'likes' as const, label: '点赞', threshold: 500 },
+  { key: 'comments' as const, label: '评论', threshold: 100 },
+  { key: 'saves' as const, label: '收藏', threshold: 200 },
 ];
 
 export default function DataReportCard({ data, onAction }: { data: ReportData; onAction?: (action: string) => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const pl = platformLabel[data.platform];
-
   return (
-    <div
-      className="bg-white rounded-xl border border-[#F0EFED] shadow-sm overflow-hidden cursor-pointer transition-shadow hover:shadow-md"
-      onClick={() => setExpanded(!expanded)}
-    >
-      {/* Header: title + platform */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <h4 className="text-[15px] font-semibold text-[#333] truncate flex-1">{data.title}</h4>
-        <span
-          className="ml-2 text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0"
-          style={{ color: pl.color, background: pl.color + '15' }}
-        >
-          {pl.name}
-        </span>
+    <div className="bg-white rounded-xl border border-orange-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-5 pt-5 pb-1">
+        <h4 className="text-[16px] font-bold text-[#333] leading-snug">{data.title}</h4>
+        <p className="text-[12px] text-[#BBB] mt-1">昨天的发布表现</p>
       </div>
 
       {/* Metrics row */}
-      <div className="px-4 py-3 flex items-center gap-5">
-        {metricIcons.map(({ key, icon: Icon, label }) => (
-          <div key={key} className="flex flex-col items-center gap-0.5">
-            <div className="flex items-center gap-1">
-              <Icon size={13} className="text-[#CCC]" />
-              <span className="text-[17px] font-bold text-spark-orange">{formatNum(data.metrics[key])}</span>
-            </div>
-            <span className="text-[11px] text-[#BBB]">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Spark comment */}
-      <div className="px-4 pb-3">
-        <p className="text-[13px] text-[#999] italic leading-relaxed">{data.sparkComment}</p>
-      </div>
-
-      {/* Expanded section */}
-      {expanded && (
-        <div className="border-t border-[#F0EFED] px-4 py-3 space-y-3" style={{ animation: 'spark-fade-in 0.2s ease' }}>
-          {/* Top comments */}
-          {data.topComments && data.topComments.length > 0 && (
-            <div>
-              <h5 className="text-[13px] font-medium text-[#666] mb-2">💬 评论精选</h5>
-              <div className="space-y-1.5">
-                {data.topComments.map((c, i) => (
-                  <div key={i} className="flex gap-2 text-[13px]">
-                    <span className="text-[#999] shrink-0">@{c.user}</span>
-                    <span className="text-[#555]">{c.text}</span>
-                  </div>
-                ))}
+      <div className="px-5 py-4 grid grid-cols-4 gap-3">
+        {metricConfig.map(({ key, label, threshold }) => {
+          const value = data.metrics[key];
+          const isGood = value >= threshold;
+          return (
+            <div key={key} className="flex flex-col items-center">
+              <div className="flex items-center gap-1">
+                <span className="text-[22px] font-bold text-orange-500 leading-none">
+                  {formatNum(value)}
+                </span>
+                {isGood && (
+                  <TrendingUp size={14} className="text-green-500" />
+                )}
               </div>
+              <span className="text-[11px] text-[#BCBCBC] mt-1">{label}</span>
             </div>
-          )}
-          {/* Spark advice */}
-          {data.sparkAdvice && (
-            <div>
-              <h5 className="text-[13px] font-medium text-[#666] mb-1">✨ 火花建议</h5>
-              <p className="text-[13px] text-[#555] leading-relaxed">{data.sparkAdvice}</p>
-            </div>
-          )}
+          );
+        })}
+      </div>
+
+      {/* Spark insight */}
+      {data.sparkAdvice && (
+        <div className="mx-5 mb-4 bg-[#F9F9F7] rounded-xl px-4 py-3 flex items-start gap-2.5">
+          <span className="text-[18px] shrink-0 mt-0.5">💡</span>
+          <p className="text-[13px] text-[#666] italic leading-relaxed flex-1">
+            {data.sparkAdvice}
+          </p>
         </div>
       )}
 
-      {/* Action buttons */}
-      {expanded && onAction && (
-        <div className="flex items-center gap-2 px-4 pb-2" style={{ animation: 'spark-fade-in 0.2s ease' }}>
+      {/* Action button */}
+      {onAction && (
+        <div className="px-5 pb-5">
           <button
             onClick={(e) => { e.stopPropagation(); onAction('write_sequel'); }}
-            className="content-card-btn text-spark-orange"
+            className="w-full py-2.5 rounded-xl bg-orange-50 text-orange-500 text-[14px] font-medium hover:bg-orange-100 transition-colors"
           >
-            <PenLine size={13} /> 针对这篇写续集
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAction('analyze_trend'); }}
-            className="content-card-btn"
-          >
-            <TrendingUp size={13} /> 分析趋势
+            ⚡️ 针对评论写续集
           </button>
         </div>
       )}
-
-      {/* Expand indicator */}
-      <div className="flex justify-center py-1.5 border-t border-[#F5F5F3]">
-        {expanded ? <ChevronUp size={14} className="text-[#CCC]" /> : <ChevronDown size={14} className="text-[#CCC]" />}
-      </div>
     </div>
   );
 }

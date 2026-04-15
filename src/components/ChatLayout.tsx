@@ -8,20 +8,16 @@ import { useMemorySync } from '../hooks/useMemorySync';
 
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { setActiveTab } = useAppStore();
   const { getFullContext } = useMemorySync();
-
-  if (showProfile) {
-    return <SparkProfile onBack={() => setShowProfile(false)} />;
-  }
 
   return (
     <div className="h-screen flex flex-col bg-[#FAFAF8]">
       {/* Top nav */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-[#EEEDEB]">
         <button
-          onClick={() => setShowProfile(true)}
+          onClick={() => setProfileOpen(true)}
           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
         >
           <div
@@ -55,6 +51,9 @@ export default function ChatLayout() {
 
       {/* Draft drawer */}
       <DraftDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+
+      {/* Memory profile modal */}
+      <SparkProfile open={profileOpen} onOpenChange={setProfileOpen} />
     </div>
   );
 }
