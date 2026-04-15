@@ -378,6 +378,16 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     });
   };
 
+  const handleCardAction = useCallback((action: string, item?: ContentItem) => {
+    const actionMap: Record<string, string> = {
+      restyle: `请帮我把「${item?.title || '这篇文章'}」换一种风格重新写`,
+      write_sequel: `请针对「${(item as any)?.title || '上篇内容'}」写一篇续集`,
+      analyze_trend: '请分析一下最近的内容数据趋势，给我一些建议',
+    };
+    const text = actionMap[action];
+    if (text) sendMessage(text);
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
