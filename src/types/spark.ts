@@ -22,6 +22,7 @@ export interface ChatMessage {
   actions?: QuickAction[];
   options?: OptionCard[];
   image?: string;
+  contentItem?: ContentItem;
 }
 
 export type ContentStatus = 'draft' | 'reviewing' | 'approved' | 'published' | 'rejected';
