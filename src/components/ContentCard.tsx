@@ -587,6 +587,13 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           </>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <ContentEditDialog
+        item={item}
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+      />
     </div>
   );
 }
