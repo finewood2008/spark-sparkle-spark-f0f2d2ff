@@ -12,8 +12,10 @@ serve(async (req) => {
 
   try {
     const { title, content, platform, style } = await req.json();
-    const API_KEY = Deno.env.get("AIPAIBOX_API_KEY");
-    if (!API_KEY) throw new Error("AIPAIBOX_API_KEY is not configured");
+    
+    // Image generation requires a dedicated image model via Lovable AI Gateway
+    const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -22,16 +24,16 @@ serve(async (req) => {
 
     const prompt = `Generate an image: A beautiful cover photo for a ${platformName} social media article titled "${title}". ${(content || "").substring(0, 200)}. Style: ${style || "Modern, clean, vibrant colors, professional photography style"}. Do NOT include any text or letters in the image. Clean composition, harmonious colors, visually striking hero image.`;
 
-    console.log("Calling aipaibox API with gemini-3.1-pro-preview for image generation");
+    console.log("Calling Lovable AI Gateway with gemini-2.5-flash-image for image generation");
 
-    const response = await fetch("https://api.aipaibox.com/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-3.1-pro-preview",
+        model: "google/gemini-2.5-flash-image",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
