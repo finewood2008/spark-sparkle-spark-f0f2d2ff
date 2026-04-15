@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, Platform } from '../types/spark';
-import { Image as ImageIcon, Smartphone, Monitor, RefreshCw, Sparkles, Plus } from 'lucide-react';
+import { Image as ImageIcon, Smartphone, Monitor, RefreshCw, Sparkles, Plus, Bot, Send, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DraftData {
   id: string;
