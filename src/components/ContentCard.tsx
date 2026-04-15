@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, RefreshCw, Maximize2, Minimize2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
@@ -123,7 +123,6 @@ export default function ContentCard({ item }: ContentCardProps) {
       platform: item.platform,
       onDelta: (chunk) => { result += chunk; },
       onDone: () => {
-        // Replace selected text with AI result
         const before = editContent.substring(0, selectedRange.start);
         const after = editContent.substring(selectedRange.end);
         const newContent = before + result + after;
@@ -132,6 +131,35 @@ export default function ContentCard({ item }: ContentCardProps) {
         setSelectedRange(null);
         setAiLoading(null);
         toast.success(`AI ${action === 'rewrite' ? '改写' : action === 'expand' ? '扩写' : '精简'}完成`);
+      },
+      onError: (err) => {
+        toast.error(err);
+        setAiLoading(null);
+      },
+    });
+  };
+
+  const handlePolish = async () => {
+    const textToPolish = editing ? editContent : item.content;
+    if (!textToPolish.trim()) return;
+
+    setAiLoading('polish');
+    if (!editing) {
+      setEditing(true);
+      setExpanded(true);
+      setEditContent(textToPolish);
+    }
+
+    let result = '';
+    await streamEdit({
+      action: 'polish',
+      text: textToPolish,
+      platform: item.platform,
+      onDelta: (chunk) => { result += chunk; },
+      onDone: () => {
+        setEditContent(result);
+        setAiLoading(null);
+        toast.success('AI 润色完成');
       },
       onError: (err) => {
         toast.error(err);
@@ -220,7 +248,7 @@ export default function ContentCard({ item }: ContentCardProps) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#F0EFED]">
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#F0EFED] flex-wrap">
         {!editing ? (
           <>
             <button
@@ -238,6 +266,14 @@ export default function ContentCard({ item }: ContentCardProps) {
               编辑
             </button>
             <button
+              onClick={handlePolish}
+              disabled={!!aiLoading}
+              className="content-card-btn text-spark-orange"
+            >
+              {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              {aiLoading === 'polish' ? '润色中...' : '一键润色'}
+            </button>
+            <button
               onClick={handlePublish}
               className="content-card-btn text-spark-orange"
             >
@@ -249,6 +285,14 @@ export default function ContentCard({ item }: ContentCardProps) {
           <>
             <button onClick={handleSave} className="content-card-btn text-spark-orange font-medium">
               保存
+            </button>
+            <button
+              onClick={handlePolish}
+              disabled={!!aiLoading}
+              className="content-card-btn text-spark-orange"
+            >
+              {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              {aiLoading === 'polish' ? '润色中...' : '一键润色'}
             </button>
             <button onClick={() => { setEditing(false); setToolbarPos(null); }} className="content-card-btn">
               取消
