@@ -460,10 +460,6 @@ export default function SchedulePage() {
     setGenerating(false);
   };
 
-  const handleViewContent = (contentId: string) => {
-    setSelectedContentId(contentId);
-    setActiveTab('studio');
-  };
 
   const totalGenerated = logs.filter(l => l.status === 'success').length;
 
