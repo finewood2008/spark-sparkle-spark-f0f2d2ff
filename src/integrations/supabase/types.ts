@@ -14,7 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      brand_memories: {
+        Row: {
+          created_at: string
+          device_id: string
+          differentiation: string
+          id: string
+          industry: string
+          init_step: number
+          initialized: boolean
+          keywords: string[]
+          main_business: string
+          name: string
+          taboo_words: string[]
+          target_customer: string
+          tone_of_voice: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string
+          differentiation?: string
+          id?: string
+          industry?: string
+          init_step?: number
+          initialized?: boolean
+          keywords?: string[]
+          main_business?: string
+          name?: string
+          taboo_words?: string[]
+          target_customer?: string
+          tone_of_voice?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          differentiation?: string
+          id?: string
+          industry?: string
+          init_step?: number
+          initialized?: boolean
+          keywords?: string[]
+          main_business?: string
+          name?: string
+          taboo_words?: string[]
+          target_customer?: string
+          tone_of_voice?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      learning_entries: {
+        Row: {
+          category: string
+          confidence: number
+          created_at: string
+          device_id: string
+          evidence: string
+          id: string
+          insight: string
+          type: string
+        }
+        Insert: {
+          category?: string
+          confidence?: number
+          created_at?: string
+          device_id?: string
+          evidence?: string
+          id?: string
+          insight: string
+          type?: string
+        }
+        Update: {
+          category?: string
+          confidence?: number
+          created_at?: string
+          device_id?: string
+          evidence?: string
+          id?: string
+          insight?: string
+          type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
