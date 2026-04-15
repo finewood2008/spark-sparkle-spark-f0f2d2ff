@@ -144,7 +144,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <DataReportCard data={msg.reportData as ReportData} />
+          <DataReportCard data={msg.reportData as unknown as ReportData} />
         </div>
       </div>
     );
