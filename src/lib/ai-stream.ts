@@ -1,4 +1,4 @@
-// Shared SSE streaming utility for Lovable AI Gateway via Supabase edge functions
+// Shared AI utilities for Lovable AI Gateway via Supabase edge functions
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
