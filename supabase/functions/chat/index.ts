@@ -12,11 +12,10 @@ serve(async (req) => {
 
   try {
     const { messages, mode, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY)
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GEMINI_KEY)
+      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
-    // mode: "chat" (discussion) | "generate" (create article as JSON)
     let systemPrompt: string;
 
     if (mode === "generate") {
@@ -63,15 +62,15 @@ ${brandContext || ""}`;
     }
 
     const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${GEMINI_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.5-flash",
           messages: [
             { role: "system", content: systemPrompt },
             ...messages,
@@ -88,14 +87,14 @@ ${brandContext || ""}`;
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 401 || response.status === 403) {
         return new Response(
-          JSON.stringify({ error: "AI 额度不足，请添加使用额度" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "API Key 无效或额度不足，请检查设置" }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("Gemini API error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "AI 服务暂时不可用" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

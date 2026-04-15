@@ -6,14 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
 
   try {
     const { action, text, fullContent, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GEMINI_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -57,7 +59,6 @@ serve(async (req) => {
         userPrompt = fullContent || text;
         break;
       case "learn_from_edit": {
-        // Non-streaming: analyze diff between original and edited content
         const learnPrompt = `你是内容创作助手的学习模块。用户修改了AI生成的内容，请分析修改差异并总结用户的写作偏好。
 
 原始内容：
@@ -71,11 +72,11 @@ ${fullContent}
 
 只返回JSON，不要其他文字。`;
 
-        const learnResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const learnResp = await fetch(GEMINI_URL, {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${GEMINI_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gemini-2.5-flash",
             messages: [{ role: "user", content: learnPrompt }],
           }),
         });
@@ -97,36 +98,27 @@ ${fullContent}
         userPrompt = text;
     }
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: true,
-        }),
-      }
-    );
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        stream: true,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "请求过于频繁，请稍后再试" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI 额度不足" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const t = await response.text();
