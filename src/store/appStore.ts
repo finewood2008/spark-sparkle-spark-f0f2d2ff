@@ -51,6 +51,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   brand: null,
   setBrand: (brand) => set({ brand }),
+  brandMemoryEnabled: false,
+  setBrandMemoryEnabled: (v) => set({ brandMemoryEnabled: v }),
   learnings: [],
   setLearnings: (learnings) => set({ learnings }),
 }));
