@@ -4,13 +4,13 @@ import { useAuthStore } from '../store/authStore';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
-import { useAppStore } from '../store/appStore';
+
 import { useMemorySync } from '../hooks/useMemorySync';
 
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const { setActiveTab } = useAppStore();
+  
   const { getFullContext } = useMemorySync();
 
   return (
