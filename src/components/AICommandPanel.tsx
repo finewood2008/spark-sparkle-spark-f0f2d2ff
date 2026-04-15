@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, X, FileText, Loader2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
+import { getUserPrefsContext, loadUserPrefs } from '../lib/user-prefs';
 import { toast } from 'sonner';
 import type { ChatMessage, ContentItem, Platform } from '../types/spark';
 
@@ -51,9 +52,13 @@ export default function AICommandPanel() {
 
   const getBrandContext = useCallback(() => {
     const store = useAppStore.getState();
-    if (!store.brand || !store.brand.initialized) return '';
-    const b = store.brand;
-    return `\n品牌名: ${b.name}\n行业: ${b.industry}\n主营: ${b.mainBusiness}\n目标客户: ${b.targetCustomer}\n语气: ${b.toneOfVoice}\n关键词: ${b.keywords.join(', ')}`;
+    const parts: string[] = [];
+    if (store.brand?.initialized) {
+      const b = store.brand;
+      parts.push(`\n品牌名: ${b.name}\n行业: ${b.industry}\n主营: ${b.mainBusiness}\n目标客户: ${b.targetCustomer}\n语气: ${b.toneOfVoice}\n关键词: ${b.keywords.join(', ')}`);
+    }
+    parts.push(getUserPrefsContext());
+    return parts.join('\n');
   }, []);
 
   // Chat mode - discussion only
