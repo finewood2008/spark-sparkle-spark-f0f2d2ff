@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
-import { loadSettings } from '../lib/settings';
-import { generateContent } from '../functions/generate.functions';
+import { generateArticle } from '../lib/ai-stream';
 import type { ScheduleConfig, Platform, ContentItem } from '../types/spark';
 import {
   Calendar,
@@ -418,22 +417,7 @@ export default function SchedulePage() {
       return;
     }
 
-    const settings = loadSettings();
-    if (!settings.apiKey) {
-      alert('请先在设置页面配置 API Key');
-      return;
-    }
-
     setGenerating(true);
-
-    let provider = settings.provider;
-    let baseUrl = settings.baseUrl;
-    if (provider === 'gemini' && baseUrl) {
-      provider = 'custom';
-      if (!baseUrl.includes('/v1')) {
-        baseUrl = baseUrl.replace(/\/+$/, '') + '/v1';
-      }
-    }
 
     const brandCtx = getBrandContext();
     const newLogs: ScheduleLogEntry[] = [];
