@@ -45,28 +45,69 @@ function TypingIndicator() {
   );
 }
 
+// Mock data for welcome briefing
+const mockReport: ReportData = {
+  title: '5个让你皮肤发光的晨间习惯',
+  platform: 'xiaohongshu',
+  metrics: { views: 12800, likes: 986, comments: 234, saves: 567 },
+  sparkComment: '这篇笔记的互动率达到了 13.9%，远超行业平均水平，收藏率尤其突出。',
+  topComments: [
+    { user: '小美同学', text: '第三个方法真的有用！已经坚持一周了' },
+    { user: '护肤达人Lisa', text: '请问用的什么牌子的洁面？求推荐' },
+    { user: '早起打卡', text: '收藏了，明天开始试试看' },
+  ],
+  sparkAdvice: '评论区对产品推荐有强烈需求，建议下一篇可以做一个「晨间护肤好物清单」，趁热度做系列内容。',
+};
+
 function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }) {
   const suggestions = [
-    '帮我写一篇小红书种草文',
-    '分析一下最近的爆款选题',
-    '优化我上次的文案',
+    '好的，帮我写一篇护肤好物清单',
+    '换个方向，分析一下最近的爆款选题',
   ];
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4">
-      <SparkAvatar size={64} />
-      <p className="mt-5 text-[16px] text-[#333] text-center leading-relaxed">
-        嗨，我是火花 ✨<br />你的内容创作搭子。告诉我你想写什么，我来搞定。
-      </p>
-      <div className="flex flex-wrap justify-center gap-2 mt-6">
-        {suggestions.map(s => (
-          <button
-            key={s}
-            onClick={() => onSuggestion(s)}
-            className="px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
-          >
-            {s}
-          </button>
-        ))}
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+        {/* Spark greeting */}
+        <div className="flex items-start gap-3">
+          <SparkAvatar size={32} />
+          <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
+            <p className="text-[14px] leading-[1.6] text-[#333]">
+              早上好 ☀️ 昨天发的内容表现还不错，我整理了一份简报给你看看。
+            </p>
+          </div>
+        </div>
+
+        {/* Data report card */}
+        <div className="flex items-start gap-3">
+          <SparkAvatar size={32} />
+          <div className="flex-1 min-w-0 max-w-[85%]">
+            <DataReportCard data={mockReport} />
+          </div>
+        </div>
+
+        {/* Spark suggestion */}
+        <div className="flex items-start gap-3">
+          <SparkAvatar size={32} />
+          <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
+            <p className="text-[14px] leading-[1.6] text-[#333]">
+              根据最近的数据趋势，我建议今天可以写一篇关于「晨间护肤好物推荐」的内容，趁着上篇笔记的热度做系列。要不要我来？
+            </p>
+          </div>
+        </div>
+
+        {/* Quick suggestions */}
+        <div className="flex flex-wrap gap-2 pl-11">
+          {suggestions.map(s => (
+            <button
+              key={s}
+              onClick={() => onSuggestion(s)}
+              className="px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -75,7 +116,7 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user';
 
-  // Check if this is a content card message
+  // Content card message
   if (!isUser && msg.contentItem) {
     return (
       <div className="flex items-start gap-3">
@@ -87,6 +128,23 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
             </div>
           )}
           <ContentCard item={msg.contentItem} />
+        </div>
+      </div>
+    );
+  }
+
+  // Data report message
+  if (!isUser && msg.reportData) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <DataReportCard data={msg.reportData as ReportData} />
         </div>
       </div>
     );
