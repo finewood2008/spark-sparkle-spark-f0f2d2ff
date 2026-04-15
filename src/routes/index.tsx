@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import ChatLayout from "../components/ChatLayout";
-import SettingsPage from "../pages/SettingsPage";
-import { useAppStore } from "../store/appStore";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -14,11 +12,5 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { activeTab } = useAppStore();
-
-  if (activeTab === 'settings') {
-    return <SettingsPage />;
-  }
-
   return <ChatLayout />;
 }
