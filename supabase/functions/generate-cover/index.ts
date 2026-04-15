@@ -6,42 +6,40 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
 
   try {
     const { title, content, platform, style } = await req.json();
-    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GEMINI_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
       platform === "wechat" ? "微信公众号" :
       platform === "douyin" ? "抖音" : "社交媒体";
 
-    const prompt = `为以下${platformName}文章生成一张精美的封面配图。
+    const prompt = `Generate a beautiful cover image for a ${platformName} social media article.
 
-标题：${title}
-内容摘要：${(content || "").substring(0, 200)}
+Title: ${title}
+Content summary: ${(content || "").substring(0, 200)}
 
-要求：
-- 风格：${style || "现代简约、色彩明亮、适合社交媒体"}
-- 画面要有视觉冲击力，适合作为文章首图
-- 不要包含任何文字
-- 构图清晰，色彩和谐
-- 适合${platformName}平台的竖版或方形比例`;
+Requirements:
+- Style: ${style || "Modern, clean, vibrant colors, suitable for social media"}
+- Visually striking, suitable as a hero/cover image
+- Do NOT include any text or words in the image
+- Clean composition, harmonious colors
+- Square or vertical aspect ratio suitable for ${platformName}`;
 
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GEMINI_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-image",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -52,6 +50,12 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ error: "请求过于频繁，请稍后再试" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "AI 额度不足，请添加使用额度" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const t = await response.text();
