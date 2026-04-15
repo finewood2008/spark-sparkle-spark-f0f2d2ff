@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const API_URL = "https://api.aipaibox.com/v1/chat/completions";
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -14,8 +14,8 @@ serve(async (req) => {
 
   try {
     const { action, text, fullContent, platform, brandContext } = await req.json();
-    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GEMINI_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const API_KEY = Deno.env.get("AIPAIBOX_API_KEY");
+    if (!API_KEY) throw new Error("AIPAIBOX_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -72,9 +72,9 @@ ${fullContent}
 
 只返回JSON，不要其他文字。`;
 
-        const learnResp = await fetch(GEMINI_URL, {
+        const learnResp = await fetch(API_URL, {
           method: "POST",
-          headers: { Authorization: `Bearer ${GEMINI_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "gemini-2.5-flash",
             messages: [{ role: "user", content: learnPrompt }],
@@ -98,10 +98,10 @@ ${fullContent}
         userPrompt = text;
     }
 
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(API_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GEMINI_KEY}`,
+        Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
