@@ -171,6 +171,14 @@ export default function ContentCard({ item }: ContentCardProps) {
     });
   };
 
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack(s => s.slice(0, -1));
+    setEditContent(prev);
+    toast.success('已撤销');
+  };
+
   const handleSave = () => {
     const updated = contents.map(c =>
       c.id === item.id
