@@ -430,7 +430,7 @@ export default function SchedulePage() {
     const interval = setInterval(checkTimer, 30_000); // check every 30s
     checkTimer(); // check immediately
     return () => clearInterval(interval);
-  }, [config.enabled, config.frequency, config.daysOfWeek, config.topics.length, config.scheduledTimes]);
+  }, [config.enabled, config.frequency, config.daysOfWeek, config.topics.length, config.scheduledTimes, handleRunOnce]);
 
   const getBrandContext = useCallback(() => {
     if (!brand || !brand.initialized) return '';
