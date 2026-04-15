@@ -26,8 +26,8 @@ Content summary: ${(content || "").substring(0, 200)}
 Style: ${style || "Modern, clean, vibrant colors, suitable for social media"}
 Do NOT include any text or words in the image. Clean composition, harmonious colors.`;
 
-    // Use native Gemini API with gemini-2.0-flash-exp for image generation
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_KEY}`;
+    // Use native Gemini API with imagen-3.0-generate for image generation
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_KEY}`;
 
     const response = await fetch(url, {
       method: "POST",
