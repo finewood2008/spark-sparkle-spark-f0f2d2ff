@@ -403,35 +403,6 @@ export default function SchedulePage() {
     setConfig(prev => ({ ...prev, enabled: !prev.enabled }));
   };
 
-  // --- Auto-trigger timer ---
-  const lastTriggeredRef = useRef<string>('');
-
-  useEffect(() => {
-    if (!config.enabled || config.topics.length === 0) return;
-
-    const checkTimer = () => {
-      const now = new Date();
-      const dow = now.getDay();
-      const shouldRunToday = config.frequency === 'daily' || config.daysOfWeek.includes(dow);
-      if (!shouldRunToday) return;
-
-      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-      for (const scheduledTime of (config.scheduledTimes || ['09:00'])) {
-        const triggerKey = `${now.toDateString()}-${scheduledTime}`;
-        if (currentTime === scheduledTime && lastTriggeredRef.current !== triggerKey) {
-          lastTriggeredRef.current = triggerKey;
-          handleRunOnce();
-          break;
-        }
-      }
-    };
-
-    const interval = setInterval(checkTimer, 30_000); // check every 30s
-    checkTimer(); // check immediately
-    return () => clearInterval(interval);
-  }, [config.enabled, config.frequency, config.daysOfWeek, config.topics.length, config.scheduledTimes, handleRunOnce]);
-
   const getBrandContext = useCallback(() => {
     if (!brand || !brand.initialized) return '';
     return `\n品牌名: ${brand.name}\n行业: ${brand.industry}\n主营: ${brand.mainBusiness}\n语气: ${brand.toneOfVoice}\n关键词: ${brand.keywords.join(', ')}\n禁用词: ${brand.tabooWords.join(', ')}`;
