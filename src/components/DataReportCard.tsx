@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import type { Platform } from '../types/spark';
 
