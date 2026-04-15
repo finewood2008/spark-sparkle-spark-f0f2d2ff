@@ -1,21 +1,24 @@
-import { useState } from 'react';
-import { Settings, Save, Image as ImageIcon, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Save, Image as ImageIcon, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { loadSettings, saveSettings, type AISettings } from '../lib/settings';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    provider: 'gemini',
-    apiKey: '',
-    baseUrl: '',
-    model: 'gemini-2.5-flash',
-    imageProvider: 'gemini-imagen',
-    imageApiKey: '',
-    imageModel: 'imagen-3.0-generate-images',
-  });
+  const [settings, setSettings] = useState<AISettings>(loadSettings);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setSettings(loadSettings());
+  }, []);
 
   const handleSave = () => {
     setSaving(true);
-    setTimeout(() => setSaving(false), 600);
+    saveSettings(settings);
+    setTimeout(() => {
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }, 300);
   };
 
   return (
@@ -55,15 +58,20 @@ export default function SettingsPage() {
               placeholder="AIzaSy..."
             />
           </div>
-          {settings.provider === 'custom' && (
+          {(settings.provider === 'custom' || settings.provider === 'gemini') && (
             <div>
-              <label className="text-xs text-spark-gray-500 mb-1 block">Base URL</label>
+              <label className="text-xs text-spark-gray-500 mb-1 block">
+                {settings.provider === 'gemini' ? 'API 代理地址（可选，留空则直连）' : 'Base URL'}
+              </label>
               <input
                 value={settings.baseUrl}
                 onChange={(e) => setSettings({ ...settings, baseUrl: e.target.value })}
                 className="spark-input"
-                placeholder="https://api.example.com/v1"
+                placeholder={settings.provider === 'gemini' ? 'https://your-proxy.workers.dev' : 'https://api.example.com/v1'}
               />
+              {settings.provider === 'gemini' && (
+                <p className="text-[10px] text-spark-gray-400 mt-1">填写 CF Worker 代理地址后，将通过代理调用 Gemini API</p>
+              )}
             </div>
           )}
           <div>
@@ -118,8 +126,8 @@ export default function SettingsPage() {
       </div>
 
       <button onClick={handleSave} className="spark-btn-primary" disabled={saving}>
-        <Save size={16} />
-        {saving ? '保存中...' : '保存设置'}
+        {saved ? <CheckCircle2 size={16} /> : <Save size={16} />}
+        {saving ? '保存中...' : saved ? '已保存' : '保存设置'}
       </button>
     </div>
   );

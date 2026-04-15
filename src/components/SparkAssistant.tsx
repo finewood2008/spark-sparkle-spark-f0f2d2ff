@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, User, Bot, Flame } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, X, Send, User, Bot, Flame, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
+import { loadSettings } from '../lib/settings';
+import { chatWithAI } from '../functions/chat.functions';
 import type { ChatMessage } from '../types/spark';
 
 function Bubble({ msg }: { msg: ChatMessage }) {
@@ -10,7 +12,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isUser ? 'bg-spark-gray-200' : 'spark-gradient'}`}>
         {isUser ? <User size={14} className="text-spark-gray-600" /> : <Bot size={14} className="text-primary-foreground" />}
       </div>
-      <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+      <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
         isUser ? 'bg-spark-orange text-primary-foreground rounded-tr-md' : 'bg-spark-gray-100 text-spark-gray-800 rounded-tl-md'
       }`}>
         {msg.content}
@@ -23,6 +25,7 @@ export default function SparkAssistant() {
   const { messages, addMessage, isGenerating, setIsGenerating } = useAppStore();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -31,7 +34,7 @@ export default function SparkAssistant() {
       addMessage({
         id: 'welcome',
         role: 'assistant',
-        content: '嗨，我是火花 🔥 有什么想做的，直接说。',
+        content: '嗨，我是火花 🔥 有什么想做的，直接说。\n\n💡 如果还没配置 API Key，请先去「设置」页面填写。',
         timestamp: new Date().toISOString(),
       });
     }
@@ -49,9 +52,27 @@ export default function SparkAssistant() {
     }
   }, [open]);
 
+  const getDraftContext = useCallback(() => {
+    const store = useAppStore.getState();
+    const id = store.selectedContentId;
+    if (!id) return '';
+    const item = store.contents.find(c => c.id === id);
+    if (!item) return '';
+    return `\n\n[当前草稿上下文]\n标题: ${item.title || '(空)'}\n正文: ${item.content || '(空)'}\n平台: ${item.platform}\nCTA: ${item.cta || '(空)'}\n标签: ${(item.tags || []).join(', ') || '(空)'}`;
+  }, []);
+
+  const getBrandContext = useCallback(() => {
+    const store = useAppStore.getState();
+    if (!store.brand || !store.brand.initialized) return '';
+    const b = store.brand;
+    return `\n\n[品牌信息]\n品牌名: ${b.name}\n行业: ${b.industry}\n主营: ${b.mainBusiness}\n目标客户: ${b.targetCustomer}\n差异化: ${b.differentiation}\n语气: ${b.toneOfVoice}\n关键词: ${b.keywords.join(', ')}\n禁用词: ${b.tabooWords.join(', ')}`;
+  }, []);
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isGenerating) return;
+
+    setError(null);
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -63,24 +84,73 @@ export default function SparkAssistant() {
     setInput('');
     setIsGenerating(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        '好的，我来帮你生成一篇内容草稿 ✨',
-        '收到！让我想想怎么写更吸引人...',
-        '这个方向不错，我来优化一下文案 🔥',
-        '已经为你准备好了，看看满不满意？',
-        '建议可以加一些互动话题，提升评论率 📈',
-      ];
+    try {
+      const settings = loadSettings();
+
+      if (!settings.apiKey) {
+        throw new Error('请先在「设置」页面配置 API Key');
+      }
+
+      // Build message history for AI
+      const currentMessages = useAppStore.getState().messages;
+      const history = currentMessages
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+      // Add context to the last user message
+      const draftCtx = getDraftContext();
+      const brandCtx = getBrandContext();
+      const contextSuffix = draftCtx + brandCtx;
+
+      const aiMessages = history.map((m, i) => {
+        if (i === history.length - 1 && m.role === 'user' && contextSuffix) {
+          return { ...m, content: m.content + contextSuffix };
+        }
+        return m;
+      });
+
+      // Determine actual API URL - if user set a proxy baseUrl for gemini, use it
+      let provider = settings.provider;
+      let baseUrl = settings.baseUrl;
+
+      if (provider === 'gemini' && baseUrl) {
+        // User has a CF Worker proxy, use it as custom endpoint
+        provider = 'custom';
+        // Ensure the baseUrl ends with compatible path
+        if (!baseUrl.includes('/v1')) {
+          baseUrl = baseUrl.replace(/\/+$/, '') + '/v1';
+        }
+      }
+
+      const result = await chatWithAI({
+        data: {
+          messages: aiMessages,
+          provider,
+          apiKey: settings.apiKey,
+          baseUrl,
+          model: settings.model,
+        },
+      });
+
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: result.content,
         timestamp: new Date().toISOString(),
       };
       addMessage(botMsg);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '发生未知错误';
+      setError(message);
+      addMessage({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `⚠️ ${message}`,
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
       setIsGenerating(false);
-    }, 1000 + Math.random() * 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -124,11 +194,23 @@ export default function SparkAssistant() {
             <div className="flex items-center gap-2">
               <Flame size={18} className="text-primary-foreground" />
               <span className="font-semibold text-primary-foreground text-sm">火花助理</span>
+              <span className="text-[10px] text-primary-foreground/70">AI 驱动</span>
             </div>
             <button onClick={() => setOpen(false)} className="p-1 hover:bg-primary-foreground/20 rounded-lg transition-colors">
               <X size={16} className="text-primary-foreground" />
             </button>
           </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="px-3 py-2 bg-destructive/10 text-destructive text-xs flex items-center gap-1.5">
+              <AlertCircle size={12} />
+              <span className="flex-1">{error}</span>
+              <button onClick={() => setError(null)} className="text-destructive/60 hover:text-destructive">
+                <X size={12} />
+              </button>
+            </div>
+          )}
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
