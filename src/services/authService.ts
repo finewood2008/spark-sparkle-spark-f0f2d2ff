@@ -67,10 +67,11 @@ export async function loginWithPassword(
   if (!username || !password) {
     return { success: false, error: '请输入账号和密码' };
   }
-  // Mock: 任意用户名密码均可登录
+  // Mock: 基于用户名生成唯一 ID，确保不同账号数据隔离
+  const uniqueId = `spark-user-${Array.from(username).reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)}`;
   return {
     success: true,
-    user: { ...MOCK_USER, username, nickname: username },
+    user: { ...MOCK_USER, id: uniqueId, username, nickname: username, email: `${username}@brandspark.ai` },
     token: `mock_token_${Date.now()}`,
   };
 }
