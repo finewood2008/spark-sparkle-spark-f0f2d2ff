@@ -523,8 +523,9 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? '收起' : '展开全文'}
             </button>
-            <button onClick={() => { setEditing(true); setExpanded(true); }} className="content-card-btn">
+            <button onClick={() => setEditDialogOpen(true)} className="content-card-btn">
               <Pencil size={13} /> 编辑
+            </button>
             </button>
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
               {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
