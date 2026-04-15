@@ -93,4 +93,4 @@ export interface Suggestion {
   desc: string;
 }
 
-export type TabId = 'studio' | 'dashboard' | 'memory' | 'settings';
+export type TabId = 'studio' | 'dashboard' | 'schedule' | 'memory' | 'settings';

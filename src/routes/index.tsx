@@ -5,6 +5,7 @@ import StudioPage from "../pages/StudioPage";
 import DashboardPage from "../pages/DashboardPage";
 import MemoryPage from "../pages/MemoryPage";
 import SettingsPage from "../pages/SettingsPage";
+import SchedulePage from "../pages/SchedulePage";
 import { useAppStore } from "../store/appStore";
 
 export const Route = createFileRoute("/")({
@@ -23,6 +24,7 @@ function Index() {
   const renderPage = () => {
     switch (activeTab) {
       case 'studio': return <StudioPage />;
+      case 'schedule': return <SchedulePage />;
       case 'dashboard': return <DashboardPage />;
       case 'memory': return <MemoryPage />;
       case 'settings': return <SettingsPage />;

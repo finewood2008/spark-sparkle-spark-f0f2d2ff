@@ -5,11 +5,13 @@ import {
   Brain,
   Settings,
   Flame,
+  CalendarClock,
 } from 'lucide-react';
 import type { TabId } from '../types/spark';
 
 const tabs: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'studio', icon: <LayoutDashboard size={20} />, label: '创作' },
+  { id: 'schedule', icon: <CalendarClock size={20} />, label: '计划' },
   { id: 'dashboard', icon: <BarChart3 size={20} />, label: '数据' },
   { id: 'memory', icon: <Brain size={20} />, label: '记忆' },
 ];
