@@ -29,14 +29,13 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "火花自动版 - AI社媒图文自动化" },
+      { name: "description", content: "AI驱动的社交媒体内容创作与自动化平台" },
+      { name: "author", content: "Spark Auto" },
+      { property: "og:title", content: "火花自动版" },
+      { property: "og:description", content: "AI驱动的社交媒体内容创作与自动化平台" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
