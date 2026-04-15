@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, History } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
 import type { LearningEntry } from '../types/spark';
+import ContentEditDialog from './ContentEditDialog';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -69,6 +70,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -521,7 +523,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? '收起' : '展开全文'}
             </button>
-            <button onClick={() => { setEditing(true); setExpanded(true); }} className="content-card-btn">
+            <button onClick={() => setEditDialogOpen(true)} className="content-card-btn">
               <Pencil size={13} /> 编辑
             </button>
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
@@ -585,6 +587,13 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           </>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <ContentEditDialog
+        item={item}
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+      />
     </div>
   );
 }

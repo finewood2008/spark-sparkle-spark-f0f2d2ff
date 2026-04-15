@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
-import type { ChatMessage, ContentItem } from '../types/spark';
+import type { ChatMessage, ContentItem, ChoiceOption } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
 
@@ -215,6 +215,25 @@ function MessageBubble({ msg, onSend, onCardAction }: {
   );
 }
 
+// Generate context-aware suggestions based on article content
+function generateSuggestions(title: string, content: string, tags?: string[]): ChoiceOption[] {
+  const suggestions: ChoiceOption[] = [
+    { id: 's1', label: '帮我润色一下这篇文章', emoji: '✨' },
+    { id: 's2', label: `给「${title.substring(0, 10)}」配一张封面图`, emoji: '🎨' },
+    { id: 's3', label: '换一种更活泼的风格重写', emoji: '🔄' },
+  ];
+  if (content.length < 200) {
+    suggestions.push({ id: 's4', label: '内容太短了，帮我扩写一下', emoji: '📝' });
+  }
+  if (!tags || tags.length < 3) {
+    suggestions.push({ id: 's5', label: '帮我补充更多标签', emoji: '🏷️' });
+  }
+  if (content.length > 500) {
+    suggestions.push({ id: 's6', label: '太长了，帮我精简到300字以内', emoji: '✂️' });
+  }
+  return suggestions.slice(0, 4);
+}
+
 export default function SparkChat({ getContext }: { getContext?: () => string }) {
   const {
     messages, addMessage, isGenerating, setIsGenerating,
@@ -357,7 +376,10 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         setContents([newItem, ...currentContents]);
         setSelectedContentId(newItem.id);
 
-        // Update message with content card
+        // Generate context-aware suggestions
+        const suggestions = generateSuggestions(parsed.title, parsed.content, parsed.tags);
+
+        // Update message with content card and suggestions
         const msgs = useAppStore.getState().messages;
         const updated = msgs.map(m =>
           m.id === statusId
@@ -365,6 +387,17 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             : m
         );
         useAppStore.setState({ messages: updated });
+
+        // Add a follow-up message with suggestions
+        const suggestId = (Date.now() + 2).toString();
+        addMessage({
+          id: suggestId,
+          role: 'assistant',
+          content: '📋 我分析了这篇内容，以下是一些优化建议：',
+          timestamp: new Date().toISOString(),
+          choices: suggestions,
+        });
+
         setIsGenerating(false);
       },
       onError: (errMsg) => {
