@@ -1,9 +1,10 @@
 import { useAppStore } from '../store/appStore';
+import { useAuthStore } from '../store/authStore';
 import {
   LayoutDashboard,
   BarChart3,
   Brain,
-  Settings,
+  User,
   Flame,
   CalendarClock,
 } from 'lucide-react';
@@ -56,17 +57,16 @@ export default function SparkSidebar() {
         })}
       </div>
 
-      {/* Settings */}
+      {/* User / Account */}
       <div className="mt-auto">
         <button
-          onClick={() => setActiveTab('settings')}
-          className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-            activeTab === 'settings'
-              ? 'bg-spark-warm text-spark-orange'
-              : 'text-spark-gray-400 hover:bg-spark-gray-100 hover:text-spark-gray-600'
-          }`}
+          onClick={() => {
+            const { isAuthenticated } = useAuthStore.getState();
+            window.location.href = isAuthenticated ? '/account' : '/auth';
+          }}
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors text-spark-gray-400 hover:bg-spark-gray-100 hover:text-spark-gray-600"
         >
-          <Settings size={20} />
+          <User size={20} />
         </button>
       </div>
     </div>

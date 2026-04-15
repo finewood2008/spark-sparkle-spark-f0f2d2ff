@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { FileText, User, Brain } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
 import { useAuthStore } from '../store/authStore';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
