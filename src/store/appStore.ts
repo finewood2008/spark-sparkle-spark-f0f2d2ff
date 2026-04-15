@@ -23,6 +23,8 @@ interface AppState {
 
   brand: BrandMemory | null;
   setBrand: (b: BrandMemory) => void;
+  brandMemoryEnabled: boolean;
+  setBrandMemoryEnabled: (v: boolean) => void;
   learnings: LearningEntry[];
   setLearnings: (l: LearningEntry[]) => void;
 }
