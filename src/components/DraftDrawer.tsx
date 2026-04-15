@@ -8,8 +8,19 @@ interface DraftDrawerProps {
 }
 
 export default function DraftDrawer({ open, onOpenChange }: DraftDrawerProps) {
-  const { contents } = useAppStore();
+  const { contents, addMessage } = useAppStore();
   const drafts = contents.filter(c => c.status === 'draft' || c.status === 'reviewing');
+
+  const handleClick = (draft: typeof drafts[0]) => {
+    addMessage({
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `📄 已加载草稿「${draft.title}」，你可以在下方查看和编辑。`,
+      contentItem: draft,
+      timestamp: new Date().toISOString(),
+    });
+    onOpenChange(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -27,6 +38,7 @@ export default function DraftDrawer({ open, onOpenChange }: DraftDrawerProps) {
             drafts.map(d => (
               <div
                 key={d.id}
+                onClick={() => handleClick(d)}
                 className="bg-white rounded-xl p-3 border border-[#F0EFED] hover:border-spark-orange/30 transition-colors cursor-pointer"
               >
                 <h4 className="text-[14px] font-medium text-[#333] truncate">{d.title}</h4>
