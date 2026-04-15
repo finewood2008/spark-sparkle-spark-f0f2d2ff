@@ -437,7 +437,7 @@ export default function SchedulePage() {
     return `\n品牌名: ${brand.name}\n行业: ${brand.industry}\n主营: ${brand.mainBusiness}\n语气: ${brand.toneOfVoice}\n关键词: ${brand.keywords.join(', ')}\n禁用词: ${brand.tabooWords.join(', ')}`;
   }, [brand]);
 
-  const handleRunOnce = async () => {
+  const handleRunOnce = useCallback(async () => {
     if (generating) return;
     if (config.topics.length === 0) {
       alert('请先添加至少一个主题');
