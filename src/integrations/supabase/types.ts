@@ -104,6 +104,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          default_platform: string
+          id: string
+          signature: string
+          updated_at: string
+          user_id: string
+          writing_style: string
+          writing_tone: string
+        }
+        Insert: {
+          created_at?: string
+          default_platform?: string
+          id?: string
+          signature?: string
+          updated_at?: string
+          user_id: string
+          writing_style?: string
+          writing_tone?: string
+        }
+        Update: {
+          created_at?: string
+          default_platform?: string
+          id?: string
+          signature?: string
+          updated_at?: string
+          user_id?: string
+          writing_style?: string
+          writing_tone?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
