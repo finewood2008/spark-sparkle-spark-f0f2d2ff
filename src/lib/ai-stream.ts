@@ -1,4 +1,5 @@
 // Shared AI utilities for Lovable AI Gateway via Supabase edge functions
+import { loadUserPrefs } from './user-prefs';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -22,13 +23,14 @@ export async function streamChat({
   onDone: () => void;
   onError?: (error: string) => void;
 }) {
+  const presetId = loadUserPrefs().tonePreset;
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${SUPABASE_KEY}`,
     },
-    body: JSON.stringify({ messages, mode, platform, brandContext }),
+    body: JSON.stringify({ messages, mode, platform, brandContext, presetId }),
   });
 
   if (!resp.ok) {
