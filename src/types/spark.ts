@@ -39,10 +39,31 @@ export interface ChatMessage {
   contentItem?: ContentItem;
   reportData?: Record<string, unknown>;
   reviewTask?: ReviewTaskData;
+  distribution?: DistributionData;
+  scheduleCard?: ScheduleCardData;
 }
 
 export type ContentStatus = 'draft' | 'reviewing' | 'approved' | 'published' | 'rejected';
-export type Platform = 'xiaohongshu' | 'wechat' | 'douyin';
+export type Platform = 'xiaohongshu' | 'wechat' | 'douyin' | 'tiktok' | 'instagram';
+
+export interface DistributionData {
+  contentId: string;
+  title: string;
+  defaultPlatforms?: Platform[];
+  /** Platforms it has been published to (sets card to success state on restore) */
+  publishedPlatforms?: Platform[];
+}
+
+export interface ScheduleCardData {
+  /** ID for tracking the proposed plan */
+  id: string;
+  /** Suggested topic parsed from user message */
+  suggestedTopic?: string;
+  /** Suggested frequency parsed from user message */
+  suggestedFrequency?: 'daily' | 'weekly';
+  /** Whether the plan was already confirmed (for restore) */
+  confirmed?: boolean;
+}
 
 export interface ContentVersion {
   id: string;
