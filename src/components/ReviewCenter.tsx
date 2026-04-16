@@ -397,9 +397,14 @@ export default function ReviewCenter({ layout = 'page', refreshKey = 0 }: Review
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                             {PLATFORM_LABEL[e.platform] || e.platform}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {SOURCE_LABEL[e.taskSource] || e.taskSource}
-                          </span>
+                          {(() => {
+                            const s = sourceTag(e.taskSource);
+                            return (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.cls}`}>
+                                {s.text}
+                              </span>
+                            );
+                          })()}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border ${badge.cls}`}>
                             {badge.text}
                           </span>
@@ -527,9 +532,10 @@ function DetailView({
           <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
             {PLATFORM_LABEL[entry.platform] || entry.platform}
           </span>
-          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-            {SOURCE_LABEL[entry.taskSource] || entry.taskSource}
-          </span>
+          {(() => {
+            const s = sourceTag(entry.taskSource);
+            return <span className={`text-xs px-2 py-0.5 rounded ${s.cls}`}>{s.text}</span>;
+          })()}
           <span className={`text-xs px-2 py-0.5 rounded border ${badge.cls}`}>{badge.text}</span>
           <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto">
             <Clock size={12} />
