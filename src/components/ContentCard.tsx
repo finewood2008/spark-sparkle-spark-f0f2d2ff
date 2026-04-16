@@ -1,11 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, History } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, Plus } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ContentItem } from '../types/spark';
+import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
-import type { LearningEntry } from '../types/spark';
-import ContentEditDialog from './ContentEditDialog';
+import { saveReviewItem } from '../lib/review-persistence';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
