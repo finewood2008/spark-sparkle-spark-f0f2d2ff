@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { ScheduleConfig, Platform } from '../types/spark';
+import type { ScheduleConfig, Platform, ContentItem, ReviewTaskData } from '../types/spark';
+import { generateArticle } from './ai-stream';
+import { saveReviewItem } from './review-persistence';
 
 const DEVICE_KEY = 'spark-device-id';
 const LEGACY_CONFIG_KEY = 'spark-auto-schedule';
