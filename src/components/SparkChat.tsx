@@ -107,10 +107,7 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
             <button
               key={s}
               type="button"
-              onClick={(e) => {
-                console.log('[WelcomeState] button clicked:', s, e);
-                onSuggestion(s);
-              }}
+              onClick={() => onSuggestion(s)}
               className="relative z-10 px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors cursor-pointer"
             >
               {s}
