@@ -48,6 +48,12 @@ function AuthPage() {
   const [otp, setOtp] = useState('');
   const [countdown, setCountdown] = useState(0);
 
+  // forgot password
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
   useEffect(() => {
     if (isAuthenticated) navigate({ to: '/' });
   }, [isAuthenticated, navigate]);
