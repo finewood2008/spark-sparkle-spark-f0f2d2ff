@@ -65,10 +65,6 @@ export async function updateReviewItemStatus(
   const { error } = await supabase.from('review_items').update(patch).eq('id', id);
   if (error) console.error('[review] update failed:', error);
 }
-  if (rejectReason !== undefined) patch.reject_reason = rejectReason;
-  const { error } = await supabase.from('review_items').update(patch).eq('id', id);
-  if (error) console.error('[review] update failed:', error);
-}
 
 /**
  * Load all review items for the current user/device, then restore them into
