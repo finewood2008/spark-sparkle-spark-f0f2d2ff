@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, X } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
 import SettingsPage from '../pages/SettingsPage';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 import { useMemorySync } from '../hooks/useMemorySync';
 
