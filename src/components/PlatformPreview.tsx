@@ -1,5 +1,17 @@
+import { useEffect, useState } from 'react';
 import { Heart, MessageCircle, Bookmark, Share2, Eye, Play, Music2, ImageIcon } from 'lucide-react';
 import type { ContentItem, Platform } from '../types/spark';
+
+// 客户端日期，避免 SSR/CSR 跨日跨时区导致 hydration mismatch
+function useClientDate(formatter: (d: Date) => string): string {
+  const [value, setValue] = useState('');
+  useEffect(() => {
+    setValue(formatter(new Date()));
+  }, [formatter]);
+  return value;
+}
+
+const formatCnDate = (d: Date) => d.toLocaleDateString('zh-CN');
 
 interface PlatformPreviewProps {
   item: ContentItem;
@@ -60,6 +72,7 @@ function XiaohongshuPreview({ item }: { item: ContentItem }) {
 /* ============ 微信公众号 图文预览 ============ */
 function WechatPreview({ item }: { item: ContentItem }) {
   const preview = (item.content || '').slice(0, 60);
+  const dateText = useClientDate(formatCnDate);
   return (
     <div className="rounded-lg overflow-hidden border border-green-100 bg-white shadow-sm">
       {/* 顶部品牌条 */}
@@ -89,7 +102,7 @@ function WechatPreview({ item }: { item: ContentItem }) {
           {preview || '正文摘要会显示在这里...'}
         </div>
         <div className="flex items-center justify-between pt-1.5 border-t border-green-50">
-          <span className="text-[10px] text-[#999]">{new Date().toLocaleDateString('zh-CN')}</span>
+          <span className="text-[10px] text-[#999]" suppressHydrationWarning>{dateText || '今天'}</span>
           <div className="flex items-center gap-2 text-[10px] text-[#999]">
             <span className="flex items-center gap-0.5"><Eye size={10} /> 阅读</span>
             <span className="flex items-center gap-0.5"><MessageCircle size={10} /> 留言</span>
