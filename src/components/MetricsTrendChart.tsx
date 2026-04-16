@@ -187,7 +187,7 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
                 className="text-base font-semibold mt-0.5"
                 style={{ color: METRIC_COLORS[k] }}
               >
-                {latest[k].toLocaleString()}
+                {latest?.[k].toLocaleString()}
               </div>
             </div>
           ))}
