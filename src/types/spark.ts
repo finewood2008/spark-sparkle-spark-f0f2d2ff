@@ -162,4 +162,4 @@ export interface Suggestion {
   desc: string;
 }
 
-export type TabId = 'studio' | 'dashboard' | 'schedule' | 'memory';
+export type TabId = 'studio' | 'dashboard' | 'schedule' | 'review' | 'memory';

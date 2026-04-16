@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { FileText, User, Brain } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, User, Brain, ClipboardCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
@@ -10,8 +11,29 @@ import { useMemorySync } from '../hooks/useMemorySync';
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  
+  const [reviewingCount, setReviewingCount] = useState(0);
+
   const { getFullContext } = useMemorySync();
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { user, isAuthenticated } = useAuthStore.getState();
+      let query = supabase
+        .from('review_items')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['reviewing', 'draft']);
+      query = isAuthenticated && user?.id
+        ? query.eq('user_id', user.id)
+        : query.is('user_id', null).eq('device_id', 'default');
+      const { count, error } = await query;
+      if (!error && typeof count === 'number') setReviewingCount(count);
+    };
+    fetchCount();
+    // Refresh on tab focus so badge updates after returning from /review
+    const onFocus = () => fetchCount();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-[#FAFAF8]">
@@ -33,6 +55,18 @@ export default function ChatLayout() {
             title="草稿箱"
           >
             <FileText size={18} />
+          </button>
+          <button
+            onClick={() => { window.location.href = '/review'; }}
+            className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+            title="审核中心"
+          >
+            <ClipboardCheck size={18} />
+            {reviewingCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                {reviewingCount > 9 ? '9+' : reviewingCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setProfileOpen(true)}
