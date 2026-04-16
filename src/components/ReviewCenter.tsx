@@ -58,11 +58,29 @@ const PLATFORM_LABEL: Record<string, string> = {
   instagram: 'Instagram',
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  manual: '手动创作',
-  schedule: '定时任务',
-  auto: '自动重写',
+const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
+  manual: {
+    text: '✍️ 手动创作',
+    cls: 'bg-muted text-muted-foreground border border-border',
+  },
+  schedule: {
+    text: '⏰ 定时任务',
+    cls: 'bg-blue-100 text-blue-700 border border-blue-200',
+  },
+  auto: {
+    text: '↻ 自动重写',
+    cls: 'bg-purple-100 text-purple-700 border border-purple-200',
+  },
 };
+
+function sourceTag(taskSource: string) {
+  return (
+    SOURCE_LABEL[taskSource] || {
+      text: taskSource,
+      cls: 'bg-muted text-muted-foreground border border-border',
+    }
+  );
+}
 
 function statusDot(status: ContentStatus) {
   switch (status) {

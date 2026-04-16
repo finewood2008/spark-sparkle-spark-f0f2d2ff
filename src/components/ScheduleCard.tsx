@@ -72,7 +72,7 @@ export default function ScheduleCard({ data }: ScheduleCardProps) {
     addMessage({
       id: `${Date.now()}-schedule-confirmed`,
       role: 'assistant',
-      content: `✅ 计划已创建：${frequency === 'daily' ? '每天' : '每周'} ${time} 自动生成「${topic.trim()}」相关内容，生成后会以待审核卡片形式推送给你。`,
+      content: `✅ 计划已创建：${frequency === 'daily' ? '每天' : '每周'} ${time} 自动生成「${topic.trim()}」相关内容。生成后会自动进入审核中心等待你审核，未经审核不会发布。`,
       timestamp: new Date().toISOString(),
     });
     toast.success('定时任务已创建');
