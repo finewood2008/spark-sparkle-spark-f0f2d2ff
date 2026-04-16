@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,8 +15,17 @@ export default function ChatLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
+  const [pulseKey, setPulseKey] = useState(0);
+  const prevCountRef = useRef(0);
 
   const { getFullContext } = useMemorySync();
+
+  useEffect(() => {
+    if (reviewingCount > prevCountRef.current) {
+      setPulseKey((k) => k + 1);
+    }
+    prevCountRef.current = reviewingCount;
+  }, [reviewingCount]);
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -88,9 +97,18 @@ export default function ChatLayout() {
           >
             <ClipboardCheck size={18} />
             {reviewingCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                {reviewingCount > 9 ? '9+' : reviewingCount}
-              </span>
+              <>
+                <span
+                  key={`pulse-${pulseKey}`}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 opacity-60 animate-badge-ping pointer-events-none"
+                />
+                <span
+                  key={`badge-${pulseKey}`}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center animate-badge-pop"
+                >
+                  {reviewingCount > 9 ? '9+' : reviewingCount}
+                </span>
+              </>
             )}
           </button>
           <button
