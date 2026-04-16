@@ -7,6 +7,7 @@ import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
 import SettingsPage from '../pages/SettingsPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { toast } from 'sonner';
 
 import { useMemorySync } from '../hooks/useMemorySync';
 
@@ -58,7 +59,28 @@ export default function ChatLayout() {
           const matchUser = isAuthenticated && user?.id
             ? row.user_id === user.id
             : row.user_id === null && row.device_id === 'default';
-          if (matchUser) fetchCount();
+          if (!matchUser) return;
+          fetchCount();
+
+          // Toast for newly arrived auto-generated items
+          if (
+            payload.eventType === 'INSERT' &&
+            payload.new &&
+            (payload.new as Record<string, unknown>).auto_generated === true &&
+            (payload.new as Record<string, unknown>).status === 'reviewing'
+          ) {
+            const newRow = payload.new as Record<string, unknown>;
+            const taskName = (newRow.task_name as string) || '定时任务';
+            const title = (newRow.title as string) || (newRow.task_topic as string) || '新内容';
+            toast.success(`${taskName} 已生成新内容`, {
+              description: title.length > 40 ? `${title.slice(0, 40)}…` : title,
+              action: {
+                label: '去审核',
+                onClick: () => { window.location.href = '/review'; },
+              },
+              duration: 6000,
+            });
+          }
         },
       )
       .subscribe();
