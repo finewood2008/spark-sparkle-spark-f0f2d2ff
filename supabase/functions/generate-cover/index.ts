@@ -6,6 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
@@ -13,10 +15,9 @@ serve(async (req) => {
   try {
     const { title, content, platform, style } = await req.json();
     
-    const AIPAIBOX_KEY = Deno.env.get("AIPAIBOX_API_KEY");
-    if (!AIPAIBOX_KEY) throw new Error("AIPAIBOX_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Platform-specific prompt templates
     const platformPrompts: Record<string, { aspect: string; vibe: string }> = {
       xiaohongshu: {
         aspect: "3:4 vertical portrait orientation",
@@ -37,16 +38,16 @@ serve(async (req) => {
 
     const prompt = `Generate a single photographic image in ${platformConfig.aspect}. Topic: "${title}". Context: ${contentSnippet}. Visual style: ${style || platformConfig.vibe}. CRITICAL RULES: Absolutely NO text, NO letters, NO words, NO watermarks, NO logos anywhere in the image. Pure visual imagery only. The image should feel like a real photograph taken by a lifestyle blogger.`;
 
-    console.log("Calling aipaibox with gemini-3.1-flash-image-preview for image generation");
+    console.log("Calling Lovable AI Gateway for image generation");
 
-    const response = await fetch("https://api.aipaibox.com/v1/chat/completions", {
+    const response = await fetch(AI_GATEWAY_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${AIPAIBOX_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-3.1-flash-image-preview",
+        model: "google/gemini-3.1-flash-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -59,9 +60,16 @@ serve(async (req) => {
       );
     }
 
+    if (response.status === 402) {
+      return new Response(
+        JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!response.ok) {
       const t = await response.text();
-      console.error("API error:", response.status, t);
+      console.error("AI gateway error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "图片生成暂不可用，请稍后重试" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
