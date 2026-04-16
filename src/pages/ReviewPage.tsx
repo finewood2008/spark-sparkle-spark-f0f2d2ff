@@ -29,6 +29,7 @@ import { streamChat } from '@/lib/ai-stream';
 import { loadUserPrefs } from '@/lib/user-prefs';
 import type { ContentItem, ContentStatus, Platform, ReviewTaskData } from '@/types/spark';
 import DistributionCard from '@/components/DistributionCard';
+import MetricsTrendChart from '@/components/MetricsTrendChart';
 import { useAppStore } from '@/store/appStore';
 import {
   AlertDialog,
@@ -549,13 +550,16 @@ function DetailView({
 
         {/* Status-specific extras */}
         {isApproved && (
-          <DistributionCard
-            data={{
-              contentId: entry.id,
-              title: entry.title,
-              defaultPlatforms: [entry.platform as Platform],
-            }}
-          />
+          <>
+            <DistributionCard
+              data={{
+                contentId: entry.id,
+                title: entry.title,
+                defaultPlatforms: [entry.platform as Platform],
+              }}
+            />
+            <MetricsTrendChart reviewItemId={entry.id} />
+          </>
         )}
 
         {isRejected && (
