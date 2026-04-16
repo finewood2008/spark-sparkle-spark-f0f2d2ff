@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X, Sparkles, Briefcase, Scissors } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X, Sparkles, Briefcase, Scissors, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, ReviewTaskData, ChatMessage } from '../types/spark';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs } from '../lib/user-prefs';
-import { saveReviewItem, updateReviewItemStatus } from '../lib/review-persistence';
+import { saveReviewItem, updateReviewItemStatus, deleteReviewItem } from '../lib/review-persistence';
 import ContentCard from './ContentCard';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './ui/alert-dialog';
 
 interface ReviewCardProps {
   item: ContentItem;
