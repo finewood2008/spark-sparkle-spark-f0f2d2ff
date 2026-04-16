@@ -97,9 +97,18 @@ export default function ChatLayout() {
           >
             <ClipboardCheck size={18} />
             {reviewingCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                {reviewingCount > 9 ? '9+' : reviewingCount}
-              </span>
+              <>
+                <span
+                  key={`pulse-${pulseKey}`}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 opacity-60 animate-badge-ping pointer-events-none"
+                />
+                <span
+                  key={`badge-${pulseKey}`}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center animate-badge-pop"
+                >
+                  {reviewingCount > 9 ? '9+' : reviewingCount}
+                </span>
+              </>
             )}
           </button>
           <button
