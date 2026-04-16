@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2, Ruler, Megaphone, Image } from 'lucide-react';
+import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2, Ruler, Megaphone, Image, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type BindingStatus, type SocialProvider } from '@/services/authService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
 
@@ -31,15 +32,63 @@ function AccountPage() {
   const [prefs, setPrefs] = useState<UserPreferences>(defaultPrefs);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
+  // 密码设置
+  const [hasPassword, setHasPassword] = useState<boolean>(false);
+  const [showPwdForm, setShowPwdForm] = useState(false);
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdErr, setPwdErr] = useState('');
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: '/auth' });
       return;
     }
     getBindingStatus(user!.id).then(setBindings);
-    // Load prefs from cloud first, fallback to local
     syncPrefsFromCloud().then(setPrefs);
+    // 通过 user_metadata.has_password 标记位判断（注册成功后写入）
+    supabase.auth.getUser().then(({ data }) => {
+      setHasPassword(!!data.user?.user_metadata?.has_password);
+    });
   }, [isAuthenticated, navigate, user]);
+
+  const handleSavePassword = async () => {
+    setPwdErr('');
+    if (newPwd.length < 8) { setPwdErr('新密码至少 8 位'); return; }
+    if (newPwd.length > 72) { setPwdErr('新密码不超过 72 位'); return; }
+    if (newPwd !== confirmPwd) { setPwdErr('两次输入的密码不一致'); return; }
+    if (hasPassword && !currentPwd) { setPwdErr('请输入当前密码'); return; }
+
+    setPwdSaving(true);
+    // 修改密码：先用旧密码校验
+    if (hasPassword) {
+      const { error: signErr } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPwd,
+      });
+      if (signErr) {
+        setPwdSaving(false);
+        setPwdErr('当前密码错误');
+        return;
+      }
+    }
+    const { error } = await supabase.auth.updateUser({
+      password: newPwd,
+      data: { has_password: true },
+    });
+    setPwdSaving(false);
+    if (error) {
+      setPwdErr(error.message || '保存失败');
+      return;
+    }
+    setHasPassword(true);
+    setShowPwdForm(false);
+    setCurrentPwd(''); setNewPwd(''); setConfirmPwd('');
+    toast.success(hasPassword ? '密码已修改' : '密码已设置，下次可直接用邮箱+密码登录');
+  };
 
   const handleBind = async (provider: SocialProvider) => {
     if (!user) return;
