@@ -104,6 +104,69 @@ export type Database = {
         }
         Relationships: []
       }
+      review_items: {
+        Row: {
+          auto_generated: boolean
+          content: string
+          cover_image: string | null
+          created_at: string
+          cta: string
+          device_id: string
+          id: string
+          platform: string
+          reject_reason: string | null
+          status: string
+          tags: string[]
+          task_name: string
+          task_source: string
+          task_topic: string | null
+          title: string
+          triggered_at: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          auto_generated?: boolean
+          content?: string
+          cover_image?: string | null
+          created_at?: string
+          cta?: string
+          device_id?: string
+          id: string
+          platform?: string
+          reject_reason?: string | null
+          status?: string
+          tags?: string[]
+          task_name?: string
+          task_source?: string
+          task_topic?: string | null
+          title?: string
+          triggered_at?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          auto_generated?: boolean
+          content?: string
+          cover_image?: string | null
+          created_at?: string
+          cta?: string
+          device_id?: string
+          id?: string
+          platform?: string
+          reject_reason?: string | null
+          status?: string
+          tags?: string[]
+          task_name?: string
+          task_source?: string
+          task_topic?: string | null
+          title?: string
+          triggered_at?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           auto_cta: boolean
