@@ -183,7 +183,7 @@ export default function ReviewPage() {
     toast.success('已忽略此审核任务');
   };
 
-  const runRegenerate = async (reason: string, presetLabel?: string) => {
+  const runRegenerate = async (reason: string, _presetLabel?: string) => {
     if (!selected) return;
     if (!reason.trim()) {
       toast.error('请填写打回意见');
