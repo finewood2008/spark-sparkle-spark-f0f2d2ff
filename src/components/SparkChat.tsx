@@ -363,11 +363,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   };
 
   const sendMessage = async (text: string) => {
-    console.log('[SparkChat] sendMessage called with:', text, 'isGenerating:', isGenerating);
-    if (!text.trim() || isGenerating) {
-      console.log('[SparkChat] sendMessage early return');
-      return;
-    }
+    if (!text.trim() || isGenerating) return;
     setInput('');
 
     const userMsg: ChatMessage = {
