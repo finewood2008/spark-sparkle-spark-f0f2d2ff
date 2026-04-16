@@ -517,8 +517,11 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         setContents([newItem, ...currentContents]);
         setSelectedContentId(newItem.id);
 
-        // Generate context-aware suggestions
-        const suggestions = generateSuggestions(parsed.title, parsed.content, parsed.tags);
+        // Generate context-aware suggestions; prepend a "提交审核" action
+        const suggestions: ChoiceOption[] = [
+          { id: `submit-review-${newItem.id}`, label: '提交审核', emoji: '✅' },
+          ...generateSuggestions(parsed.title, parsed.content, parsed.tags),
+        ].slice(0, 4);
 
         // Update message with content card and suggestions
         const msgs = useAppStore.getState().messages;
@@ -534,7 +537,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         addMessage({
           id: suggestId,
           role: 'assistant',
-          content: '📋 我分析了这篇内容，以下是一些优化建议：',
+          content: '📋 你可以直接提交审核，或先让我帮你优化：',
           timestamp: new Date().toISOString(),
           choices: suggestions,
         });
