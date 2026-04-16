@@ -155,6 +155,27 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          email: string
+          id: string
+          ip_address: string
+        }
+        Insert: {
+          attempted_at?: string
+          email: string
+          id?: string
+          ip_address: string
+        }
+        Update: {
+          attempted_at?: string
+          email?: string
+          id?: string
+          ip_address?: string
+        }
+        Relationships: []
+      }
       review_items: {
         Row: {
           auto_generated: boolean
@@ -343,7 +364,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_old_login_attempts: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

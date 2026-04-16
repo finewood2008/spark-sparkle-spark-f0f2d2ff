@@ -4,6 +4,11 @@ import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLef
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  checkLoginLock,
+  recordLoginFailure,
+  clearLoginFailures,
+} from '@/functions/login-rate-limit.functions';
 
 export const Route = createFileRoute('/auth')({
   head: () => ({
@@ -130,12 +135,47 @@ function AuthPage() {
     if (eErr || pErr) return;
 
     setLoading(true);
+    // 1. 后端预检：邮箱/IP 是否已被锁
+    try {
+      const pre = await checkLoginLock({ data: { email: loginEmail } });
+      if (pre.locked) {
+        const until = Date.now() + pre.remainSec * 1000;
+        setLockUntil(until);
+        try {
+          localStorage.setItem(LOCK_KEY, JSON.stringify({ count: MAX_ATTEMPTS, until }));
+        } catch {}
+        const reasonText = pre.reason === 'ip' ? '该网络' : '该账号';
+        toast.error(`${reasonText}登录失败次数过多，请 ${pre.remainSec} 秒后再试`);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // 后端不可用时降级到前端 localStorage 限流
+    }
+
+    // 2. 真正登录
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPwd,
     });
-    setLoading(false);
     if (error || !data.user) {
+      // 3. 失败 → 后端写入记录并取最新锁定状态
+      try {
+        const status = await recordLoginFailure({ data: { email: loginEmail } });
+        if (status.locked) {
+          const until = Date.now() + status.remainSec * 1000;
+          setLockUntil(until);
+          try {
+            localStorage.setItem(LOCK_KEY, JSON.stringify({ count: MAX_ATTEMPTS, until }));
+          } catch {}
+          const reasonText = status.reason === 'ip' ? '该网络' : '该账号';
+          toast.error(`${reasonText}登录失败次数过多，已锁定 ${status.remainSec} 秒`);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // 后端记录失败时降级到前端计数
+      }
       recordFailure();
       const remaining = MAX_ATTEMPTS - failCount - 1;
       const msg = error?.message?.toLowerCase().includes('invalid')
@@ -147,9 +187,13 @@ function AuthPage() {
       } else if (remaining > 2) {
         toast.error(msg);
       }
+      setLoading(false);
       return;
     }
+    setLoading(false);
+    // 4. 成功 → 清空后端 + 前端记录
     resetFailures();
+    clearLoginFailures({ data: { email: loginEmail } }).catch(() => {});
     login(
       {
         id: data.user.id,
