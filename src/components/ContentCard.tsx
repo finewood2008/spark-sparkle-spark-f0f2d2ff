@@ -56,24 +56,56 @@ function AIFloatingToolbar({
 }
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
-  const { contents, setContents, learnings, setLearnings, addMessage } = useAppStore();
+  const { contents, setContents, setLearnings, addMessage } = useAppStore();
   // Use live item from store if available, fall back to prop
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(item.content);
   const [editTitle, setEditTitle] = useState(item.title);
+  const [editCta, setEditCta] = useState(item.cta || '');
+  const [editTags, setEditTags] = useState<string[]>(item.tags || []);
+  const [tagDraft, setTagDraft] = useState('');
   const [originalContent, setOriginalContent] = useState(item.content);
   const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const enterEditMode = () => {
+    setEditTitle(item.title);
+    setEditContent(item.content);
+    setEditCta(item.cta || '');
+    setEditTags(item.tags || []);
+    setOriginalContent(item.content);
+    setEditing(true);
+    setExpanded(true);
+  };
+
+  const addTag = () => {
+    const t = tagDraft.trim().replace(/^#+/, '');
+    if (!t) return;
+    if (editTags.includes(t)) {
+      setTagDraft('');
+      return;
+    }
+    if (editTags.length >= 10) {
+      toast.error('最多 10 个标签');
+      return;
+    }
+    setEditTags([...editTags, t]);
+    setTagDraft('');
+  };
+
+  const removeTag = (t: string) => {
+    setEditTags(editTags.filter(x => x !== t));
+  };
 
   const handleUploadCover = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
