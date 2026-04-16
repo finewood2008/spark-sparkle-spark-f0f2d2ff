@@ -597,7 +597,12 @@ export default function SchedulePage() {
             <Calendar size={20} className="text-spark-orange" />
             自动发布计划
           </h1>
-          <p className="text-sm text-spark-gray-400">设定规则，AI 自动生成并排期内容</p>
+          <p className="text-sm text-spark-gray-400 flex items-center gap-2">
+            设定规则，AI 自动生成并排期内容
+            <span className="inline-flex items-center gap-1 text-[10px] text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">
+              <Cloud size={10} /> 多端同步{loaded ? '已就绪' : '加载中…'}
+            </span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Run Once */}
