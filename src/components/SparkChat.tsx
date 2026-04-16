@@ -6,6 +6,7 @@ import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import type { ChatMessage, ContentItem, ChoiceOption } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
+import ReviewCard from './ReviewCard';
 
 function SparkAvatar({ size = 32 }: { size?: number }) {
   return (
@@ -120,6 +121,23 @@ function MessageBubble({ msg, onSend, onCardAction }: {
   onCardAction: (action: string, item?: ContentItem) => void;
 }) {
   const isUser = msg.role === 'user';
+
+  // Review card (Human-in-the-loop) — for scheduled-task generated content awaiting approval
+  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <ReviewCard item={msg.contentItem} task={msg.reviewTask} />
+        </div>
+      </div>
+    );
+  }
 
   // Content card message
   if (!isUser && msg.contentItem) {
