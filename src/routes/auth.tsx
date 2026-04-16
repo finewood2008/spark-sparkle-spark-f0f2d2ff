@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft } from 'lucide-react';
+import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +26,16 @@ function AuthPage() {
   // login (邮箱 + 密码)
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPwd, setLoginPwd] = useState('');
+  const [emailErr, setEmailErr] = useState('');
+  const [pwdErr, setPwdErr] = useState('');
+
+  // 失败计数 + 冷却（持久化）
+  const LOCK_KEY = 'spark_login_lock';
+  const MAX_ATTEMPTS = 5;
+  const COOLDOWN_SEC = 60;
+  const [failCount, setFailCount] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+  const [lockRemain, setLockRemain] = useState(0);
 
   // register (邮箱 + OTP)
   const [step, setStep] = useState<'email' | 'otp'>('email');
@@ -43,11 +53,82 @@ function AuthPage() {
     return () => clearTimeout(t);
   }, [countdown]);
 
+  // 恢复锁定状态
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCK_KEY);
+      if (!raw) return;
+      const { count, until } = JSON.parse(raw) as { count: number; until: number };
+      setFailCount(count || 0);
+      if (until && until > Date.now()) setLockUntil(until);
+      else if (until) localStorage.removeItem(LOCK_KEY);
+    } catch {}
+  }, []);
+
+  // 冷却倒计时
+  useEffect(() => {
+    if (lockUntil <= 0) return;
+    const tick = () => {
+      const remain = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setLockRemain(remain);
+      if (remain <= 0) {
+        setLockUntil(0);
+        setFailCount(0);
+        localStorage.removeItem(LOCK_KEY);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockUntil]);
+
+  const validateEmail = (v: string) => {
+    if (!v) return '请输入邮箱';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return '邮箱格式不正确';
+    if (v.length > 254) return '邮箱过长';
+    return '';
+  };
+  const validatePwd = (v: string) => {
+    if (!v) return '请输入密码';
+    if (v.length < 8) return '密码至少 8 位';
+    if (v.length > 72) return '密码过长（最多 72 位）';
+    return '';
+  };
+
+  const recordFailure = () => {
+    const next = failCount + 1;
+    setFailCount(next);
+    if (next >= MAX_ATTEMPTS) {
+      const until = Date.now() + COOLDOWN_SEC * 1000;
+      setLockUntil(until);
+      try {
+        localStorage.setItem(LOCK_KEY, JSON.stringify({ count: next, until }));
+      } catch {}
+      toast.error(`登录失败次数过多，请 ${COOLDOWN_SEC} 秒后再试`);
+    } else {
+      try {
+        localStorage.setItem(LOCK_KEY, JSON.stringify({ count: next, until: 0 }));
+      } catch {}
+    }
+  };
+
+  const resetFailures = () => {
+    setFailCount(0);
+    setLockUntil(0);
+    localStorage.removeItem(LOCK_KEY);
+  };
+
   const handleLogin = async () => {
-    if (!loginEmail || !loginPwd) {
-      toast.error('请输入邮箱和密码');
+    if (lockUntil > Date.now()) {
+      toast.error(`请 ${lockRemain} 秒后再试`);
       return;
     }
+    const eErr = validateEmail(loginEmail);
+    const pErr = validatePwd(loginPwd);
+    setEmailErr(eErr);
+    setPwdErr(pErr);
+    if (eErr || pErr) return;
+
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -55,9 +136,20 @@ function AuthPage() {
     });
     setLoading(false);
     if (error || !data.user) {
-      toast.error(error?.message || '登录失败，请检查邮箱密码');
+      recordFailure();
+      const remaining = MAX_ATTEMPTS - failCount - 1;
+      const msg = error?.message?.toLowerCase().includes('invalid')
+        ? '邮箱或密码错误'
+        : (error?.message || '登录失败');
+      setPwdErr(msg);
+      if (remaining > 0 && remaining <= 2) {
+        toast.error(`${msg}，还剩 ${remaining} 次机会`);
+      } else if (remaining > 2) {
+        toast.error(msg);
+      }
       return;
     }
+    resetFailures();
     login(
       {
         id: data.user.id,
@@ -165,41 +257,71 @@ function AuthPage() {
         {/* Login form */}
         {tab === 'login' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="relative">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9"
-                placeholder="邮箱"
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
+            {lockUntil > Date.now() && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+                <span>登录失败次数过多，账户已临时锁定。请 <span className="font-semibold">{lockRemain}s</span> 后再试。</span>
+              </div>
+            )}
+            <div>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 ${emailErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  placeholder="邮箱"
+                  type="email"
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(e) => { setLoginEmail(e.target.value); if (emailErr) setEmailErr(''); }}
+                  onBlur={() => loginEmail && setEmailErr(validateEmail(loginEmail))}
+                />
+              </div>
+              {emailErr && (
+                <p className="mt-1.5 ml-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} /> {emailErr}
+                </p>
+              )}
             </div>
-            <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9 pr-10"
-                type={showPwd ? 'text' : 'password'}
-                placeholder="密码"
-                value={loginPwd}
-                onChange={(e) => setLoginPwd(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+            <div>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 pr-10 ${pwdErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  type={showPwd ? 'text' : 'password'}
+                  placeholder="密码（至少 8 位）"
+                  autoComplete="current-password"
+                  value={loginPwd}
+                  onChange={(e) => { setLoginPwd(e.target.value); if (pwdErr) setPwdErr(''); }}
+                  onBlur={() => loginPwd && setPwdErr(validatePwd(loginPwd))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(!showPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {pwdErr && (
+                <p className="mt-1.5 ml-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} /> {pwdErr}
+                </p>
+              )}
             </div>
             <button
               type="button"
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || lockUntil > Date.now()}
               className="spark-btn-primary w-full h-11 text-base"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>登录 <ArrowRight size={16} /></>}
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : lockUntil > Date.now() ? (
+                <>已锁定 {lockRemain}s</>
+              ) : (
+                <>登录 <ArrowRight size={16} /></>
+              )}
             </button>
 
             <p className="text-center text-xs text-muted-foreground pt-1">
