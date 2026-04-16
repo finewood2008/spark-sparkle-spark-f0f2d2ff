@@ -25,7 +25,7 @@ interface ReviewCardProps {
 }
 
 export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
-  const { contents, setContents, addMessage } = useAppStore();
+  const { contents, setContents, addMessage, messages } = useAppStore();
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
