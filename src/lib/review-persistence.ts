@@ -19,6 +19,49 @@ export interface ReviewItemRecord {
   rejectReason?: string;
 }
 
+export interface ReviewHistoryEntry {
+  id: string;
+  title: string;
+  platform: ContentItem['platform'];
+  status: ContentItem['status'];
+  taskName: string;
+  taskTopic?: string;
+  triggeredAt: string;
+  updatedAt: string;
+  rejectReason?: string;
+  contentPreview: string;
+}
+
+/** Load all review items as flat history entries (for the Memory page list). */
+export async function loadReviewHistory(): Promise<ReviewHistoryEntry[]> {
+  const id = getIdentifier();
+  const query = supabase
+    .from('review_items')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  const { data, error } = id.user_id
+    ? await query.eq('user_id', id.user_id)
+    : await query.is('user_id', null).eq('device_id', id.device_id);
+
+  if (error) {
+    console.error('[review] history load failed:', error);
+    return [];
+  }
+  return (data || []).map(row => ({
+    id: row.id,
+    title: row.title || '(无标题)',
+    platform: row.platform as ContentItem['platform'],
+    status: row.status as ContentItem['status'],
+    taskName: row.task_name || '审核任务',
+    taskTopic: row.task_topic || undefined,
+    triggeredAt: row.triggered_at,
+    updatedAt: row.updated_at,
+    rejectReason: row.reject_reason || undefined,
+    contentPreview: (row.content || '').slice(0, 120),
+  }));
+}
+
 /**
  * Save a review item to Supabase (insert or update).
  */
