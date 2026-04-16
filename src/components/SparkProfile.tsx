@@ -3,12 +3,12 @@ import { Pencil, Trash2, Plus, X, Cloud, Lock, HardDrive, Monitor, Brain, FileSe
 import { useAppStore } from '../store/appStore';
 import type { LearningEntry, BrandMemory } from '../types/spark';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from './ui/sheet';
 import { toast } from 'sonner';
 
 interface SparkProfileProps {
