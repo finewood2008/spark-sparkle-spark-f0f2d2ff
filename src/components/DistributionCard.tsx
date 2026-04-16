@@ -158,6 +158,24 @@ export default function DistributionCard({ data }: DistributionCardProps) {
         return;
       }
 
+      // In parallel: ask analyze-metrics for 7-day growth + AI insight
+      const analysisPromise = supabase.functions
+        .invoke('analyze-metrics', {
+          body: { contentId: data.contentId, title: data.title },
+        })
+        .catch(err => {
+          console.error('[distribution] analyze-metrics failed:', err);
+          return { data: null, error: err };
+        });
+
+      const { data: analysis } = await analysisPromise;
+      const analysisData = (analysis ?? null) as {
+        hasData?: boolean;
+        sampleCount?: number;
+        growth?: { views: number; likes: number; comments: number; saves: number };
+        insight?: string;
+      } | null;
+
       const report: ReportData = {
         title: data.title,
         platform: (aggregate.platform === 'all'
@@ -171,6 +189,9 @@ export default function DistributionCard({ data }: DistributionCardProps) {
         },
         sparkComment: aggregate.ai_insight || '数据已就绪',
         sparkAdvice: aggregate.ai_insight || undefined,
+        growth: analysisData?.growth,
+        growthSampleCount: analysisData?.sampleCount,
+        aiInsight: analysisData?.insight,
       };
 
       const fetchedLabel = new Date(aggregate.fetched_at).toLocaleString('zh-CN', {
@@ -180,10 +201,15 @@ export default function DistributionCard({ data }: DistributionCardProps) {
         minute: '2-digit',
       });
 
+      const hasTrend = !!analysisData?.growth && (analysisData.sampleCount ?? 0) >= 2;
+      const headerText = hasTrend
+        ? `📊 「${data.title}」近 7 天数据 & 增长趋势（最新更新于 ${fetchedLabel}）：`
+        : `📊 「${data.title}」最新数据（更新于 ${fetchedLabel}）：`;
+
       addMessage({
         id: `${Date.now()}-report`,
         role: 'assistant',
-        content: `📊 「${data.title}」最新数据（更新于 ${fetchedLabel}）：`,
+        content: headerText,
         timestamp: new Date().toISOString(),
         reportData: report as unknown as Record<string, unknown>,
       });
