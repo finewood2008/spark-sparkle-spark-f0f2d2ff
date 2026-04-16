@@ -4,12 +4,14 @@ import { useAuthStore } from '../store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
+import ReviewDrawer from './ReviewDrawer';
 import SparkProfile from './SparkProfile';
 
 import { useMemorySync } from '../hooks/useMemorySync';
 
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
 
@@ -57,7 +59,7 @@ export default function ChatLayout() {
             <FileText size={18} />
           </button>
           <button
-            onClick={() => { window.location.href = '/review'; }}
+            onClick={() => setReviewOpen(true)}
             className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="审核中心"
           >
@@ -93,6 +95,18 @@ export default function ChatLayout() {
 
       {/* Draft drawer */}
       <DraftDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+
+      {/* Review center drawer */}
+      <ReviewDrawer
+        open={reviewOpen}
+        onOpenChange={(o) => {
+          setReviewOpen(o);
+          // Refresh badge count after closing the drawer (status may have changed)
+          if (!o) {
+            window.dispatchEvent(new Event('focus'));
+          }
+        }}
+      />
 
       {/* Memory profile modal */}
       <SparkProfile open={profileOpen} onOpenChange={setProfileOpen} />
