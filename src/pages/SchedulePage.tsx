@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
 import { generateArticle } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
+import {
+  loadScheduleConfig,
+  saveScheduleConfig,
+  loadScheduleLogs,
+  insertScheduleLog,
+  updateScheduleLog,
+  clearScheduleLogs,
+  subscribeScheduleChanges,
+  type ScheduleLogEntry,
+} from '../lib/schedule-persistence';
 import type { ScheduleConfig, Platform, ContentItem } from '../types/spark';
 import {
   Calendar,
