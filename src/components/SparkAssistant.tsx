@@ -107,22 +107,22 @@ export default function SparkAssistant() {
       brandContext,
       onDelta: (chunk) => {
         assistantContent += chunk;
-        const store = useAppStore.getState();
-        const updated = store.messages.map(m =>
+        const msgs = useAppStore.getState().messages;
+        const updated = msgs.map(m =>
           m.id === assistantId ? { ...m, content: assistantContent } : m
         );
-        store.setMessages(updated);
+        useAppStore.setState({ messages: updated });
       },
       onDone: () => {
         setIsGenerating(false);
       },
       onError: (err) => {
         setError(err);
-        const store = useAppStore.getState();
-        const updated = store.messages.map(m =>
+        const msgs = useAppStore.getState().messages;
+        const updated = msgs.map(m =>
           m.id === assistantId ? { ...m, content: `⚠️ ${err}` } : m
         );
-        store.setMessages(updated);
+        useAppStore.setState({ messages: updated });
         setIsGenerating(false);
       },
     });
