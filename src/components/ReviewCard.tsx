@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore';
 import type { ContentItem, ReviewTaskData, ChatMessage } from '../types/spark';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs } from '../lib/user-prefs';
+import { saveReviewItem, updateReviewItemStatus } from '../lib/review-persistence';
 import ContentCard from './ContentCard';
 import { toast } from 'sonner';
 
