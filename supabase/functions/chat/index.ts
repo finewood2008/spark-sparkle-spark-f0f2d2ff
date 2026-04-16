@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildChatPrompt, buildGeneratePrompt } from "./prompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,29 +76,9 @@ serve(async (req) => {
     const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
-    let systemPrompt: string;
-    if (mode === "generate") {
-      const platformName =
-        platform === "xiaohongshu" ? "小红书" :
-        platform === "wechat" ? "微信公众号" :
-        platform === "douyin" ? "抖音" : "社交媒体";
-      systemPrompt = `你是"火花"，一个专业的社交媒体内容创作助手。
-用户正在请求你为${platformName}平台生成一篇完整文章。
-
-你必须严格按照以下 JSON 格式返回（不要包含 markdown 代码块标记，直接返回纯 JSON）：
-{
-  "title": "吸引人的标题",
-  "content": "完整的正文内容，200-500字",
-  "cta": "行动号召语",
-  "tags": ["标签1", "标签2", "标签3"]
-}
-${brandContext || ""}`;
-    } else {
-      systemPrompt = `你是"火花"，一个专业的社交媒体内容创作助手和策略顾问。
-请用简洁、友好、专业的语气回复。适当使用 emoji。回复控制在 200 字以内。
-当用户想要生成文章时，引导他们点击"生成文章"按钮。
-${brandContext || ""}`;
-    }
+    const systemPrompt = mode === "generate"
+      ? buildGeneratePrompt(platform, brandContext)
+      : buildChatPrompt(brandContext);
 
     const body = toGemini(messages, systemPrompt);
 
