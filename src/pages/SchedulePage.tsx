@@ -391,7 +391,7 @@ function ExecutionLog({ logs }: { logs: ScheduleLogEntry[] }) {
 
 // --- Main Page ---
 export default function SchedulePage() {
-  const { contents, setContents, setSelectedContentId, brand } = useAppStore();
+  const { contents, setContents, setSelectedContentId, brand, addMessage } = useAppStore();
   const [config, setConfig] = useState<ScheduleConfig>(loadSchedule);
   const [logs, setLogs] = useState<ScheduleLogEntry[]>(loadLogs);
   const [generating, setGenerating] = useState(false);
@@ -453,7 +453,7 @@ export default function SchedulePage() {
           title: result.title,
           content: result.content,
           platform: log.platform,
-          status: 'draft',
+          status: 'reviewing',
           tags: result.tags,
           cta: result.cta,
           createdAt: new Date().toISOString(),
@@ -464,6 +464,21 @@ export default function SchedulePage() {
         newContents.push(contentItem);
         log.status = 'success';
         log.contentId = contentItem.id;
+
+        // Push a Human-in-the-loop review message into chat
+        addMessage({
+          id: `${Date.now()}-review-${i}`,
+          role: 'assistant',
+          content: `🟡 定时任务生成了一篇新内容，请审核：`,
+          timestamp: new Date().toISOString(),
+          contentItem,
+          reviewTask: {
+            source: 'schedule',
+            taskName: `「${log.topic}」 · ${log.platform}`,
+            triggeredAt: new Date().toISOString(),
+            topic: log.topic,
+          },
+        });
       } catch (err: unknown) {
         log.status = 'error';
         log.error = err instanceof Error ? err.message : '生成失败';
