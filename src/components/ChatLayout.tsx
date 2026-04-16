@@ -7,6 +7,7 @@ import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
 import SettingsPage from '../pages/SettingsPage';
+import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
