@@ -186,18 +186,34 @@ export async function loadReviewItemsIntoStore(): Promise<void> {
         triggeredAt: row.triggered_at,
         topic: row.task_topic || undefined,
       };
-      newMessages.push({
-        id: msgId,
-        role: 'assistant',
-        content: item.status === 'reviewing'
-          ? '🟡 这是上次未完成审核的内容，请继续：'
-          : item.status === 'approved'
-            ? '✅ 这条内容此前已通过审核：'
-            : '↻ 这条内容此前已被打回：',
-        timestamp: row.triggered_at,
-        contentItem: item,
-        reviewTask: task,
-      });
+
+      // Schedule-source reviewing items → simplified reminder pointing to /review
+      if (task.source === 'schedule' && item.status === 'reviewing') {
+        newMessages.push({
+          id: msgId,
+          role: 'assistant',
+          content: '',
+          timestamp: row.triggered_at,
+          reviewReminder: {
+            taskName: task.taskName,
+            message: `定时任务「${task.taskName}」已生成 1 篇内容，请前往审核中心查看`,
+            item: { id: item.id, title: item.title, content: item.content, status: item.status },
+          },
+        });
+      } else {
+        newMessages.push({
+          id: msgId,
+          role: 'assistant',
+          content: item.status === 'reviewing'
+            ? '🟡 这是上次未完成审核的内容，请继续：'
+            : item.status === 'approved'
+              ? '✅ 这条内容此前已通过审核：'
+              : '↻ 这条内容此前已被打回：',
+          timestamp: row.triggered_at,
+          contentItem: item,
+          reviewTask: task,
+        });
+      }
     }
   }
 

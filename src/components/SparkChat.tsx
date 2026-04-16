@@ -3,10 +3,11 @@ import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData } from '../types/spark';
+import { saveReviewItem } from '../lib/review-persistence';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
-import ReviewCard from './ReviewCard';
+import ReviewReminderCard from './ReviewReminderCard';
 import DistributionCard from './DistributionCard';
 import ScheduleCard from './ScheduleCard';
 import MetricsCard from './MetricsCard';
@@ -177,18 +178,39 @@ function MessageBubble({ msg, onSend, onCardAction }: {
     );
   }
 
-  // Review card (Human-in-the-loop) — for scheduled-task generated content awaiting approval
-  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
+  // Review reminder card — simplified pointer to /review (replaces ReviewCard in chat)
+  if (!isUser && msg.reviewReminder) {
     return (
       <div className="flex items-start gap-3">
         <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 max-w-[85%]">
           {msg.content && (
             <div className="chat-bubble-assistant px-4 py-3 mb-2">
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <ReviewCard item={msg.contentItem} task={msg.reviewTask} />
+          <ReviewReminderCard
+            item={msg.reviewReminder.item}
+            taskName={msg.reviewReminder.taskName}
+            message={msg.reviewReminder.message}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Legacy: scheduled-task reviewing items routed via contentItem+reviewTask → render as reminder too
+  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <ReviewReminderCard item={msg.contentItem} taskName={msg.reviewTask?.taskName} />
         </div>
       </div>
     );
@@ -362,9 +384,59 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     };
   };
 
+  const submitForReview = useCallback(async () => {
+    // Find the most recent draft content item
+    const all = useAppStore.getState().contents;
+    const draft = all.find(c => c.status === 'draft');
+    if (!draft) {
+      addMessage({
+        id: `${Date.now()}-no-draft`,
+        role: 'assistant',
+        content: '咦，没有找到待提交的草稿哦～请先生成一篇内容再提交审核。',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    // Update status → reviewing
+    const updatedItem: ContentItem = { ...draft, status: 'reviewing', updatedAt: new Date().toISOString() };
+    setContents(all.map(c => (c.id === draft.id ? updatedItem : c)));
+
+    // Persist
+    const task: ReviewTaskData = {
+      source: 'manual',
+      taskName: '手动创作',
+      triggeredAt: new Date().toISOString(),
+    };
+    await saveReviewItem(updatedItem, task);
+
+    addMessage({
+      id: `${Date.now()}-submitted`,
+      role: 'assistant',
+      content: '✅ 已提交到审核中心，你可以随时去审核页查看和操作。',
+      timestamp: new Date().toISOString(),
+      reviewReminder: {
+        taskName: '手动创作',
+        message: '内容已进入审核中心，待你审核',
+        item: { id: updatedItem.id, title: updatedItem.title, content: updatedItem.content, status: 'reviewing' },
+      },
+    });
+  }, [addMessage, setContents]);
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
     setInput('');
+
+    // Special-case: "提交审核" choice — skip AI, submit current draft
+    if (text.trim() === '提交审核') {
+      addMessage({
+        id: Date.now().toString(),
+        role: 'user',
+        content: '提交审核',
+        timestamp: new Date().toISOString(),
+      });
+      await submitForReview();
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -495,8 +567,11 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         setContents([newItem, ...currentContents]);
         setSelectedContentId(newItem.id);
 
-        // Generate context-aware suggestions
-        const suggestions = generateSuggestions(parsed.title, parsed.content, parsed.tags);
+        // Generate context-aware suggestions; prepend a "提交审核" action
+        const suggestions: ChoiceOption[] = [
+          { id: `submit-review-${newItem.id}`, label: '提交审核', emoji: '✅' },
+          ...generateSuggestions(parsed.title, parsed.content, parsed.tags),
+        ].slice(0, 4);
 
         // Update message with content card and suggestions
         const msgs = useAppStore.getState().messages;
@@ -512,7 +587,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         addMessage({
           id: suggestId,
           role: 'assistant',
-          content: '📋 我分析了这篇内容，以下是一些优化建议：',
+          content: '📋 你可以直接提交审核，或先让我帮你优化：',
           timestamp: new Date().toISOString(),
           choices: suggestions,
         });

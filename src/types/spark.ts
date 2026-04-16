@@ -39,6 +39,12 @@ export interface ChatMessage {
   contentItem?: ContentItem;
   reportData?: Record<string, unknown>;
   reviewTask?: ReviewTaskData;
+  /** Lightweight reminder pointing to /review (replaces full ReviewCard in chat) */
+  reviewReminder?: {
+    taskName?: string;
+    message?: string;
+    item?: Pick<ContentItem, 'id' | 'title' | 'content' | 'status'>;
+  };
   distribution?: DistributionData;
   scheduleCard?: ScheduleCardData;
   metricsCard?: MetricsCardData;
