@@ -596,6 +596,7 @@ function DetailView({
                 ))}
               </div>
             )}
+            <MetricsTrendChart reviewItemId={entry.id} />
           </div>
         )}
       </div>
