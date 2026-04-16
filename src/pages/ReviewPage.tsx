@@ -444,7 +444,13 @@ export default function ReviewPage({ embedded = false }: ReviewPageProps = {}) {
           </div>
 
           {/* Right: detail panel */}
-          <div className="md:w-[60%] rounded-2xl bg-card shadow-lg border border-border flex flex-col overflow-hidden">
+          <div
+            className={
+              embedded
+                ? 'flex-1 min-h-0 rounded-xl bg-card shadow-sm border border-border flex flex-col overflow-hidden'
+                : 'md:w-[60%] rounded-2xl bg-card shadow-lg border border-border flex flex-col overflow-hidden'
+            }
+          >
             {!selected ? (
               <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground py-20">
                 <Inbox size={40} className="mb-3 opacity-40" />
