@@ -9,6 +9,7 @@ import DataReportCard, { type ReportData } from './DataReportCard';
 import ReviewCard from './ReviewCard';
 import DistributionCard from './DistributionCard';
 import ScheduleCard from './ScheduleCard';
+import MetricsCard from './MetricsCard';
 
 function SparkAvatar({ size = 32 }: { size?: number }) {
   return (
@@ -123,6 +124,23 @@ function MessageBubble({ msg, onSend, onCardAction }: {
   onCardAction: (action: string, item?: ContentItem) => void;
 }) {
   const isUser = msg.role === 'user';
+
+  // Metrics card — 24h post-publish data report
+  if (!isUser && msg.metricsCard) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <MetricsCard data={msg.metricsCard} />
+        </div>
+      </div>
+    );
+  }
 
   // Distribution card — content approved, choose platforms to publish
   if (!isUser && msg.distribution) {
