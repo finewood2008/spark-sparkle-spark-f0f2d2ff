@@ -153,6 +153,25 @@ export default function ReviewPage() {
     setRejectReason('');
   }, [selectedId]);
 
+  // Sync status changes from appStore (e.g. DistributionCard publish) back into entries
+  useEffect(() => {
+    setEntries(prev =>
+      prev.map(e => {
+        const c = contents.find(c => c.id === e.id);
+        if (!c) return e;
+        if (c.status !== e.status || (c.publishedAt && c.publishedAt !== e.publishedAt)) {
+          return {
+            ...e,
+            status: c.status,
+            publishedAt: c.publishedAt || e.publishedAt,
+            updatedAt: c.updatedAt || e.updatedAt,
+          };
+        }
+        return e;
+      }),
+    );
+  }, [contents]);
+
   const updateLocalStatus = (id: string, status: ContentStatus, rejectReason?: string) => {
     setEntries(prev =>
       prev.map(e =>
