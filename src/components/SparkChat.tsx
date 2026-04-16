@@ -95,6 +95,23 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
         return;
       }
 
+      // Fetch 7-day growth + AI insight (best-effort, non-blocking on failure)
+      const { data: analysis } = await supabase.functions
+        .invoke('analyze-metrics', {
+          body: { contentId: latest.id, title: latest.title },
+        })
+        .catch(err => {
+          console.error('[welcome] analyze-metrics failed:', err);
+          return { data: null };
+        });
+      if (cancelled) return;
+      const a = (analysis ?? null) as {
+        hasData?: boolean;
+        sampleCount?: number;
+        growth?: { views: number; likes: number; comments: number; saves: number };
+        insight?: string;
+      } | null;
+
       setReport({
         title: latest.title || '(无标题)',
         platform: (latest.platform as Platform) || 'xiaohongshu',
@@ -106,6 +123,9 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
         },
         sparkComment: '',
         sparkAdvice: m.ai_insight || '',
+        growth: a?.growth,
+        growthSampleCount: a?.sampleCount,
+        aiInsight: a?.insight,
       });
       setLoading(false);
     };
