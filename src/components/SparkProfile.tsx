@@ -3,12 +3,12 @@ import { Pencil, Trash2, Plus, X, Cloud, Lock, HardDrive, Monitor, Brain, FileSe
 import { useAppStore } from '../store/appStore';
 import type { LearningEntry, BrandMemory } from '../types/spark';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from './ui/sheet';
 import { toast } from 'sonner';
 
 interface SparkProfileProps {
@@ -236,20 +236,25 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
   ];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto bg-[#FAFAF8] border-orange-100 p-0">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md p-0 bg-[#FAFAF8] border-l border-orange-100 flex flex-col gap-0"
+      >
         {/* Header */}
-        <DialogHeader className="text-center pt-6 px-6 pb-2">
+        <SheetHeader className="text-center pt-6 px-6 pb-3 shrink-0 border-b border-[#EEEDEB]">
           <div className="flex justify-center mb-3">
             <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}>
               <span className="text-[22px]">✨</span>
             </div>
           </div>
-          <DialogTitle className="text-[18px] font-bold text-[#333]">火花的记忆本</DialogTitle>
-          <DialogDescription className="text-[13px] text-[#999] mt-1">
+          <SheetTitle className="text-[18px] font-bold text-[#333] text-center">火花的记忆本</SheetTitle>
+          <SheetDescription className="text-[13px] text-[#999] mt-1 text-center">
             填写品牌信息并启用后，火花创作的所有内容都会自动关联你的品牌。
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto">
 
         {/* Brand memory toggle */}
         <div className="mx-6 mt-1 mb-3">
@@ -392,7 +397,8 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
             </button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
