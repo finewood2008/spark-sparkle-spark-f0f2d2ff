@@ -80,7 +80,7 @@ export default function ChatLayout() {
               description: title.length > 40 ? `${title.slice(0, 40)}…` : title,
               action: {
                 label: '去审核',
-                onClick: () => navigate({ to: '/review' }),
+                onClick: () => setReviewOpen(true),
               },
               duration: 6000,
             });
