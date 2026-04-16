@@ -27,8 +27,6 @@ function NotFoundComponent() {
 export const Route = createRootRoute({
   head: () => ({
     meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "火花 - AI社媒图文自动化" },
       { name: "description", content: "AI驱动的社交媒体内容创作与自动化平台" },
       { name: "author", content: "Spark Auto" },
@@ -55,6 +53,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <HeadContent />
       </head>
       <body>
