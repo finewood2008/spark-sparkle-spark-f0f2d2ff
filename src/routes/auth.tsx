@@ -265,6 +265,24 @@ function AuthPage() {
     navigate({ to: '/' });
   };
 
+  const handleForgotPassword = async () => {
+    const eErr = validateEmail(forgotEmail);
+    if (eErr) {
+      toast.error(eErr);
+      return;
+    }
+    setForgotLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) {
+      toast.error(error.message || '发送重置邮件失败');
+      return;
+    }
+    setForgotSent(true);
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4"
