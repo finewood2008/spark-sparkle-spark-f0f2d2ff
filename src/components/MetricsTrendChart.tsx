@@ -61,10 +61,20 @@ function formatFull(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN');
 }
 
+type PlatformFilter = 'all' | 'xiaohongshu' | 'douyin' | 'wechat';
+
+const PLATFORM_TABS: { value: PlatformFilter; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'xiaohongshu', label: '小红书' },
+  { value: 'douyin', label: '抖音' },
+  { value: 'wechat', label: '微信' },
+];
+
 export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartProps) {
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<ChartPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<PlatformFilter>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +85,7 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
         .from('content_metrics')
         .select('fetched_at, views, likes, comments, saves, shares')
         .eq('review_item_id', reviewItemId)
-        .eq('platform', 'all')
+        .eq('platform', platform)
         .order('fetched_at', { ascending: true })
         .limit(200);
 
@@ -102,7 +112,7 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
     return () => {
       cancelled = true;
     };
-  }, [reviewItemId]);
+  }, [reviewItemId, platform]);
 
   if (loading) {
     return (
