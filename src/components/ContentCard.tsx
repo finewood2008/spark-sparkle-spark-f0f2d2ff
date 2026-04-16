@@ -1,11 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, History } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Sparkles, Loader2, Undo2, ImagePlus, ImageUp, RefreshCw, Send, Trash2, Save } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ContentItem } from '../types/spark';
+import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
-import type { LearningEntry } from '../types/spark';
-import ContentEditDialog from './ContentEditDialog';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -40,10 +38,11 @@ function AIFloatingToolbar({
       className="absolute z-50 flex items-center gap-1 bg-white rounded-lg shadow-lg border border-[#E5E4E2] px-1.5 py-1"
       style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)' }}
     >
-      <span className="text-[11px] text-[#BBB] px-1">AI</span>
+      <span className="text-[11px] text-spark-orange/80 px-1 font-medium">AI</span>
       {actions.map(a => (
         <button
           key={a.id}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => { e.stopPropagation(); onAction(a.id); }}
           disabled={!!loading}
           className="text-[12px] px-2.5 py-1 rounded-md text-[#666] hover:bg-spark-orange/10 hover:text-spark-orange transition-colors disabled:opacity-40 flex items-center gap-1"
@@ -57,11 +56,14 @@ function AIFloatingToolbar({
 }
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
-  const { contents, setContents, learnings, setLearnings, addMessage } = useAppStore();
+  const { contents, setContents, learnings: _learnings, setLearnings, addMessage } = useAppStore();
   // Use live item from store if available, fall back to prop
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
+
+  // Inline edit mode: auto-enabled if item.isEditingMode is set (just generated)
+  const [editing, setEditing] = useState<boolean>(!!item.isEditingMode);
+  const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(item.content);
   const [editTitle, setEditTitle] = useState(item.title);
   const [originalContent, setOriginalContent] = useState(item.content);
@@ -70,11 +72,30 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  // Highlight range for the just-edited text
+  const [highlightRange, setHighlightRange] = useState<{ start: number; end: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync edit state when item changes externally or auto-edit flag flips on
+  useEffect(() => {
+    if (item.isEditingMode && !editing) {
+      setEditing(true);
+      setEditContent(item.content);
+      setEditTitle(item.title);
+      setOriginalContent(item.content);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.isEditingMode]);
+
+  // Auto-fade highlight after 2.5s
+  useEffect(() => {
+    if (!highlightRange) return;
+    const t = setTimeout(() => setHighlightRange(null), 2500);
+    return () => clearTimeout(t);
+  }, [highlightRange]);
 
   const handleUploadCover = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -148,6 +169,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     const selectedText = editContent.substring(selectedRange.start, selectedRange.end);
     if (!selectedText.trim()) return;
 
+    const range = selectedRange;
     setUndoStack(prev => [...prev, editContent]);
     setAiLoading(action);
     let result = '';
@@ -159,10 +181,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       platform: item.platform,
       onDelta: (chunk) => { result += chunk; },
       onDone: () => {
-        const before = editContent.substring(0, selectedRange.start);
-        const after = editContent.substring(selectedRange.end);
+        const before = editContent.substring(0, range.start);
+        const after = editContent.substring(range.end);
         const newContent = before + result + after;
         setEditContent(newContent);
+        setHighlightRange({ start: range.start, end: range.start + result.length });
         setToolbarPos(null);
         setSelectedRange(null);
         setAiLoading(null);
@@ -179,11 +202,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     const textToPolish = editing ? editContent : item.content;
     if (!textToPolish.trim()) return;
 
-    setUndoStack(prev => [...prev, editing ? editContent : item.content]);
+    setUndoStack(prev => [...prev, textToPolish]);
     setAiLoading('polish');
     if (!editing) {
       setEditing(true);
-      setExpanded(true);
       setEditContent(textToPolish);
     }
 
@@ -195,6 +217,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       onDelta: (chunk) => { result += chunk; },
       onDone: () => {
         setEditContent(result);
+        setHighlightRange({ start: 0, end: result.length });
         setAiLoading(null);
         toast.success('AI 润色完成');
       },
@@ -210,6 +233,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     const prev = undoStack[undoStack.length - 1];
     setUndoStack(s => s.slice(0, -1));
     setEditContent(prev);
+    setHighlightRange(null);
     toast.success('已撤销');
   };
 
@@ -253,6 +277,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
     setCoverLoading(false);
   };
+
   const handleRegenerateTitle = async () => {
     setTitleLoading(true);
     try {
@@ -292,7 +317,9 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
                 const json = JSON.parse(line.slice(6));
                 const delta = json.choices?.[0]?.delta?.content;
                 if (delta) newTitle += delta;
-              } catch {}
+              } catch {
+                /* ignore */
+              }
             }
           }
         }
@@ -300,9 +327,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
 
       newTitle = newTitle.trim().replace(/^["'""'']+|["'""'']+$/g, '');
       if (newTitle) {
-        if (editing) {
-          setEditTitle(newTitle);
-        }
+        if (editing) setEditTitle(newTitle);
         const updated = contents.map(c =>
           c.id === item.id
             ? { ...c, title: newTitle, updatedAt: new Date().toISOString() }
@@ -319,16 +344,21 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setTitleLoading(false);
   };
 
-  const handleSave = () => {
+  // Persist current edits to store; clear isEditingMode flag
+  const persistEdits = (extra?: Partial<ContentItem>) => {
     const updated = contents.map(c =>
       c.id === item.id
-        ? { ...c, title: editTitle, content: editContent, updatedAt: new Date().toISOString() }
+        ? {
+            ...c,
+            title: editTitle,
+            content: editContent,
+            updatedAt: new Date().toISOString(),
+            isEditingMode: false,
+            ...(extra || {}),
+          }
         : c
     );
     setContents(updated);
-    setEditing(false);
-    setToolbarPos(null);
-    toast.success('内容已保存');
 
     if (item.autoGenerated && editContent !== originalContent && editContent.length > 10) {
       const diff = Math.abs(editContent.length - originalContent.length);
@@ -338,6 +368,42 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       }
     }
     setOriginalContent(editContent);
+  };
+
+  // Save to drafts → exit edit, collapse
+  const handleSaveToDraft = () => {
+    persistEdits({ status: 'draft' });
+    setEditing(false);
+    setCollapsed(true);
+    setToolbarPos(null);
+    toast.success('已保存到草稿箱');
+  };
+
+  // Confirm + go to distribution
+  const handleConfirmAndDistribute = () => {
+    persistEdits({ status: 'reviewing' });
+    setEditing(false);
+    setCollapsed(true);
+    setToolbarPos(null);
+    toast.success('已确定，进入分发流程');
+    onAction?.('distribute', { ...item, title: editTitle, content: editContent });
+  };
+
+  // Discard edits → reset to original, collapse
+  const handleDiscard = () => {
+    setEditContent(originalContent);
+    setEditTitle(item.title);
+    setEditing(false);
+    setCollapsed(true);
+    setToolbarPos(null);
+    setUndoStack([]);
+    setHighlightRange(null);
+    // Clear isEditingMode in store too
+    const updated = contents.map(c =>
+      c.id === item.id ? { ...c, isEditingMode: false } : c
+    );
+    setContents(updated);
+    toast('已丢弃修改');
   };
 
   const learnFromEdits = async (original: string, edited: string) => {
@@ -391,15 +457,26 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
   };
 
-  const handlePublish = () => {
-    const updated = contents.map(c =>
-      c.id === item.id
-        ? { ...c, status: 'published' as const, publishedAt: new Date().toISOString() }
-        : c
+  // === Collapsed (used-and-discarded) read-only summary ===
+  if (collapsed && !editing) {
+    return (
+      <div
+        ref={cardRef}
+        className="content-card flex items-center gap-3 cursor-pointer hover:border-spark-orange/40 transition-colors"
+        onClick={() => setCollapsed(false)}
+      >
+        {item.coverImage && (
+          <img src={item.coverImage} alt="" className="w-12 h-12 rounded-md object-cover shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-medium text-[#333] truncate">{item.title}</div>
+          <div className="text-[12px] text-[#999] truncate">
+            {item.status === 'reviewing' ? '✓ 已确定' : item.status === 'published' ? '✓ 已发布' : '✓ 已保存到草稿箱'} · 点击展开
+          </div>
+        </div>
+      </div>
     );
-    setContents(updated);
-    toast.success('内容已发布！');
-  };
+  }
 
   return (
     <div className="content-card relative" ref={cardRef}>
@@ -411,11 +488,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       {/* Cover Image */}
       {item.coverImage && (
         <div className="relative -mx-4 -mt-4 mb-3 rounded-t-xl overflow-hidden">
-          <img
-            src={item.coverImage}
-            alt={item.title}
-            className="w-full h-48 object-cover"
-          />
+          <img src={item.coverImage} alt={item.title} className="w-full h-48 object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
             <button
@@ -436,7 +509,6 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       )}
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -451,7 +523,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           <input
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            className="flex-1 text-[15px] font-semibold text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-1.5 outline-none focus:border-spark-orange"
+            placeholder="标题"
+            className="flex-1 text-[15px] font-semibold text-[#333] bg-transparent border-0 border-b border-transparent hover:border-[#E5E4E2] focus:border-spark-orange/60 outline-none px-0 py-1 transition-colors"
           />
           <button
             onClick={handleRegenerateTitle}
@@ -476,29 +549,43 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       )}
 
-      {/* Content */}
+      {/* Content — inline edit OR readonly */}
       {editing ? (
         <div className="relative">
+          {/* Highlight overlay (only when no active selection toolbar) */}
+          {highlightRange && !toolbarPos && (
+            <div
+              className="pointer-events-none absolute inset-0 px-0 py-0 text-[14px] leading-[1.6] whitespace-pre-wrap break-words text-transparent"
+              aria-hidden
+            >
+              <span>{editContent.substring(0, highlightRange.start)}</span>
+              <span className="bg-spark-orange/15 rounded-sm">
+                {editContent.substring(highlightRange.start, highlightRange.end)}
+              </span>
+              <span>{editContent.substring(highlightRange.end)}</span>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             onSelect={handleSelect}
             onMouseUp={handleSelect}
-            className="w-full text-[14px] text-[#555] leading-[1.6] border border-[#E5E4E2] rounded-lg px-3 py-2 outline-none focus:border-spark-orange resize-none min-h-[160px]"
+            placeholder="在这里写点什么..."
+            className="relative w-full text-[14px] text-[#333] leading-[1.6] bg-transparent border-0 outline-none resize-none min-h-[180px] p-0"
           />
           {aiLoading && (
-            <div className="absolute inset-0 bg-white/60 rounded-lg flex items-center justify-center">
+            <div className="absolute inset-0 bg-white/60 rounded-lg flex items-center justify-center pointer-events-none">
               <div className="flex items-center gap-2 text-[13px] text-spark-orange">
                 <Loader2 size={16} className="animate-spin" />
                 AI 处理中...
               </div>
             </div>
           )}
-          <p className="text-[11px] text-[#CCC] mt-1">💡 选中文字后可使用 AI 改写、扩写或精简</p>
+          <p className="text-[11px] text-[#BBB] mt-2">💡 选中文字可使用 AI 改写、扩写或精简</p>
         </div>
       ) : (
-        <div className="text-[14px] text-[#555] leading-[1.6] whitespace-pre-wrap">
+        <div className="text-[14px] text-[#333] leading-[1.6] whitespace-pre-wrap">
           {expanded ? item.content : previewText}
           {!expanded && item.content.split('\n').length > 3 && '...'}
         </div>
@@ -515,7 +602,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       )}
 
-      {/* Actions */}
+      {/* Footer Actions */}
       <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[#F0EFED] flex-wrap">
         {!editing ? (
           <>
@@ -523,8 +610,16 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? '收起' : '展开全文'}
             </button>
-            <button onClick={() => setEditDialogOpen(true)} className="content-card-btn">
-              <Pencil size={13} /> 编辑
+            <button
+              onClick={() => {
+                setEditing(true);
+                setEditContent(item.content);
+                setEditTitle(item.title);
+                setOriginalContent(item.content);
+              }}
+              className="content-card-btn"
+            >
+              <Pencil size={13} /> 修改
             </button>
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
               {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
@@ -537,63 +632,44 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             >
               {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
               {coverLoading ? '生成中...' : 'AI配图'}
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="content-card-btn"
-            >
-              <ImageUp size={13} /> 上传封面
-            </button>
-            <button onClick={() => onAction?.('restyle', item)} className="content-card-btn">
-              <Palette size={13} /> 换风格
-            </button>
-            <button onClick={handlePublish} className="content-card-btn text-spark-orange">
-              <Upload size={13} /> 发布
-            </button>
-            <button
-              onClick={() => { toast.success('已存入草稿箱'); }}
-              className="content-card-btn"
-            >
-              <BookmarkPlus size={13} /> 存稿
             </button>
           </>
         ) : (
           <>
-            <button onClick={handleSave} className="content-card-btn text-spark-orange font-medium">保存</button>
+            {/* Primary: Confirm + distribute */}
+            <button
+              onClick={handleConfirmAndDistribute}
+              className="flex items-center gap-1 text-[12px] px-3 py-1.5 rounded-lg bg-spark-orange text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <Send size={13} /> 确定并进入分发
+            </button>
+            {/* Primary: Save draft */}
+            <button
+              onClick={handleSaveToDraft}
+              className="flex items-center gap-1 text-[12px] px-3 py-1.5 rounded-lg border border-spark-orange/40 text-spark-orange hover:bg-spark-orange/5 transition-colors"
+            >
+              <Save size={13} /> 保存到草稿箱
+            </button>
+            {/* AI helpers */}
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
               {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {aiLoading === 'polish' ? '润色中...' : '润色'}
-            </button>
-            <button
-              onClick={handleGenerateCover}
-              disabled={coverLoading}
-              className="content-card-btn text-spark-orange"
-            >
-              {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {coverLoading ? '生成中...' : 'AI配图'}
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="content-card-btn"
-            >
-              <ImageUp size={13} /> 上传
+              {aiLoading === 'polish' ? '润色中...' : '润色全文'}
             </button>
             {undoStack.length > 0 && (
               <button onClick={handleUndo} disabled={!!aiLoading} className="content-card-btn text-[#999]">
                 <Undo2 size={13} /> 撤销
               </button>
             )}
-            <button onClick={() => { setEditing(false); setToolbarPos(null); setUndoStack([]); }} className="content-card-btn">取消</button>
+            {/* Secondary: Discard */}
+            <button
+              onClick={handleDiscard}
+              className="ml-auto content-card-btn text-[#BBB] hover:text-[#E55]"
+            >
+              <Trash2 size={13} /> 丢弃
+            </button>
           </>
         )}
       </div>
-
-      {/* Edit Dialog */}
-      <ContentEditDialog
-        item={item}
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-      />
     </div>
   );
 }
