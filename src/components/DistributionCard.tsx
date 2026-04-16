@@ -209,13 +209,24 @@ export default function DistributionCard({ data }: DistributionCardProps) {
             )}
           </button>
         ) : (
-          <button
-            onClick={handleViewData}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors"
-          >
-            <BarChart3 size={14} />
-            查看数据
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleViewData}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-green-300 text-green-700 text-[13px] font-medium hover:bg-green-50 transition-colors"
+            >
+              <BarChart3 size={14} />
+              查看数据
+            </button>
+            <button
+              onClick={handleTestFetchNow}
+              disabled={fetchingTest}
+              title="立即触发数据回流（开发测试用，正式环境会在 24 小时后自动触发）"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-medium hover:bg-blue-100 transition-colors disabled:opacity-60"
+            >
+              {fetchingTest ? <Loader2 size={12} className="animate-spin" /> : '⚡'}
+              立即拉取
+            </button>
+          </div>
         )}
       </div>
     </div>
