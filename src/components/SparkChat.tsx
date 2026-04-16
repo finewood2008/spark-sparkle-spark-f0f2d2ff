@@ -323,6 +323,26 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     return parts.join('\n');
   }, [getContext]);
 
+  // Detect schedule-creation intent in natural language
+  const tryDetectScheduleIntent = (text: string): ScheduleCardData | null => {
+    const scheduleKeywords = /(每周|每天|每日|定时|定期|自动生成|自动发|计划|按时|每隔)/;
+    if (!scheduleKeywords.test(text)) return null;
+    const frequency: 'daily' | 'weekly' = /每周|周一|周二|周三|周四|周五|周六|周日/.test(text) ? 'weekly' : 'daily';
+    // Extract a topic guess: text after "关于" or "写" up to common stopwords
+    let topic = '';
+    const aboutMatch = text.match(/关于(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
+    if (aboutMatch) topic = aboutMatch[1].trim();
+    if (!topic) {
+      const writeMatch = text.match(/写(?:一篇|一个|点)?(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
+      if (writeMatch) topic = writeMatch[1].trim();
+    }
+    return {
+      id: `${Date.now()}-plan`,
+      suggestedTopic: topic.slice(0, 30),
+      suggestedFrequency: frequency,
+    };
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
     setInput('');
@@ -334,6 +354,20 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       timestamp: new Date().toISOString(),
     };
     addMessage(userMsg);
+
+    // Schedule intent: short-circuit to a ScheduleCard instead of generating
+    const scheduleCard = tryDetectScheduleIntent(text);
+    if (scheduleCard) {
+      addMessage({
+        id: `${Date.now()}-sched-card`,
+        role: 'assistant',
+        content: '听起来你想创建一个定时任务，我帮你拟了一份计划，确认一下👇',
+        timestamp: new Date().toISOString(),
+        scheduleCard,
+      });
+      return;
+    }
+
     setIsGenerating(true);
 
     // Determine if this should generate an article or just chat
@@ -477,7 +511,27 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     });
   };
 
+  const pushDistributionCard = useCallback((item: ContentItem) => {
+    const distribution: DistributionData = {
+      contentId: item.id,
+      title: item.title,
+      defaultPlatforms: [item.platform],
+    };
+    addMessage({
+      id: `${Date.now()}-dist`,
+      role: 'assistant',
+      content: `太好了！「${item.title}」已就绪，请选择要分发的平台：`,
+      timestamp: new Date().toISOString(),
+      distribution,
+    });
+  }, [addMessage]);
+
   const handleCardAction = useCallback((action: string, item?: ContentItem) => {
+    // Distribution flow: approve / publish / distribute → push DistributionCard
+    if (item && (action === 'approve' || action === 'distribute' || action === 'publish')) {
+      pushDistributionCard(item);
+      return;
+    }
     const actionMap: Record<string, string> = {
       restyle: `请帮我把「${item?.title || '这篇文章'}」换一种风格重新写`,
       write_sequel: `请针对「${(item as any)?.title || '上篇内容'}」写一篇续集`,
@@ -485,7 +539,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     };
     const text = actionMap[action];
     if (text) sendMessage(text);
-  }, []);
+  }, [pushDistributionCard]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
