@@ -76,6 +76,31 @@ export async function loginWithPassword(
   };
 }
 
+/** 申请注册（提交后等待管理员审核） */
+export interface RegisterApplyInput {
+  email: string;
+  nickname: string;
+  reason?: string;
+}
+export async function applyForRegistration(
+  input: RegisterApplyInput,
+): Promise<{ success: boolean; error?: string }> {
+  await delay(1000);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email);
+  if (!emailOk) return { success: false, error: '请输入正确的邮箱' };
+  if (!input.nickname || input.nickname.trim().length < 2) {
+    return { success: false, error: '昵称至少 2 个字符' };
+  }
+  // Mock：将申请存入 localStorage，便于演示
+  try {
+    const KEY = 'spark_register_applications';
+    const list = JSON.parse(localStorage.getItem(KEY) || '[]');
+    list.push({ ...input, submittedAt: new Date().toISOString(), status: 'pending' });
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {}
+  return { success: true };
+}
+
 /** 验证码登录 */
 export async function loginWithCode(
   phone: string,
