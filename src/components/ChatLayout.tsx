@@ -15,8 +15,17 @@ export default function ChatLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
+  const [pulseKey, setPulseKey] = useState(0);
+  const prevCountRef = useRef(0);
 
   const { getFullContext } = useMemorySync();
+
+  useEffect(() => {
+    if (reviewingCount > prevCountRef.current) {
+      setPulseKey((k) => k + 1);
+    }
+    prevCountRef.current = reviewingCount;
+  }, [reviewingCount]);
 
   useEffect(() => {
     const fetchCount = async () => {
