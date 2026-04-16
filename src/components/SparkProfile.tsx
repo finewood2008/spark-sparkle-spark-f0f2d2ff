@@ -397,7 +397,8 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
             </button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
