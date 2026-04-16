@@ -25,11 +25,19 @@ export interface ReviewHistoryEntry {
   platform: ContentItem['platform'];
   status: ContentItem['status'];
   taskName: string;
+  taskSource: ReviewTaskData['source'];
   taskTopic?: string;
   triggeredAt: string;
   updatedAt: string;
+  publishedAt?: string;
+  publishedPlatforms?: string[];
   rejectReason?: string;
   contentPreview: string;
+  /** Full content for detail view */
+  content: string;
+  cta: string;
+  tags: string[];
+  coverImage?: string;
 }
 
 /** Load all review items as flat history entries (for the Memory page list). */
@@ -54,11 +62,18 @@ export async function loadReviewHistory(): Promise<ReviewHistoryEntry[]> {
     platform: row.platform as ContentItem['platform'],
     status: row.status as ContentItem['status'],
     taskName: row.task_name || '审核任务',
+    taskSource: (row.task_source as ReviewTaskData['source']) || 'schedule',
     taskTopic: row.task_topic || undefined,
     triggeredAt: row.triggered_at,
     updatedAt: row.updated_at,
+    publishedAt: row.published_at || undefined,
+    publishedPlatforms: row.published_platforms || [],
     rejectReason: row.reject_reason || undefined,
     contentPreview: (row.content || '').slice(0, 120),
+    content: row.content || '',
+    cta: row.cta || '',
+    tags: row.tags || [],
+    coverImage: row.cover_image || undefined,
   }));
 }
 
