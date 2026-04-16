@@ -110,7 +110,11 @@ function formatTime(iso: string) {
   });
 }
 
-export default function ReviewPage() {
+interface ReviewPageProps {
+  embedded?: boolean;
+}
+
+export default function ReviewPage({ embedded = false }: ReviewPageProps = {}) {
   const [entries, setEntries] = useState<ReviewHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>('all');
