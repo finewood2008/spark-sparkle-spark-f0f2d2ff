@@ -28,6 +28,8 @@ import {
   CalendarDays,
   Repeat,
   Target,
+  Cloud,
+  Trash2,
 } from 'lucide-react';
 
 const PLATFORM_LABELS: Record<Platform, string> = {
