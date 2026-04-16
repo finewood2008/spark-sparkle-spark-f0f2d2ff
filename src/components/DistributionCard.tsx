@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Loader2, CheckCircle2, BarChart3, Rocket, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, CheckCircle2, BarChart3, Rocket, Check, Eye } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { loadUserPrefs } from '../lib/user-prefs';
 import { supabase } from '@/integrations/supabase/client';
 import type { Platform, DistributionData } from '../types/spark';
 import type { ReportData } from './DataReportCard';
+import PlatformPreview from './PlatformPreview';
 import { toast } from 'sonner';
 
 interface PlatformOption {
