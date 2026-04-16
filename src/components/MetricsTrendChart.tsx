@@ -242,9 +242,11 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
         </div>
       )}
 
-      <div className="text-[10px] text-muted-foreground text-right">
-        最近采样：{latest.fullTime}
-      </div>
+          <div className="text-[10px] text-muted-foreground text-right">
+            最近采样：{latest?.fullTime}
+          </div>
+        </>
+      )}
     </div>
   );
 }
