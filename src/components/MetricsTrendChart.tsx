@@ -114,40 +114,37 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
     };
   }, [reviewItemId, platform]);
 
-  if (loading) {
-    return (
-      <div className="rounded-xl border border-border bg-background/40 p-4 flex items-center justify-center h-48 text-muted-foreground text-sm">
-        <Loader2 size={16} className="animate-spin mr-2" />
-        加载趋势数据...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 text-sm text-red-700">
-        加载失败：{error}
-      </div>
-    );
-  }
-
-  if (points.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 flex flex-col items-center justify-center h-32 text-muted-foreground">
-        <Inbox size={20} className="mb-1.5 opacity-50" />
-        <span className="text-xs">暂无指标数据 — 桌面客户端拉取后会自动出现</span>
-      </div>
-    );
-  }
-
-  const latest = points[points.length - 1];
-  const first = points[0];
-  const viewsDelta = latest.views - first.views;
+  const latest = points.length > 0 ? points[points.length - 1] : null;
+  const first = points.length > 0 ? points[0] : null;
+  const viewsDelta = latest && first ? latest.views - first.views : 0;
   const showSingle = points.length === 1;
+
+  const tabs = (
+    <div className="flex gap-1 rounded-lg bg-muted/40 p-0.5">
+      {PLATFORM_TABS.map(t => {
+        const active = t.value === platform;
+        return (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setPlatform(t.value)}
+            className={
+              'px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ' +
+              (active
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground')
+            }
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="rounded-xl border border-border bg-background/40 p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
           <TrendingUp size={14} className="text-primary" />
           数据趋势
@@ -155,13 +152,32 @@ export default function MetricsTrendChart({ reviewItemId }: MetricsTrendChartPro
             （{points.length} 次采样）
           </span>
         </div>
-        {!showSingle && viewsDelta > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-            浏览 +{viewsDelta.toLocaleString()}
-          </span>
-        )}
+        {tabs}
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+          <Loader2 size={16} className="animate-spin mr-2" />
+          加载趋势数据...
+        </div>
+      ) : error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          加载失败：{error}
+        </div>
+      ) : points.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 flex flex-col items-center justify-center h-32 text-muted-foreground">
+          <Inbox size={20} className="mb-1.5 opacity-50" />
+          <span className="text-xs">该平台暂无采样数据</span>
+        </div>
+      ) : (
+        <>
+          {!showSingle && viewsDelta > 0 && (
+            <div className="flex justify-end">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                浏览 +{viewsDelta.toLocaleString()}
+              </span>
+            </div>
+          )}
       {showSingle ? (
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(METRIC_LABELS) as (keyof typeof METRIC_LABELS)[]).map(k => (
