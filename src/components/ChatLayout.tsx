@@ -184,6 +184,21 @@ export default function ChatLayout() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Review center drawer */}
+      <Sheet open={reviewOpen} onOpenChange={setReviewOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-2xl p-0 bg-[#FAFAF8] flex flex-col gap-0"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>审核中心</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <ReviewPage embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
