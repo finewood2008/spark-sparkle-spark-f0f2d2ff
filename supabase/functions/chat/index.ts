@@ -83,7 +83,13 @@ ${brandContext || ""}`;
           }),
         });
         // Don't retry on client errors (4xx) — only on 5xx
-        if (response.ok || (response.status >= 400 && response.status < 500)) break;
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          if (!response.ok) {
+            lastErrText = await response.text();
+            console.error(`Gemini ${response.status} body:`, lastErrText);
+          }
+          break;
+        }
         lastErrText = await response.text();
         console.error(`Gemini attempt ${attempt + 1} failed:`, response.status, lastErrText);
       } catch (fetchErr) {
