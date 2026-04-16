@@ -68,6 +68,57 @@ export type Database = {
         }
         Relationships: []
       }
+      content_metrics: {
+        Row: {
+          ai_insight: string | null
+          comments: number
+          created_at: string
+          device_id: string
+          fetched_at: string
+          id: string
+          likes: number
+          platform: string
+          review_item_id: string
+          saves: number
+          shares: number
+          source: string
+          user_id: string | null
+          views: number
+        }
+        Insert: {
+          ai_insight?: string | null
+          comments?: number
+          created_at?: string
+          device_id?: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          platform: string
+          review_item_id: string
+          saves?: number
+          shares?: number
+          source?: string
+          user_id?: string | null
+          views?: number
+        }
+        Update: {
+          ai_insight?: string | null
+          comments?: number
+          created_at?: string
+          device_id?: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          platform?: string
+          review_item_id?: string
+          saves?: number
+          shares?: number
+          source?: string
+          user_id?: string | null
+          views?: number
+        }
+        Relationships: []
+      }
       learning_entries: {
         Row: {
           category: string
@@ -113,7 +164,10 @@ export type Database = {
           cta: string
           device_id: string
           id: string
+          metrics_fetched_at: string | null
           platform: string
+          published_at: string | null
+          published_platforms: string[]
           reject_reason: string | null
           status: string
           tags: string[]
@@ -133,7 +187,10 @@ export type Database = {
           cta?: string
           device_id?: string
           id: string
+          metrics_fetched_at?: string | null
           platform?: string
+          published_at?: string | null
+          published_platforms?: string[]
           reject_reason?: string | null
           status?: string
           tags?: string[]
@@ -153,7 +210,10 @@ export type Database = {
           cta?: string
           device_id?: string
           id?: string
+          metrics_fetched_at?: string | null
           platform?: string
+          published_at?: string | null
+          published_platforms?: string[]
           reject_reason?: string | null
           status?: string
           tags?: string[]
