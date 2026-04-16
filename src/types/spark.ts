@@ -20,7 +20,7 @@ export interface ChoiceOption {
 }
 
 export interface ReviewTaskData {
-  source: 'schedule' | 'auto';
+  source: 'schedule' | 'auto' | 'manual';
   taskName: string;
   triggeredAt: string;
   topic?: string;

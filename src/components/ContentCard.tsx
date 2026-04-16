@@ -1,11 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Upload, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, History } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, Plus } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ContentItem } from '../types/spark';
+import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
-import type { LearningEntry } from '../types/spark';
-import ContentEditDialog from './ContentEditDialog';
+import { saveReviewItem } from '../lib/review-persistence';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -57,24 +56,56 @@ function AIFloatingToolbar({
 }
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
-  const { contents, setContents, learnings, setLearnings, addMessage } = useAppStore();
+  const { contents, setContents, setLearnings, addMessage } = useAppStore();
   // Use live item from store if available, fall back to prop
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(item.content);
   const [editTitle, setEditTitle] = useState(item.title);
+  const [editCta, setEditCta] = useState(item.cta || '');
+  const [editTags, setEditTags] = useState<string[]>(item.tags || []);
+  const [tagDraft, setTagDraft] = useState('');
   const [originalContent, setOriginalContent] = useState(item.content);
   const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const enterEditMode = () => {
+    setEditTitle(item.title);
+    setEditContent(item.content);
+    setEditCta(item.cta || '');
+    setEditTags(item.tags || []);
+    setOriginalContent(item.content);
+    setEditing(true);
+    setExpanded(true);
+  };
+
+  const addTag = () => {
+    const t = tagDraft.trim().replace(/^#+/, '');
+    if (!t) return;
+    if (editTags.includes(t)) {
+      setTagDraft('');
+      return;
+    }
+    if (editTags.length >= 10) {
+      toast.error('最多 10 个标签');
+      return;
+    }
+    setEditTags([...editTags, t]);
+    setTagDraft('');
+  };
+
+  const removeTag = (t: string) => {
+    setEditTags(editTags.filter(x => x !== t));
+  };
 
   const handleUploadCover = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -322,7 +353,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const handleSave = () => {
     const updated = contents.map(c =>
       c.id === item.id
-        ? { ...c, title: editTitle, content: editContent, updatedAt: new Date().toISOString() }
+        ? {
+            ...c,
+            title: editTitle,
+            content: editContent,
+            cta: editCta,
+            tags: editTags,
+            updatedAt: new Date().toISOString(),
+          }
         : c
     );
     setContents(updated);
@@ -391,14 +429,37 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
   };
 
-  const handlePublish = () => {
-    const updated = contents.map(c =>
-      c.id === item.id
-        ? { ...c, status: 'published' as const, publishedAt: new Date().toISOString() }
-        : c
-    );
+  const handleSubmitReview = async () => {
+    setSubmitLoading(true);
+    // 如果在编辑态，先把编辑内容合并进来
+    const finalItem: ContentItem = {
+      ...item,
+      title: editing ? editTitle : item.title,
+      content: editing ? editContent : item.content,
+      cta: editing ? editCta : item.cta,
+      tags: editing ? editTags : item.tags,
+      status: 'reviewing',
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = contents.map(c => (c.id === item.id ? finalItem : c));
     setContents(updated);
-    toast.success('内容已发布！');
+
+    try {
+      await saveReviewItem(finalItem, {
+        source: 'manual',
+        taskName: '手动提交审核',
+        triggeredAt: new Date().toISOString(),
+      });
+      toast.success('已提交审核，请前往审核页查看');
+      if (editing) {
+        setEditing(false);
+        setToolbarPos(null);
+      }
+    } catch {
+      toast.error('提交审核失败，请重试');
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   return (
@@ -504,15 +565,73 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       )}
 
-      {/* Tags */}
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {item.tags.map(tag => (
-            <span key={tag} className="text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full">
-              #{tag}
-            </span>
-          ))}
+      {/* CTA (edit mode) */}
+      {editing && (
+        <div className="mt-3">
+          <label className="block text-[11px] text-[#999] mb-1">CTA（行动号召）</label>
+          <input
+            value={editCta}
+            onChange={(e) => setEditCta(e.target.value)}
+            placeholder="如：点击关注，下期更新…"
+            className="w-full text-[13px] text-[#555] border border-[#E5E4E2] rounded-lg px-3 py-1.5 outline-none focus:border-spark-orange"
+            maxLength={100}
+          />
         </div>
+      )}
+
+      {/* Tags */}
+      {editing ? (
+        <div className="mt-3">
+          <label className="block text-[11px] text-[#999] mb-1">标签</label>
+          <div className="flex flex-wrap items-center gap-1.5 border border-[#E5E4E2] rounded-lg px-2 py-1.5 focus-within:border-spark-orange">
+            {editTags.map(tag => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full"
+              >
+                #{tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-spark-orange/70"
+                  aria-label={`删除 ${tag}`}
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagDraft}
+              onChange={(e) => setTagDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+                  e.preventDefault();
+                  addTag();
+                } else if (e.key === 'Backspace' && !tagDraft && editTags.length > 0) {
+                  removeTag(editTags[editTags.length - 1]);
+                }
+              }}
+              onBlur={() => tagDraft && addTag()}
+              placeholder={editTags.length === 0 ? '输入标签，回车添加' : ''}
+              className="flex-1 min-w-[100px] text-[12px] text-[#555] outline-none bg-transparent"
+              maxLength={20}
+            />
+          </div>
+        </div>
+      ) : (
+        item.tags && item.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {item.tags.map(tag => (
+              <span key={tag} className="text-[11px] text-spark-orange bg-spark-orange/10 px-2 py-0.5 rounded-full">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Non-edit CTA preview */}
+      {!editing && item.cta && (
+        <p className="text-[12px] text-[#999] italic mt-2">👉 {item.cta}</p>
       )}
 
       {/* Actions */}
@@ -523,7 +642,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? '收起' : '展开全文'}
             </button>
-            <button onClick={() => setEditDialogOpen(true)} className="content-card-btn">
+            <button onClick={enterEditMode} className="content-card-btn">
               <Pencil size={13} /> 编辑
             </button>
             <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
@@ -548,10 +667,12 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               <Palette size={13} /> 换风格
             </button>
             <button
-              onClick={() => onAction ? onAction('distribute', item) : handlePublish()}
+              onClick={handleSubmitReview}
+              disabled={submitLoading}
               className="content-card-btn text-spark-orange"
             >
-              <Upload size={13} /> 发布
+              {submitLoading ? <Loader2 size={13} className="animate-spin" /> : <ClipboardCheck size={13} />}
+              {submitLoading ? '提交中...' : '提交审核'}
             </button>
             <button
               onClick={() => { toast.success('已存入草稿箱'); }}
@@ -586,17 +707,20 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
                 <Undo2 size={13} /> 撤销
               </button>
             )}
-            <button onClick={() => { setEditing(false); setToolbarPos(null); setUndoStack([]); }} className="content-card-btn">取消</button>
+            <button
+              onClick={() => {
+                setEditing(false);
+                setToolbarPos(null);
+                setUndoStack([]);
+                setTagDraft('');
+              }}
+              className="content-card-btn"
+            >
+              取消
+            </button>
           </>
         )}
       </div>
-
-      {/* Edit Dialog */}
-      <ContentEditDialog
-        item={item}
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-      />
     </div>
   );
 }
