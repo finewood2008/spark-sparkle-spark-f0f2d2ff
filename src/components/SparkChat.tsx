@@ -238,7 +238,7 @@ function generateSuggestions(title: string, content: string, tags?: string[]): C
 export default function SparkChat({ getContext }: { getContext?: () => string }) {
   const {
     messages, addMessage, isGenerating, setIsGenerating,
-    setContents, setSelectedContentId,
+    contents, setContents, setSelectedContentId,
   } = useAppStore();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -246,11 +246,17 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
 
   const hasMessages = messages.length > 0;
 
+  // Smooth-scroll to bottom on new messages, generation status changes,
+  // and content updates (so expanding cards keep focus on the latest input).
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isGenerating]);
+    const el = scrollRef.current;
+    if (!el) return;
+    // Use rAF so the DOM (including freshly mounted ContentCard) has laid out.
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [messages, isGenerating, contents]);
 
   const getBrandContext = useCallback(() => {
     const parts: string[] = [];
