@@ -50,10 +50,15 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
     updateReviewItemStatus(item.id, 'approved');
     appendUserMessage(`[已通过] 这篇「${item.title}」可以发布`);
     addMessage({
-      id: `${Date.now()}-approved`,
+      id: `${Date.now()}-approved-dist`,
       role: 'assistant',
-      content: `好的，「${item.title}」已通过审核 ✅\n稍后我会按计划自动分发到 ${item.platform}。`,
+      content: `太好了！「${item.title}」已通过审核 ✅，请选择要分发的平台：`,
       timestamp: new Date().toISOString(),
+      distribution: {
+        contentId: item.id,
+        title: item.title,
+        defaultPlatforms: [item.platform],
+      },
     });
     toast.success('内容已通过审核');
   };

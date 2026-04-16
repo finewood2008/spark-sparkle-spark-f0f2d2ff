@@ -547,7 +547,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             <button onClick={() => onAction?.('restyle', item)} className="content-card-btn">
               <Palette size={13} /> 换风格
             </button>
-            <button onClick={handlePublish} className="content-card-btn text-spark-orange">
+            <button
+              onClick={() => onAction ? onAction('distribute', item) : handlePublish()}
+              className="content-card-btn text-spark-orange"
+            >
               <Upload size={13} /> 发布
             </button>
             <button

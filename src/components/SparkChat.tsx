@@ -3,10 +3,12 @@ import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
-import type { ChatMessage, ContentItem, ChoiceOption } from '../types/spark';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
 import ReviewCard from './ReviewCard';
+import DistributionCard from './DistributionCard';
+import ScheduleCard from './ScheduleCard';
 
 function SparkAvatar({ size = 32 }: { size?: number }) {
   return (
@@ -121,6 +123,40 @@ function MessageBubble({ msg, onSend, onCardAction }: {
   onCardAction: (action: string, item?: ContentItem) => void;
 }) {
   const isUser = msg.role === 'user';
+
+  // Distribution card — content approved, choose platforms to publish
+  if (!isUser && msg.distribution) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <DistributionCard data={msg.distribution} />
+        </div>
+      </div>
+    );
+  }
+
+  // Schedule card — natural-language triggered task creation
+  if (!isUser && msg.scheduleCard) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <ScheduleCard data={msg.scheduleCard} />
+        </div>
+      </div>
+    );
+  }
 
   // Review card (Human-in-the-loop) — for scheduled-task generated content awaiting approval
   if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
@@ -287,6 +323,26 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     return parts.join('\n');
   }, [getContext]);
 
+  // Detect schedule-creation intent in natural language
+  const tryDetectScheduleIntent = (text: string): ScheduleCardData | null => {
+    const scheduleKeywords = /(每周|每天|每日|定时|定期|自动生成|自动发|计划|按时|每隔)/;
+    if (!scheduleKeywords.test(text)) return null;
+    const frequency: 'daily' | 'weekly' = /每周|周一|周二|周三|周四|周五|周六|周日/.test(text) ? 'weekly' : 'daily';
+    // Extract a topic guess: text after "关于" or "写" up to common stopwords
+    let topic = '';
+    const aboutMatch = text.match(/关于(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
+    if (aboutMatch) topic = aboutMatch[1].trim();
+    if (!topic) {
+      const writeMatch = text.match(/写(?:一篇|一个|点)?(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
+      if (writeMatch) topic = writeMatch[1].trim();
+    }
+    return {
+      id: `${Date.now()}-plan`,
+      suggestedTopic: topic.slice(0, 30),
+      suggestedFrequency: frequency,
+    };
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
     setInput('');
@@ -298,6 +354,20 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       timestamp: new Date().toISOString(),
     };
     addMessage(userMsg);
+
+    // Schedule intent: short-circuit to a ScheduleCard instead of generating
+    const scheduleCard = tryDetectScheduleIntent(text);
+    if (scheduleCard) {
+      addMessage({
+        id: `${Date.now()}-sched-card`,
+        role: 'assistant',
+        content: '听起来你想创建一个定时任务，我帮你拟了一份计划，确认一下👇',
+        timestamp: new Date().toISOString(),
+        scheduleCard,
+      });
+      return;
+    }
+
     setIsGenerating(true);
 
     // Determine if this should generate an article or just chat
@@ -441,7 +511,27 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     });
   };
 
+  const pushDistributionCard = useCallback((item: ContentItem) => {
+    const distribution: DistributionData = {
+      contentId: item.id,
+      title: item.title,
+      defaultPlatforms: [item.platform],
+    };
+    addMessage({
+      id: `${Date.now()}-dist`,
+      role: 'assistant',
+      content: `太好了！「${item.title}」已就绪，请选择要分发的平台：`,
+      timestamp: new Date().toISOString(),
+      distribution,
+    });
+  }, [addMessage]);
+
   const handleCardAction = useCallback((action: string, item?: ContentItem) => {
+    // Distribution flow: approve / publish / distribute → push DistributionCard
+    if (item && (action === 'approve' || action === 'distribute' || action === 'publish')) {
+      pushDistributionCard(item);
+      return;
+    }
     const actionMap: Record<string, string> = {
       restyle: `请帮我把「${item?.title || '这篇文章'}」换一种风格重新写`,
       write_sequel: `请针对「${(item as any)?.title || '上篇内容'}」写一篇续集`,
@@ -449,7 +539,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     };
     const text = actionMap[action];
     if (text) sendMessage(text);
-  }, []);
+  }, [pushDistributionCard]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -27,6 +27,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: '小红书',
   wechat: '公众号',
   douyin: '抖音',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
 };
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
