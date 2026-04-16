@@ -6,6 +6,7 @@ import {
   TrendingUp, Lightbulb,
   Edit3, Tag, X,
 } from 'lucide-react';
+import ReviewHistoryList from '../components/ReviewHistoryList';
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   edit: { label: '内容编辑', icon: Edit3, color: 'text-blue-500' },
@@ -184,6 +185,8 @@ export default function MemoryPage() {
           })}
         </div>
       </div>
+
+      <ReviewHistoryList />
     </div>
   );
 }
