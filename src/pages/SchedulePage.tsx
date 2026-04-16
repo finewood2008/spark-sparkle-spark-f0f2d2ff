@@ -453,6 +453,10 @@ export default function SchedulePage() {
     }
 
     setLogs(prev => [...newLogs, ...prev]);
+    // Insert pending log rows to cloud
+    for (const l of newLogs) {
+      insertScheduleLog(l);
+    }
 
     for (let i = 0; i < newLogs.length; i++) {
       const log = newLogs[i];
@@ -504,6 +508,8 @@ export default function SchedulePage() {
       }
 
       setLogs(prev => prev.map(l => l.id === log.id ? { ...log } : l));
+      // Sync log status to cloud
+      updateScheduleLog(log);
     }
 
     // Add generated contents to store
@@ -512,7 +518,6 @@ export default function SchedulePage() {
       setSelectedContentId(newContents[0].id);
     }
 
-    saveLogs([...newLogs.map(l => ({ ...l })), ...loadLogs()]);
     setGenerating(false);
   }, [generating, config, getBrandContext, contents, setContents, setSelectedContentId, addMessage]);
 
