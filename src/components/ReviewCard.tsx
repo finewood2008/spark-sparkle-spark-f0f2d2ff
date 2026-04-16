@@ -173,16 +173,39 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
         <ContentCard item={item} />
       </div>
 
+      {/* Quick-tune presets */}
+      {isReviewing && !rejecting && !regenerating && (
+        <div className="px-4 pt-3 pb-1 bg-yellow-50/30 border-t border-yellow-200/40">
+          <div className="text-[11px] text-[#999] mb-1.5">⚡ 快速微调（一键重写）</div>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: '语气更活泼', icon: <Sparkles size={11} />, prompt: '把语气改得更活泼、轻松、有感染力，多用口语化表达和有趣的比喻，让读者读起来有亲切感。' },
+              { label: '语气更专业', icon: <Briefcase size={11} />, prompt: '把语气改得更专业、严谨、权威，使用行业术语和数据支撑观点，去掉过于口语化的表达。' },
+              { label: '更精简', icon: <Scissors size={11} />, prompt: '在保留核心信息和关键卖点的前提下，把内容精简到原文的 60% 长度左右，去除冗余表达。' },
+            ].map(preset => (
+              <button
+                key={preset.label}
+                onClick={() => runRegenerate(preset.prompt, preset.label)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] bg-white border border-yellow-200 text-[#666] hover:bg-yellow-50 hover:border-yellow-400 hover:text-spark-orange transition-colors"
+              >
+                {preset.icon}
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       {isReviewing && !rejecting && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-yellow-50/30 border-t border-yellow-200/40">
+        <div className="flex items-center gap-2 px-4 py-3 bg-yellow-50/30">
           <button
             onClick={handleApprove}
             disabled={regenerating}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
           >
-            <CheckCircle2 size={14} />
-            通过并分发
+            {regenerating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            {regenerating ? '重新生成中...' : '通过并分发'}
           </button>
           <button
             onClick={() => setRejecting(true)}
@@ -190,7 +213,7 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-600 border border-red-200 text-[13px] font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
           >
             <RotateCcw size={14} />
-            打回重写
+            自定义打回
           </button>
         </div>
       )}
@@ -214,7 +237,7 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
             className="w-full text-[13px] text-[#333] bg-white border border-yellow-200 rounded-lg px-3 py-2 outline-none focus:border-yellow-400 resize-none"
           />
           <button
-            onClick={handleSubmitReject}
+            onClick={() => runRegenerate(rejectReason)}
             disabled={regenerating || !rejectReason.trim()}
             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-spark-orange text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
