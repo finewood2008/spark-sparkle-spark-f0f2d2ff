@@ -117,7 +117,7 @@ export default function ChatLayout() {
             <FileText size={18} />
           </button>
           <button
-            onClick={() => navigate({ to: '/review' })}
+            onClick={() => setReviewOpen(true)}
             className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
             title="审核中心"
           >
