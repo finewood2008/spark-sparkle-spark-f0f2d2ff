@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth.authorize'
+import { Route as ApiIngestMetricsRouteImport } from './routes/api.ingest-metrics'
 
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
@@ -46,6 +47,11 @@ const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
   path: '/oauth/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIngestMetricsRoute = ApiIngestMetricsRouteImport.update({
+  id: '/api/ingest-metrics',
+  path: '/api/ingest-metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review': typeof ReviewRoute
+  '/api/ingest-metrics': typeof ApiIngestMetricsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review': typeof ReviewRoute
+  '/api/ingest-metrics': typeof ApiIngestMetricsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review': typeof ReviewRoute
+  '/api/ingest-metrics': typeof ApiIngestMetricsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/review'
+    | '/api/ingest-metrics'
     | '/oauth/authorize'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/review'
+    | '/api/ingest-metrics'
     | '/oauth/authorize'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/review'
+    | '/api/ingest-metrics'
     | '/oauth/authorize'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewRoute: typeof ReviewRoute
+  ApiIngestMetricsRoute: typeof ApiIngestMetricsRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
 }
 
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthAuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ingest-metrics': {
+      id: '/api/ingest-metrics'
+      path: '/api/ingest-metrics'
+      fullPath: '/api/ingest-metrics'
+      preLoaderRoute: typeof ApiIngestMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewRoute: ReviewRoute,
+  ApiIngestMetricsRoute: ApiIngestMetricsRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
 }
 export const routeTree = rootRouteImport

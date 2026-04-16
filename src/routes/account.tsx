@@ -6,6 +6,7 @@ import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
+import DeviceTokenManager from '@/components/DeviceTokenManager';
 
 export const Route = createFileRoute('/account')({
   head: () => ({
@@ -469,6 +470,9 @@ function AccountPage() {
             </button>
           </div>
         </div>
+
+        {/* Desktop client tokens */}
+        <DeviceTokenManager />
       </div>
     </div>
   );
