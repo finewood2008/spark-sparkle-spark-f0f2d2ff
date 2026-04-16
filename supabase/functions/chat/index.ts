@@ -58,42 +58,60 @@ ${brandContext || ""}`;
 ${brandContext || ""}`;
     }
 
-    const response = await fetch(AI_GATEWAY_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
+    // Retry up to 2 times on transient upstream failures (5xx / network)
+    let response: Response | null = null;
+    let lastErrText = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await fetch(AI_GATEWAY_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...messages,
+            ],
+            stream: true,
+          }),
+        });
+        // Don't retry on client errors (4xx) — only on 5xx
+        if (response.ok || (response.status >= 400 && response.status < 500)) break;
+        lastErrText = await response.text();
+        console.error(`AI gateway attempt ${attempt + 1} failed:`, response.status, lastErrText);
+      } catch (fetchErr) {
+        lastErrText = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        console.error(`AI gateway attempt ${attempt + 1} threw:`, lastErrText);
+        response = null;
+      }
+      // Backoff: 400ms, 1000ms
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 400 + attempt * 600));
+    }
 
-    if (!response.ok) {
-      if (response.status === 429) {
+    if (!response || !response.ok) {
+      const status = response?.status ?? 502;
+      if (status === 429) {
         return new Response(
           JSON.stringify({ error: "请求过于频繁，请稍后再试" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (status === 402) {
         return new Response(
           JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("AI gateway final failure:", status, lastErrText);
       return new Response(
-        JSON.stringify({ error: "AI 服务暂时不可用" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: `AI 服务暂时不可用 (${status})，请稍后重试` }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
 
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
