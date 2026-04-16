@@ -19,6 +19,13 @@ export interface ChoiceOption {
   emoji?: string;
 }
 
+export interface ReviewTaskData {
+  source: 'schedule' | 'auto';
+  taskName: string;
+  triggeredAt: string;
+  topic?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -31,6 +38,7 @@ export interface ChatMessage {
   image?: string;
   contentItem?: ContentItem;
   reportData?: Record<string, unknown>;
+  reviewTask?: ReviewTaskData;
 }
 
 export type ContentStatus = 'draft' | 'reviewing' | 'approved' | 'published' | 'rejected';
