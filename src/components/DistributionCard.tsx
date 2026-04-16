@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Loader2, CheckCircle2, BarChart3, Rocket, Check } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { loadUserPrefs } from '../lib/user-prefs';
-import type { Platform, ChatMessage, DistributionData } from '../types/spark';
+import type { Platform, DistributionData } from '../types/spark';
 import type { ReportData } from './DataReportCard';
 import { toast } from 'sonner';
 

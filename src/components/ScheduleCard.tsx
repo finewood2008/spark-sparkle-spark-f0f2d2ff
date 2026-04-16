@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CalendarClock, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ChatMessage, ScheduleCardData, ScheduleConfig } from '../types/spark';
+import type { ScheduleCardData, ScheduleConfig } from '../types/spark';
 import { toast } from 'sonner';
 
 const STORAGE_KEY = 'spark-auto-schedule';
