@@ -351,33 +351,67 @@ function ScheduleTimeline({ config }: { config: ScheduleConfig }) {
 }
 
 // --- Execution Log ---
-function ExecutionLog({ logs }: { logs: ScheduleLogEntry[] }) {
-  if (logs.length === 0) {
-    return (
-      <div className="text-center py-6 text-spark-gray-400 text-xs">
-        暂无执行记录
-      </div>
-    );
-  }
+function ExecutionLog({ logs, onClear }: { logs: ScheduleLogEntry[]; onClear: () => void }) {
+  const [filter, setFilter] = useState<'all' | 'success' | 'error'>('all');
+  const filtered = logs.filter(l => filter === 'all' || l.status === filter);
 
   return (
-    <div className="space-y-2">
-      {logs.map(log => (
-        <div key={log.id} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-spark-gray-100">
-          {log.status === 'success' && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
-          {log.status === 'error' && <AlertCircle size={14} className="text-destructive shrink-0" />}
-          {log.status === 'pending' && <Loader2 size={14} className="text-spark-orange shrink-0 animate-spin" />}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-spark-gray-700 truncate">
-              {log.topic} · {PLATFORM_LABELS[log.platform] || log.platform}
-            </div>
-            {log.error && <div className="text-[10px] text-destructive mt-0.5">{log.error}</div>}
-          </div>
-          <div className="text-[10px] text-spark-gray-400 shrink-0">
-            {new Date(log.timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </div>
+    <div>
+      {/* Filter + Clear */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex gap-1 bg-spark-gray-100 rounded-md p-0.5">
+          {([
+            { id: 'all' as const, label: `全部 (${logs.length})` },
+            { id: 'success' as const, label: `成功 (${logs.filter(l => l.status === 'success').length})` },
+            { id: 'error' as const, label: `失败 (${logs.filter(l => l.status === 'error').length})` },
+          ]).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setFilter(opt.id)}
+              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                filter === opt.id ? 'bg-spark-surface text-spark-orange shadow-sm' : 'text-spark-gray-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-      ))}
+        {logs.length > 0 && (
+          <button
+            onClick={() => {
+              if (confirm('确定清空所有执行记录？此操作不可恢复')) onClear();
+            }}
+            className="flex items-center gap-1 text-[11px] text-spark-gray-400 hover:text-destructive transition-colors"
+          >
+            <Trash2 size={11} /> 清空
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-6 text-spark-gray-400 text-xs">
+          {logs.length === 0 ? '暂无执行记录' : '当前筛选条件下无记录'}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(log => (
+            <div key={log.id} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-spark-gray-100">
+              {log.status === 'success' && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
+              {log.status === 'error' && <AlertCircle size={14} className="text-destructive shrink-0" />}
+              {log.status === 'pending' && <Loader2 size={14} className="text-spark-orange shrink-0 animate-spin" />}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-spark-gray-700 truncate">
+                  {log.topic} · {PLATFORM_LABELS[log.platform] || log.platform}
+                </div>
+                {log.error && <div className="text-[10px] text-destructive mt-0.5">{log.error}</div>}
+              </div>
+              <div className="text-[10px] text-spark-gray-400 shrink-0">
+                {new Date(log.timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
