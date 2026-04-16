@@ -6,25 +6,81 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const STREAM_URL = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${key}`;
+
+// Convert OpenAI-style messages to Gemini contents + systemInstruction
+function toGemini(messages: Array<{ role: string; content: string }>, systemPrompt: string) {
+  const contents = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+  return {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents,
+  };
+}
+
+// Re-emit Gemini SSE as OpenAI-style chunks so frontend doesn't need changes
+function transformStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const reader = upstream.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buf = "";
+
+  return new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+        return;
+      }
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6);
+        if (payload === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const text = parsed.candidates?.[0]?.content?.parts
+            ?.map((p: { text?: string }) => p.text || "")
+            .join("") || "";
+          if (text) {
+            const chunk = {
+              choices: [{ delta: { content: text }, index: 0 }],
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          }
+        } catch {
+          // ignore partial
+        }
+      }
+    },
+    cancel() { reader.cancel(); },
+  });
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS")
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { messages, mode, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     let systemPrompt: string;
-
     if (mode === "generate") {
       const platformName =
         platform === "xiaohongshu" ? "小红书" :
         platform === "wechat" ? "微信公众号" :
         platform === "douyin" ? "抖音" : "社交媒体";
-
       systemPrompt = `你是"火花"，一个专业的社交媒体内容创作助手。
 用户正在请求你为${platformName}平台生成一篇完整文章。
 
@@ -35,85 +91,36 @@ serve(async (req) => {
   "cta": "行动号召语",
   "tags": ["标签1", "标签2", "标签3"]
 }
-
-内容要求：
-- 标题要吸睛、有吸引力
-- 正文要有价值、有深度
-- CTA 要有号召力
-- 标签 3-5 个
 ${brandContext || ""}`;
     } else {
       systemPrompt = `你是"火花"，一个专业的社交媒体内容创作助手和策略顾问。
-
-你的职责：
-1. 与用户讨论内容方向、选题、策略
-2. 提供专业的内容建议和优化意见
-3. 当用户明确要求生成文章时，告诉他们你已准备好，引导他们点击"生成文章"按钮
-4. 回答关于品牌、平台、数据分析的问题
-
-请用简洁、友好、专业的语气回复。适当使用 emoji 增加亲和力。
-回复控制在 200 字以内，除非用户明确要求详细内容。
-
-重要：你的角色是指挥和讨论，不要在对话中直接输出完整文章。当用户想要生成文章时，告诉他们使用生成功能。
+请用简洁、友好、专业的语气回复。适当使用 emoji。回复控制在 200 字以内。
+当用户想要生成文章时，引导他们点击"生成文章"按钮。
 ${brandContext || ""}`;
     }
 
-    // Retry up to 2 times on transient upstream failures (5xx / network)
-    let response: Response | null = null;
-    let lastErrText = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        response = await fetch(AI_GATEWAY_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...messages,
-            ],
-            stream: true,
-          }),
-        });
-        // Don't retry on client errors (4xx) — only on 5xx
-        if (response.ok || (response.status >= 400 && response.status < 500)) break;
-        lastErrText = await response.text();
-        console.error(`AI gateway attempt ${attempt + 1} failed:`, response.status, lastErrText);
-      } catch (fetchErr) {
-        lastErrText = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        console.error(`AI gateway attempt ${attempt + 1} threw:`, lastErrText);
-        response = null;
-      }
-      // Backoff: 400ms, 1000ms
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 400 + attempt * 600));
+    const body = toGemini(messages, systemPrompt);
+
+    const response = await fetch(STREAM_URL(KEY), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const t = await response.text();
+      console.error("Gemini error:", response.status, t);
+      const status = response.status;
+      const msg = status === 429 ? "请求过于频繁，请稍后再试"
+        : (status === 401 || status === 403) ? "Google API Key 无效或已过期"
+        : `AI 服务暂时不可用 (${status})`;
+      return new Response(JSON.stringify({ error: msg }), {
+        status: status === 429 ? 429 : 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    if (!response || !response.ok) {
-      const status = response?.status ?? 502;
-      if (status === 429) {
-        return new Response(
-          JSON.stringify({ error: "请求过于频繁，请稍后再试" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      console.error("AI gateway final failure:", status, lastErrText);
-      return new Response(
-        JSON.stringify({ error: `AI 服务暂时不可用 (${status})，请稍后重试` }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-
-    return new Response(response.body, {
+    return new Response(transformStream(response.body!), {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

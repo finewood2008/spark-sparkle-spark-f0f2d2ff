@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, User, Bot, Flame, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import { loadSettings } from '../lib/settings';
-import { chatWithAI } from '../functions/chat.functions';
+import { streamChat } from '../lib/ai-stream';
 import type { ChatMessage } from '../types/spark';
 
 function Bubble({ msg }: { msg: ChatMessage }) {
@@ -34,7 +33,7 @@ export default function SparkAssistant() {
       addMessage({
         id: 'welcome',
         role: 'assistant',
-        content: '嗨，我是火花 🔥 有什么想做的，直接说。\n\n💡 如果还没配置 API Key，请先去「设置」页面填写。',
+        content: '嗨，我是火花 🔥 有什么想做的，直接说。',
         timestamp: new Date().toISOString(),
       });
     }
@@ -84,73 +83,49 @@ export default function SparkAssistant() {
     setInput('');
     setIsGenerating(true);
 
-    try {
-      const settings = loadSettings();
+    // Build message history for AI
+    const currentMessages = useAppStore.getState().messages;
+    const history = currentMessages
+      .filter(m => m.id !== 'welcome')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-      if (!settings.apiKey) {
-        throw new Error('请先在「设置」页面配置 API Key');
-      }
+    const brandContext = getDraftContext() + getBrandContext();
 
-      // Build message history for AI
-      const currentMessages = useAppStore.getState().messages;
-      const history = currentMessages
-        .filter(m => m.id !== 'welcome')
-        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    // Create assistant placeholder
+    const assistantId = (Date.now() + 1).toString();
+    let assistantContent = '';
+    addMessage({
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+    });
 
-      // Add context to the last user message
-      const draftCtx = getDraftContext();
-      const brandCtx = getBrandContext();
-      const contextSuffix = draftCtx + brandCtx;
-
-      const aiMessages = history.map((m, i) => {
-        if (i === history.length - 1 && m.role === 'user' && contextSuffix) {
-          return { ...m, content: m.content + contextSuffix };
-        }
-        return m;
-      });
-
-      // Determine actual API URL - if user set a proxy baseUrl for gemini, use it
-      let provider = settings.provider;
-      let baseUrl = settings.baseUrl;
-
-      if (provider === 'gemini' && baseUrl) {
-        // User has a CF Worker proxy, use it as custom endpoint
-        provider = 'custom';
-        // Ensure the baseUrl ends with compatible path
-        if (!baseUrl.includes('/v1')) {
-          baseUrl = baseUrl.replace(/\/+$/, '') + '/v1';
-        }
-      }
-
-      const result = await chatWithAI({
-        data: {
-          messages: aiMessages,
-          provider,
-          apiKey: settings.apiKey,
-          baseUrl,
-          model: settings.model,
-        },
-      });
-
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: result.content,
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(botMsg);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '发生未知错误';
-      setError(message);
-      addMessage({
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `⚠️ ${message}`,
-        timestamp: new Date().toISOString(),
-      });
-    } finally {
-      setIsGenerating(false);
-    }
+    await streamChat({
+      messages: history,
+      mode: 'chat',
+      brandContext,
+      onDelta: (chunk) => {
+        assistantContent += chunk;
+        const msgs = useAppStore.getState().messages;
+        const updated = msgs.map(m =>
+          m.id === assistantId ? { ...m, content: assistantContent } : m
+        );
+        useAppStore.setState({ messages: updated });
+      },
+      onDone: () => {
+        setIsGenerating(false);
+      },
+      onError: (err) => {
+        setError(err);
+        const msgs = useAppStore.getState().messages;
+        const updated = msgs.map(m =>
+          m.id === assistantId ? { ...m, content: `⚠️ ${err}` } : m
+        );
+        useAppStore.setState({ messages: updated });
+        setIsGenerating(false);
+      },
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

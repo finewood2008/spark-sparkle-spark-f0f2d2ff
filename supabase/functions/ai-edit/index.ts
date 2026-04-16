@@ -6,16 +6,55 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const STREAM_URL = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${key}`;
+const GEN_URL = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+
+function transformStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const reader = upstream.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buf = "";
+  return new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+        return;
+      }
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6);
+        if (payload === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const text = parsed.candidates?.[0]?.content?.parts
+            ?.map((p: { text?: string }) => p.text || "").join("") || "";
+          if (text) {
+            const chunk = { choices: [{ delta: { content: text }, index: 0 }] };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          }
+        } catch {/* ignore */}
+      }
+    },
+    cancel() { reader.cancel(); },
+  });
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS")
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { action, text, fullContent, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -27,115 +66,76 @@ serve(async (req) => {
 
     switch (action) {
       case "rewrite":
-        systemPrompt = `你是专业的${platformName}内容编辑。请改写以下文本，保持核心意思但优化表达、提升吸引力。直接返回改写后的文本，不要添加任何解释。${brandContext || ""}`;
-        userPrompt = text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容编辑。请改写以下文本，保持核心意思但优化表达。直接返回改写后的文本。${brandContext || ""}`;
+        userPrompt = text; break;
       case "expand":
-        systemPrompt = `你是专业的${platformName}内容编辑。请扩写以下文本，增加细节、例子和深度，使内容更丰富。直接返回扩写后的文本，不要添加任何解释。${brandContext || ""}`;
-        userPrompt = text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容编辑。请扩写以下文本，增加细节、例子和深度。直接返回扩写后的文本。${brandContext || ""}`;
+        userPrompt = text; break;
       case "simplify":
-        systemPrompt = `你是专业的${platformName}内容编辑。请精简以下文本，保留核心信息，去除冗余。直接返回精简后的文本，不要添加任何解释。${brandContext || ""}`;
-        userPrompt = text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容编辑。请精简以下文本，去除冗余。直接返回精简后的文本。${brandContext || ""}`;
+        userPrompt = text; break;
       case "polish":
-        systemPrompt = `你是专业的${platformName}内容编辑。请润色整篇文章，优化措辞和结构，提升可读性和吸引力。直接返回润色后的完整文章，不要添加任何解释。${brandContext || ""}`;
-        userPrompt = fullContent || text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容编辑。请润色整篇文章。直接返回完整文章。${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
       case "continue":
-        systemPrompt = `你是专业的${platformName}内容创作者。请根据现有内容继续撰写，保持风格一致。直接返回续写的内容（不包含已有内容），不要添加任何解释。${brandContext || ""}`;
-        userPrompt = `已有内容：\n${fullContent || text}\n\n请续写：`;
-        break;
+        systemPrompt = `你是专业的${platformName}内容创作者。请根据现有内容继续撰写。直接返回续写的内容。${brandContext || ""}`;
+        userPrompt = `已有内容：\n${fullContent || text}\n\n请续写：`; break;
       case "generate_title":
-        systemPrompt = `你是专业的${platformName}标题专家。请根据以下正文内容生成 3 个吸引人的标题选项，用换行分隔，不要编号。${brandContext || ""}`;
-        userPrompt = fullContent || text;
-        break;
+        systemPrompt = `你是专业的${platformName}标题专家。请生成 3 个吸引人的标题，用换行分隔，不要编号。${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
       case "generate_tags":
-        systemPrompt = `你是专业的${platformName}内容运营。请根据以下内容生成 3-5 个相关标签，每个标签一行，不带 # 号。${brandContext || ""}`;
-        userPrompt = fullContent || text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容运营。请生成 3-5 个相关标签，每个一行，不带 # 号。${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
       case "generate_cta":
-        systemPrompt = `你是专业的${platformName}内容运营。请根据以下内容生成一条有号召力的 CTA（行动号召语），直接返回文本。${brandContext || ""}`;
-        userPrompt = fullContent || text;
-        break;
+        systemPrompt = `你是专业的${platformName}内容运营。请生成一条有号召力的 CTA。${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
       case "learn_from_edit": {
-        const learnPrompt = `你是内容创作助手的学习模块。用户修改了AI生成的内容，请分析修改差异并总结用户的写作偏好。
-
-原始内容：
-${text}
-
-用户修改后：
-${fullContent}
-
-请用JSON格式返回1-3条偏好洞察，每条不超过20字，格式：
-{"insights":["偏好1","偏好2"]}
-
-只返回JSON，不要其他文字。`;
-
-        const learnResp = await fetch(AI_GATEWAY_URL, {
+        const learnPrompt = `分析用户对内容的修改，总结写作偏好。
+原始：${text}
+修改后：${fullContent}
+返回 JSON：{"insights":["偏好1","偏好2"]} 只返回JSON。`;
+        const r = await fetch(GEN_URL(KEY), {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [{ role: "user", content: learnPrompt }],
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: learnPrompt }] }] }),
         });
-
-        if (!learnResp.ok) {
+        if (!r.ok) {
           return new Response(JSON.stringify({ error: "分析失败" }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-
-        const learnResult = await learnResp.json();
-        const raw = learnResult.choices?.[0]?.message?.content || "{}";
+        const result = await r.json();
+        const raw = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
         return new Response(JSON.stringify({ raw }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       default:
-        systemPrompt = `你是专业的${platformName}内容编辑。请按用户要求处理文本。${brandContext || ""}`;
+        systemPrompt = `你是专业的${platformName}内容编辑。${brandContext || ""}`;
         userPrompt = text;
     }
 
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(STREAM_URL(KEY), {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        stream: true,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "请求过于频繁，请稍后再试" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
       const t = await response.text();
-      console.error("AI edit error:", response.status, t);
-      return new Response(
-        JSON.stringify({ error: "AI 服务暂时不可用" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("Gemini edit error:", response.status, t);
+      const status = response.status;
+      const msg = status === 429 ? "请求过于频繁" : "AI 服务暂时不可用";
+      return new Response(JSON.stringify({ error: msg }), {
+        status: status === 429 ? 429 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    return new Response(response.body, {
+    return new Response(transformStream(response.body!), {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
