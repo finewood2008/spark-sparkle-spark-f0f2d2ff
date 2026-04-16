@@ -495,7 +495,7 @@ export default function SchedulePage() {
 
     saveLogs([...newLogs.map(l => ({ ...l })), ...loadLogs()]);
     setGenerating(false);
-  }, [generating, config, getBrandContext, contents, setContents, setSelectedContentId]);
+  }, [generating, config, getBrandContext, contents, setContents, setSelectedContentId, addMessage]);
 
   // --- Auto-trigger timer ---
   const lastTriggeredRef = useRef<string>('');
