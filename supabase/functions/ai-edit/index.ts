@@ -6,7 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -14,8 +16,9 @@ serve(async (req) => {
 
   try {
     const { action, text, fullContent, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GOOGLE_GEMINI_API_KEY)
+      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const platformName =
       platform === "xiaohongshu" ? "小红书" :
@@ -72,11 +75,11 @@ ${fullContent}
 
 只返回JSON，不要其他文字。`;
 
-        const learnResp = await fetch(AI_GATEWAY_URL, {
+        const learnResp = await fetch(GEMINI_URL, {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: GEMINI_MODEL,
             messages: [{ role: "user", content: learnPrompt }],
           }),
         });
@@ -98,14 +101,14 @@ ${fullContent}
         userPrompt = text;
     }
 
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -121,14 +124,14 @@ ${fullContent}
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 401 || response.status === 403) {
         return new Response(
-          JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Google API Key 无效或已过期" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const t = await response.text();
-      console.error("AI edit error:", response.status, t);
+      console.error("Gemini edit error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "AI 服务暂时不可用" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

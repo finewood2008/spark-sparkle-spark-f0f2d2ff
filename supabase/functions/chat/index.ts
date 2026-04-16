@@ -6,7 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+// Google Gemini OpenAI-compatible endpoint
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -14,8 +17,9 @@ serve(async (req) => {
 
   try {
     const { messages, mode, platform, brandContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GOOGLE_GEMINI_API_KEY)
+      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     let systemPrompt: string;
 
@@ -63,14 +67,14 @@ ${brandContext || ""}`;
     let lastErrText = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        response = await fetch(AI_GATEWAY_URL, {
+        response = await fetch(GEMINI_URL, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${GOOGLE_GEMINI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: GEMINI_MODEL,
             messages: [
               { role: "system", content: systemPrompt },
               ...messages,
@@ -81,13 +85,12 @@ ${brandContext || ""}`;
         // Don't retry on client errors (4xx) — only on 5xx
         if (response.ok || (response.status >= 400 && response.status < 500)) break;
         lastErrText = await response.text();
-        console.error(`AI gateway attempt ${attempt + 1} failed:`, response.status, lastErrText);
+        console.error(`Gemini attempt ${attempt + 1} failed:`, response.status, lastErrText);
       } catch (fetchErr) {
         lastErrText = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        console.error(`AI gateway attempt ${attempt + 1} threw:`, lastErrText);
+        console.error(`Gemini attempt ${attempt + 1} threw:`, lastErrText);
         response = null;
       }
-      // Backoff: 400ms, 1000ms
       if (attempt < 2) await new Promise((r) => setTimeout(r, 400 + attempt * 600));
     }
 
@@ -99,19 +102,18 @@ ${brandContext || ""}`;
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (status === 402) {
+      if (status === 401 || status === 403) {
         return new Response(
-          JSON.stringify({ error: "AI 额度不足，请在 Lovable 工作区设置中充值" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Google API Key 无效或已过期" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.error("AI gateway final failure:", status, lastErrText);
+      console.error("Gemini final failure:", status, lastErrText);
       return new Response(
         JSON.stringify({ error: `AI 服务暂时不可用 (${status})，请稍后重试` }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
 
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
