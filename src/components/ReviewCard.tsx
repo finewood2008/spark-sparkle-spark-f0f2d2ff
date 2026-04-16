@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore';
 import type { ContentItem, ReviewTaskData, ChatMessage } from '../types/spark';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs } from '../lib/user-prefs';
+import { saveReviewItem, updateReviewItemStatus } from '../lib/review-persistence';
 import ContentCard from './ContentCard';
 import { toast } from 'sonner';
 
@@ -46,6 +47,7 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
 
   const handleApprove = () => {
     updateStatus('approved');
+    updateReviewItemStatus(item.id, 'approved');
     appendUserMessage(`[已通过] 这篇「${item.title}」可以发布`);
     addMessage({
       id: `${Date.now()}-approved`,
@@ -63,6 +65,7 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
     }
 
     updateStatus('rejected');
+    updateReviewItemStatus(item.id, 'rejected', reason);
     appendUserMessage(presetLabel ? `[快速微调] ${presetLabel}` : `[已打回] 修改要求：${reason}`);
     setRejecting(false);
 
@@ -114,19 +117,24 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
         const current = useAppStore.getState().contents;
         setContents([newItem, ...current]);
 
+        const newTask = {
+          source: 'auto' as const,
+          taskName: `${headerLabel}（重写版）`,
+          triggeredAt: new Date().toISOString(),
+          topic: task?.topic,
+        };
+
         addMessage({
           id: `${Date.now()}-regen-card`,
           role: 'assistant',
           content: '✏️ 根据你的反馈，我重新写了一版，请审核：',
           timestamp: new Date().toISOString(),
           contentItem: newItem,
-          reviewTask: {
-            source: 'auto',
-            taskName: `${headerLabel}（重写版）`,
-            triggeredAt: new Date().toISOString(),
-            topic: task?.topic,
-          },
+          reviewTask: newTask,
         });
+
+        // Persist new version to Supabase
+        saveReviewItem(newItem, newTask);
 
         setRegenerating(false);
         setRejectReason('');

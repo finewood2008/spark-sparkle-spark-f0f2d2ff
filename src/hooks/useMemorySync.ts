@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { getUserPrefsContext, syncPrefsFromCloud } from '@/lib/user-prefs';
+import { loadReviewItemsIntoStore } from '@/lib/review-persistence';
 import type { BrandMemory, LearningEntry } from '@/types/spark';
 
 const DEVICE_ID = 'default';
@@ -84,6 +85,7 @@ export function useMemorySync() {
     if (loaded.current) return;
     loaded.current = true;
     loadData();
+    loadReviewItemsIntoStore();
   }, [loadData]);
 
   // Reload when user changes (login/logout)
@@ -97,6 +99,7 @@ export function useMemorySync() {
     }
     currentUserId.current = userId;
     loadData();
+    loadReviewItemsIntoStore();
     // Also sync user preferences from cloud
     syncPrefsFromCloud();
   }, [isAuthenticated, user?.id, loadData]);

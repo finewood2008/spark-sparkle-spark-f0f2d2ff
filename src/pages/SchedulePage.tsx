@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
 import { generateArticle } from '../lib/ai-stream';
+import { saveReviewItem } from '../lib/review-persistence';
 import type { ScheduleConfig, Platform, ContentItem } from '../types/spark';
 import {
   Calendar,
@@ -466,19 +467,22 @@ export default function SchedulePage() {
         log.contentId = contentItem.id;
 
         // Push a Human-in-the-loop review message into chat
+        const reviewTask = {
+          source: 'schedule' as const,
+          taskName: `「${log.topic}」 · ${log.platform}`,
+          triggeredAt: new Date().toISOString(),
+          topic: log.topic,
+        };
         addMessage({
           id: `${Date.now()}-review-${i}`,
           role: 'assistant',
           content: `🟡 定时任务生成了一篇新内容，请审核：`,
           timestamp: new Date().toISOString(),
           contentItem,
-          reviewTask: {
-            source: 'schedule',
-            taskName: `「${log.topic}」 · ${log.platform}`,
-            triggeredAt: new Date().toISOString(),
-            topic: log.topic,
-          },
+          reviewTask,
         });
+        // Persist to Supabase
+        saveReviewItem(contentItem, reviewTask);
       } catch (err: unknown) {
         log.status = 'error';
         log.error = err instanceof Error ? err.message : '生成失败';
