@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X, Sparkles, Briefcase, Scissors } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, RotateCcw, Loader2, X, Sparkles, Briefcase, Scissors, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, ReviewTaskData, ChatMessage } from '../types/spark';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs } from '../lib/user-prefs';
-import { saveReviewItem, updateReviewItemStatus } from '../lib/review-persistence';
+import { saveReviewItem, updateReviewItemStatus, deleteReviewItem } from '../lib/review-persistence';
 import ContentCard from './ContentCard';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './ui/alert-dialog';
 
 interface ReviewCardProps {
   item: ContentItem;
@@ -14,7 +25,7 @@ interface ReviewCardProps {
 }
 
 export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
-  const { contents, setContents, addMessage } = useAppStore();
+  const { contents, setContents, addMessage, messages } = useAppStore();
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -61,6 +72,22 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
       },
     });
     toast.success('内容已通过审核');
+  };
+
+  const handleIgnore = async () => {
+    // Remove from chat: filter out any message that references this content item
+    const filteredMessages = messages.filter(
+      (m) => m.contentItem?.id !== item.id,
+    );
+    // Remove from contents store
+    const filteredContents = contents.filter((c) => c.id !== item.id);
+    useAppStore.setState({
+      messages: filteredMessages,
+      contents: filteredContents,
+    });
+    // Delete from database
+    await deleteReviewItem(item.id);
+    toast.success('已忽略此审核任务');
   };
 
   const runRegenerate = async (reason: string, presetLabel?: string) => {
@@ -228,6 +255,35 @@ export default function ReviewCard({ item: itemProp, task }: ReviewCardProps) {
             <RotateCcw size={14} />
             自定义打回
           </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={regenerating}
+                title="忽略此条"
+                className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-white text-[#999] border border-yellow-200 text-[13px] font-medium hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                忽略
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认忽略此审核任务？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  「{item.title}」将从对话流和数据库中永久删除，此操作无法撤销。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleIgnore}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  确认忽略
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
 

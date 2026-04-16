@@ -96,6 +96,14 @@ export async function saveReviewItem(
 }
 
 /**
+ * Permanently delete a review item from the database.
+ */
+export async function deleteReviewItem(id: string): Promise<void> {
+  const { error } = await supabase.from('review_items').delete().eq('id', id);
+  if (error) console.error('[review] delete failed:', error);
+}
+
+/**
  * Update only the status (and optional reject reason) of a persisted review item.
  */
 export async function updateReviewItemStatus(
