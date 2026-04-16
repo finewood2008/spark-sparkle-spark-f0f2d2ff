@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft } from 'lucide-react';
+import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +26,16 @@ function AuthPage() {
   // login (邮箱 + 密码)
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPwd, setLoginPwd] = useState('');
+  const [emailErr, setEmailErr] = useState('');
+  const [pwdErr, setPwdErr] = useState('');
+
+  // 失败计数 + 冷却（持久化）
+  const LOCK_KEY = 'spark_login_lock';
+  const MAX_ATTEMPTS = 5;
+  const COOLDOWN_SEC = 60;
+  const [failCount, setFailCount] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+  const [lockRemain, setLockRemain] = useState(0);
 
   // register (邮箱 + OTP)
   const [step, setStep] = useState<'email' | 'otp'>('email');
@@ -43,11 +53,82 @@ function AuthPage() {
     return () => clearTimeout(t);
   }, [countdown]);
 
+  // 恢复锁定状态
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCK_KEY);
+      if (!raw) return;
+      const { count, until } = JSON.parse(raw) as { count: number; until: number };
+      setFailCount(count || 0);
+      if (until && until > Date.now()) setLockUntil(until);
+      else if (until) localStorage.removeItem(LOCK_KEY);
+    } catch {}
+  }, []);
+
+  // 冷却倒计时
+  useEffect(() => {
+    if (lockUntil <= 0) return;
+    const tick = () => {
+      const remain = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setLockRemain(remain);
+      if (remain <= 0) {
+        setLockUntil(0);
+        setFailCount(0);
+        localStorage.removeItem(LOCK_KEY);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockUntil]);
+
+  const validateEmail = (v: string) => {
+    if (!v) return '请输入邮箱';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return '邮箱格式不正确';
+    if (v.length > 254) return '邮箱过长';
+    return '';
+  };
+  const validatePwd = (v: string) => {
+    if (!v) return '请输入密码';
+    if (v.length < 8) return '密码至少 8 位';
+    if (v.length > 72) return '密码过长（最多 72 位）';
+    return '';
+  };
+
+  const recordFailure = () => {
+    const next = failCount + 1;
+    setFailCount(next);
+    if (next >= MAX_ATTEMPTS) {
+      const until = Date.now() + COOLDOWN_SEC * 1000;
+      setLockUntil(until);
+      try {
+        localStorage.setItem(LOCK_KEY, JSON.stringify({ count: next, until }));
+      } catch {}
+      toast.error(`登录失败次数过多，请 ${COOLDOWN_SEC} 秒后再试`);
+    } else {
+      try {
+        localStorage.setItem(LOCK_KEY, JSON.stringify({ count: next, until: 0 }));
+      } catch {}
+    }
+  };
+
+  const resetFailures = () => {
+    setFailCount(0);
+    setLockUntil(0);
+    localStorage.removeItem(LOCK_KEY);
+  };
+
   const handleLogin = async () => {
-    if (!loginEmail || !loginPwd) {
-      toast.error('请输入邮箱和密码');
+    if (lockUntil > Date.now()) {
+      toast.error(`请 ${lockRemain} 秒后再试`);
       return;
     }
+    const eErr = validateEmail(loginEmail);
+    const pErr = validatePwd(loginPwd);
+    setEmailErr(eErr);
+    setPwdErr(pErr);
+    if (eErr || pErr) return;
+
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -55,9 +136,20 @@ function AuthPage() {
     });
     setLoading(false);
     if (error || !data.user) {
-      toast.error(error?.message || '登录失败，请检查邮箱密码');
+      recordFailure();
+      const remaining = MAX_ATTEMPTS - failCount - 1;
+      const msg = error?.message?.toLowerCase().includes('invalid')
+        ? '邮箱或密码错误'
+        : (error?.message || '登录失败');
+      setPwdErr(msg);
+      if (remaining > 0 && remaining <= 2) {
+        toast.error(`${msg}，还剩 ${remaining} 次机会`);
+      } else if (remaining > 2) {
+        toast.error(msg);
+      }
       return;
     }
+    resetFailures();
     login(
       {
         id: data.user.id,
