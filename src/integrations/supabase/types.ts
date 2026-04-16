@@ -106,7 +106,10 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          auto_cta: boolean
+          cover_style: string
           created_at: string
+          default_length: string
           default_platform: string
           id: string
           signature: string
@@ -116,7 +119,10 @@ export type Database = {
           writing_tone: string
         }
         Insert: {
+          auto_cta?: boolean
+          cover_style?: string
           created_at?: string
+          default_length?: string
           default_platform?: string
           id?: string
           signature?: string
@@ -126,7 +132,10 @@ export type Database = {
           writing_tone?: string
         }
         Update: {
+          auto_cta?: boolean
+          cover_style?: string
           created_at?: string
+          default_length?: string
           default_platform?: string
           id?: string
           signature?: string

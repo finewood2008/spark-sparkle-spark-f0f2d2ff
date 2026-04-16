@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2 } from 'lucide-react';
+import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2, Ruler, Megaphone, Image } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type BindingStatus, type SocialProvider } from '@/services/authService';
 import { toast } from 'sonner';
@@ -222,6 +222,66 @@ function AccountPage() {
                 <option value="幽默风趣">幽默风趣</option>
                 <option value="温暖感性">温暖感性</option>
                 <option value="简洁直接">简洁直接</option>
+              </select>
+            </div>
+
+            {/* Default length */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
+                <Ruler size={12} />
+                默认文章长度
+              </label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'short', label: '短篇 ~300字' },
+                  { value: 'medium', label: '中篇 ~600字' },
+                  { value: 'long', label: '长篇 1000+' },
+                ] as const).map(l => (
+                  <button
+                    key={l.value}
+                    onClick={() => setPrefs(prev => ({ ...prev, defaultLength: l.value }))}
+                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
+                      prefs.defaultLength === l.value
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Auto CTA */}
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Megaphone size={12} />
+                自动添加行动号召（CTA）
+              </label>
+              <button
+                onClick={() => setPrefs(prev => ({ ...prev, autoCta: !prev.autoCta }))}
+                className={`w-11 h-6 rounded-full transition-colors relative ${prefs.autoCta ? 'bg-primary' : 'bg-muted'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${prefs.autoCta ? 'left-[22px]' : 'left-0.5'}`} />
+              </button>
+            </div>
+
+            {/* Cover style */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
+                <Image size={12} />
+                封面图风格
+              </label>
+              <select
+                value={prefs.coverStyle}
+                onChange={e => setPrefs(prev => ({ ...prev, coverStyle: e.target.value }))}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+              >
+                <option value="简约清新">简约清新</option>
+                <option value="商务专业">商务专业</option>
+                <option value="活泼可爱">活泼可爱</option>
+                <option value="高端大气">高端大气</option>
+                <option value="文艺复古">文艺复古</option>
               </select>
             </div>
 

@@ -8,6 +8,9 @@ export interface UserPreferences {
   writingStyle: string;
   writingTone: string;
   signature: string;
+  defaultLength: 'short' | 'medium' | 'long';
+  autoCta: boolean;
+  coverStyle: string;
 }
 
 export const defaultPrefs: UserPreferences = {
@@ -15,6 +18,9 @@ export const defaultPrefs: UserPreferences = {
   writingStyle: '专业严谨',
   writingTone: '友好亲切',
   signature: '',
+  defaultLength: 'medium',
+  autoCta: true,
+  coverStyle: '简约清新',
 };
 
 const STORAGE_KEY = 'spark-user-prefs';
@@ -46,6 +52,9 @@ export async function saveUserPrefs(p: UserPreferences) {
     writing_style: p.writingStyle,
     writing_tone: p.writingTone,
     signature: p.signature,
+    default_length: p.defaultLength,
+    auto_cta: p.autoCta,
+    cover_style: p.coverStyle,
     updated_at: new Date().toISOString(),
   };
 
@@ -79,6 +88,9 @@ export async function syncPrefsFromCloud(): Promise<UserPreferences> {
       writingStyle: data.writing_style || defaultPrefs.writingStyle,
       writingTone: data.writing_tone || defaultPrefs.writingTone,
       signature: data.signature || defaultPrefs.signature,
+      defaultLength: ((data as any).default_length as UserPreferences['defaultLength']) || defaultPrefs.defaultLength,
+      autoCta: (data as any).auto_cta ?? defaultPrefs.autoCta,
+      coverStyle: (data as any).cover_style || defaultPrefs.coverStyle,
     };
     saveLocal(prefs);
     return prefs;
@@ -90,10 +102,14 @@ export async function syncPrefsFromCloud(): Promise<UserPreferences> {
 export function getUserPrefsContext(): string {
   const p = loadUserPrefs();
   const parts: string[] = [];
+  const lengthMap: Record<string, string> = { short: '短篇(300字内)', medium: '中篇(500-800字)', long: '长篇(1000字+)' };
   parts.push('【用户写作偏好】');
   parts.push(`默认平台: ${platformLabel(p.defaultPlatform)}`);
   parts.push(`写作风格: ${p.writingStyle}`);
   parts.push(`语气偏好: ${p.writingTone}`);
+  parts.push(`文章长度: ${lengthMap[p.defaultLength] || p.defaultLength}`);
+  parts.push(`自动添加CTA: ${p.autoCta ? '是' : '否'}`);
+  parts.push(`封面图风格: ${p.coverStyle}`);
   if (p.signature) parts.push(`个性签名: ${p.signature}`);
   return parts.join('\n');
 }
