@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { FileText, User, Brain, ClipboardCheck } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import SparkProfile from './SparkProfile';
+import SettingsPage from '../pages/SettingsPage';
 
 import { useMemorySync } from '../hooks/useMemorySync';
 
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
 
   const { getFullContext } = useMemorySync();
@@ -32,7 +34,29 @@ export default function ChatLayout() {
     // Refresh on tab focus so badge updates after returning from /review
     const onFocus = () => fetchCount();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+
+    // Realtime: badge auto-updates when scheduled tasks insert new review_items
+    const channel = supabase
+      .channel('review-items-badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'review_items' },
+        (payload) => {
+          const row = (payload.new || payload.old) as Record<string, unknown> | undefined;
+          if (!row) return;
+          const { user, isAuthenticated } = useAuthStore.getState();
+          const matchUser = isAuthenticated && user?.id
+            ? row.user_id === user.id
+            : row.user_id === null && row.device_id === 'default';
+          if (matchUser) fetchCount();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
