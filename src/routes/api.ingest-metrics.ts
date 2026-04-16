@@ -119,7 +119,19 @@ export const Route = createFileRoute('/api/ingest-metrics')({
         }
 
         // 4. Insert metrics rows + per-content aggregate row (platform='all')
-        const insertRows = validRows.map((m) => ({
+        const insertRows: Array<{
+          review_item_id: string;
+          user_id: string;
+          platform: string;
+          views: number;
+          likes: number;
+          comments: number;
+          saves: number;
+          shares: number;
+          ai_insight: string | null;
+          source: string;
+          fetched_at: string;
+        }> = validRows.map((m) => ({
           review_item_id: m.review_item_id,
           user_id: userId,
           platform: m.platform,
