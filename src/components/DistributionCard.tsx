@@ -227,6 +227,39 @@ export default function DistributionCard({ data }: DistributionCardProps) {
         })}
       </div>
 
+      {/* Platform-specific preview */}
+      {item && previewPlatform && (selected.length > 0 || isSuccess) && (
+        <div className="px-3 pb-3 bg-white border-t border-gray-100 pt-2.5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Eye size={12} className="text-[#999]" />
+              <span className="text-[11px] text-[#666] font-medium">发布前预览</span>
+            </div>
+            {(isSuccess ? publishedTo : selected).length > 1 && (
+              <div className="flex gap-1 p-0.5 rounded-md bg-gray-100">
+                {(isSuccess ? publishedTo : selected).map((p) => {
+                  const opt = PLATFORM_OPTIONS.find((o) => o.id === p);
+                  if (!opt) return null;
+                  const active = previewPlatform === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPreviewPlatform(p)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        active ? 'bg-white text-[#333] shadow-sm' : 'text-[#999] hover:text-[#666]'
+                      }`}
+                    >
+                      {opt.emoji} {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <PlatformPreview item={item} platform={previewPlatform} />
+        </div>
+      )}
+
       {/* Footer actions */}
       <div className="px-4 pb-3 pt-1 bg-white">
         {!isSuccess ? (
