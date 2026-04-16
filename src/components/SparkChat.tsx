@@ -3,10 +3,11 @@ import { Send, Paperclip } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData } from '../types/spark';
+import { saveReviewItem } from '../lib/review-persistence';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData } from '../types/spark';
 import ContentCard from './ContentCard';
 import DataReportCard, { type ReportData } from './DataReportCard';
-import ReviewCard from './ReviewCard';
+import ReviewReminderCard from './ReviewReminderCard';
 import DistributionCard from './DistributionCard';
 import ScheduleCard from './ScheduleCard';
 import MetricsCard from './MetricsCard';
@@ -177,18 +178,39 @@ function MessageBubble({ msg, onSend, onCardAction }: {
     );
   }
 
-  // Review card (Human-in-the-loop) — for scheduled-task generated content awaiting approval
-  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
+  // Review reminder card — simplified pointer to /review (replaces ReviewCard in chat)
+  if (!isUser && msg.reviewReminder) {
     return (
       <div className="flex items-start gap-3">
         <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 max-w-[85%]">
           {msg.content && (
             <div className="chat-bubble-assistant px-4 py-3 mb-2">
               <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
             </div>
           )}
-          <ReviewCard item={msg.contentItem} task={msg.reviewTask} />
+          <ReviewReminderCard
+            item={msg.reviewReminder.item}
+            taskName={msg.reviewReminder.taskName}
+            message={msg.reviewReminder.message}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Legacy: scheduled-task reviewing items routed via contentItem+reviewTask → render as reminder too
+  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          {msg.content && (
+            <div className="chat-bubble-assistant px-4 py-3 mb-2">
+              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <ReviewReminderCard item={msg.contentItem} taskName={msg.reviewTask?.taskName} />
         </div>
       </div>
     );
