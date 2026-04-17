@@ -197,9 +197,7 @@ export default function ChatLayout() {
           </SheetHeader>
           <div className="px-4 py-2 border-b border-[#EEEDEB] flex items-center justify-between">
             <span className="text-sm font-semibold text-[#333]">审核中心</span>
-            <p className="text-[11px] text-[#BBB]">
-              按 <kbd className="px-1.5 py-0.5 rounded bg-[#F0EFED] text-[#999] font-mono text-[10px]">Esc</kbd> 或点击外部关闭
-            </p>
+            <p className="text-[11px] text-[#BBB]">按 Esc 关闭</p>
           </div>
           <div className="flex-1 overflow-hidden">
             <ReviewPage embedded />
