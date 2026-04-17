@@ -13,9 +13,24 @@ function createSupabaseAdminClient() {
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error(
-      'Missing Supabase server environment variables. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.'
-    );
+    const isDev = import.meta.env.DEV;
+    const missing = [
+      !SUPABASE_URL && 'SUPABASE_URL',
+      !SUPABASE_SERVICE_ROLE_KEY && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter(Boolean).join(', ');
+
+    const message = isDev
+      ? `[本地开发] 缺少后端密钥：${missing}\n` +
+        `\n` +
+        `此功能需要服务端密钥才能运行（仅线上环境自动注入）。\n` +
+        `解决方法二选一：\n` +
+        `  1. 直接在 Preview URL 上测试（推荐，云端密钥已配好）\n` +
+        `  2. 本地跑通：在项目根目录创建 .env.local，填入：\n` +
+        `     SUPABASE_URL=https://<your-project>.supabase.co\n` +
+        `     SUPABASE_SERVICE_ROLE_KEY=<从 Cloud → Secrets 复制>\n`
+      : `Server misconfiguration: missing ${missing}. Please contact support.`;
+
+    throw new Error(message);
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
