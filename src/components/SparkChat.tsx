@@ -177,26 +177,12 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
             <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
               <p className="text-[14px] leading-[1.6] text-[#333]">
                 {report
-                  ? '基于这条内容的表现，要不要我帮你顺势再写一篇？或者直接用下面的快捷指令开聊👇'
-                  : '我可以帮你写小红书 / 公众号 / 抖音脚本，做选题分析，还能定时自动生成内容。试试下面任意一个？'}
+                  ? '基于这条内容的表现，要不要我帮你顺势再写一篇？告诉我你想做什么吧～'
+                  : '我可以帮你写小红书 / 公众号 / 抖音脚本，做选题分析，还能定时自动生成内容。告诉我你想做什么吧～'}
               </p>
             </div>
           </div>
         )}
-
-        {/* Quick suggestions */}
-        <div className="flex flex-wrap gap-2 pl-11">
-          {suggestions.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSuggestion(s)}
-              className="relative z-10 px-4 py-2 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors cursor-pointer"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
