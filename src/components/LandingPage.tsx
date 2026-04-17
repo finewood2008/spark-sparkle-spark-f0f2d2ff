@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
 import SparkLogo from './SparkLogo';
 
@@ -68,21 +68,11 @@ function useTypewriter(phrases: string[]) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const router = useRouter();
   const placeholder = useTypewriter(TYPING_PHRASES);
 
   const blob1Ref = useRef<HTMLDivElement>(null);
   const blob2Ref = useRef<HTMLDivElement>(null);
   const blob3Ref = useRef<HTMLDivElement>(null);
-
-  // 挂载后立即预加载 /auth 路由（开发环境下 Vite 按需编译，
-  // 提前下发可把首次跳转的瀑布流加载从 ~10s 降到 0）
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      router.preloadRoute({ to: '/auth' }).catch(() => {});
-    }, 300);
-    return () => window.clearTimeout(id);
-  }, [router]);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
