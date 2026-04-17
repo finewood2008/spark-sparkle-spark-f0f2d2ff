@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
 
