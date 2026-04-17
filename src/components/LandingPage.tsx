@@ -72,8 +72,52 @@ export default function LandingPage() {
   const goAuth = () => navigate({ to: '/auth' });
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] flex flex-col">
-      <main className="flex-1 flex flex-col items-center px-6 pt-16 pb-12 sm:pt-24">
+    <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
+      {/* Background decorations */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+            maskImage:
+              'radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%)',
+            WebkitMaskImage:
+              'radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%)',
+          }}
+        />
+        {/* Orange glow blobs */}
+        <div
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[720px] rounded-full blur-3xl opacity-40"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,140,66,0.35) 0%, rgba(255,140,66,0) 65%)',
+            animation: 'spark-blob 12s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full blur-3xl opacity-30"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,107,26,0.25) 0%, rgba(255,107,26,0) 70%)',
+            animation: 'spark-blob 16s ease-in-out infinite',
+            animationDelay: '-4s',
+          }}
+        />
+        <div
+          className="absolute bottom-0 -right-32 w-[520px] h-[520px] rounded-full blur-3xl opacity-25"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,180,120,0.3) 0%, rgba(255,180,120,0) 70%)',
+            animation: 'spark-blob 14s ease-in-out infinite',
+            animationDelay: '-8s',
+          }}
+        />
+      </div>
+
+      <main className="relative flex-1 flex flex-col items-center px-6 pt-16 pb-12 sm:pt-24">
         <div className="w-full max-w-2xl flex flex-col items-center">
           {/* 1. Hero */}
           <section
