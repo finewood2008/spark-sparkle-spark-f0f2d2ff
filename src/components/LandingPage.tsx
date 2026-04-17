@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
+import SparkLogo from './SparkLogo';
 
 const TYPING_PHRASES = [
   '告诉火花你想做什么...',
