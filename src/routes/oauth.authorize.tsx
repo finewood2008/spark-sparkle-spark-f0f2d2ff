@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Flame, Monitor, Cloud, ArrowLeftRight, Shield, FileText, MessageSquareText, RefreshCw, Check, Loader2, X, User } from 'lucide-react';
+import { Monitor, Cloud, ArrowLeftRight, Shield, FileText, MessageSquareText, RefreshCw, Check, Loader2, X, User } from 'lucide-react';
+import SparkLogo from '@/components/SparkLogo';
 import { useAuthStore } from '@/store/authStore';
 import { handleOAuthRequest, grantOAuthCode } from '@/services/authService';
 import { toast } from 'sonner';
@@ -53,7 +54,7 @@ function OAuthAuthorizePage() {
         style={{ background: 'linear-gradient(135deg, oklch(0.985 0.002 90), oklch(0.95 0.04 70 / 20%))' }}>
         <div className="w-full max-w-md rounded-2xl bg-card shadow-lg border border-border p-8 text-center">
           <div className="w-14 h-14 rounded-2xl spark-gradient flex items-center justify-center mx-auto mb-4 spark-shadow">
-            <Flame className="text-primary-foreground" size={28} />
+            <SparkLogo size={30} className="text-primary-foreground" />
           </div>
           <h1 className="text-lg font-bold text-foreground mb-2">需要先登录</h1>
           <p className="text-sm text-muted-foreground mb-6">火花桌面版请求授权访问您的账号，请先登录。</p>

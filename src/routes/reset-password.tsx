@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Flame, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import SparkLogo from '@/components/SparkLogo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -81,7 +82,7 @@ function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
-            <Flame className="w-8 h-8 text-primary" />
+            <SparkLogo size={32} gradient idPrefix="reset-pw" />
             <span className="text-2xl font-semibold tracking-tight">火花</span>
           </div>
           <h1 className="text-xl font-medium text-foreground">重置密码</h1>

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft, AlertCircle, ShieldAlert } from 'lucide-react';
+import SparkLogo from '@/components/SparkLogo';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -292,7 +293,7 @@ function AuthPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-7">
           <div className="w-14 h-14 rounded-2xl spark-gradient flex items-center justify-center mb-4 spark-shadow">
-            <Flame className="text-primary-foreground" size={28} />
+            <SparkLogo size={30} className="text-primary-foreground" />
           </div>
           <h1 className="text-xl font-bold text-foreground">欢迎来到火花</h1>
           <p className="text-sm text-muted-foreground mt-1">
