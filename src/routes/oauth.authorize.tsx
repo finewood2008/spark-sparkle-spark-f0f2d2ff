@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Flame, Monitor, Cloud, ArrowLeftRight, Shield, FileText, MessageSquareText, RefreshCw, Check, Loader2, X, User } from 'lucide-react';
+import { Monitor, Cloud, ArrowLeftRight, Shield, FileText, MessageSquareText, RefreshCw, Check, Loader2, X, User } from 'lucide-react';
+import SparkLogo from '@/components/SparkLogo';
 import { useAuthStore } from '@/store/authStore';
 import { handleOAuthRequest, grantOAuthCode } from '@/services/authService';
 import { toast } from 'sonner';
