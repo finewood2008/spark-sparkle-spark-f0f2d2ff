@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/store/authStore";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
 
@@ -118,5 +119,9 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [login, logout]);
 
-  return <Outlet />;
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Outlet />
+    </TooltipProvider>
+  );
 }

@@ -9,6 +9,7 @@ import SparkProfile from './SparkProfile';
 import SettingsPage from '../pages/SettingsPage';
 import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 import { useMemorySync } from '../hooks/useMemorySync';
@@ -109,58 +110,85 @@ export default function ChatLayout() {
           <span className="text-[16px] font-semibold text-[#333]">火花</span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="草稿箱"
-          >
-            <FileText size={18} />
-          </button>
-          <button
-            onClick={() => setReviewOpen(true)}
-            className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="审核中心"
-          >
-            <ClipboardCheck size={18} />
-            {reviewingCount > 0 && (
-              <>
-                <span
-                  key={`pulse-${pulseKey}`}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 opacity-60 animate-badge-ping pointer-events-none"
-                />
-                <span
-                  key={`badge-${pulseKey}`}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center animate-badge-pop"
-                >
-                  {reviewingCount > 9 ? '9+' : reviewingCount}
-                </span>
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => setProfileOpen(true)}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="火花记忆"
-          >
-            <Brain size={18} />
-          </button>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="系统设置"
-          >
-            <SettingsIcon size={18} />
-          </button>
-          <button
-            onClick={() => {
-              const { isAuthenticated } = useAuthStore.getState();
-              navigate({ to: isAuthenticated ? '/account' : '/auth' });
-            }}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-            title="个人中心"
-          >
-            <User size={18} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setDrawerOpen(true)}
+                aria-label="草稿箱"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <FileText size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">草稿箱</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setReviewOpen(true)}
+                aria-label="审核中心"
+                className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <ClipboardCheck size={18} />
+                {reviewingCount > 0 && (
+                  <>
+                    <span
+                      key={`pulse-${pulseKey}`}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 opacity-60 animate-badge-ping pointer-events-none"
+                    />
+                    <span
+                      key={`badge-${pulseKey}`}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center animate-badge-pop"
+                    >
+                      {reviewingCount > 9 ? '9+' : reviewingCount}
+                    </span>
+                  </>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              审核中心{reviewingCount > 0 ? ` (${reviewingCount})` : ''}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setProfileOpen(true)}
+                aria-label="火花记忆"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <Brain size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">火花记忆</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                aria-label="系统设置"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <SettingsIcon size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">系统设置</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => {
+                  const { isAuthenticated } = useAuthStore.getState();
+                  navigate({ to: isAuthenticated ? '/account' : '/auth' });
+                }}
+                aria-label="个人中心"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <User size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">个人中心</TooltipContent>
+          </Tooltip>
         </div>
       </header>
 
