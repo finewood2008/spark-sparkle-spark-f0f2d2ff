@@ -31,6 +31,7 @@ export default function ChatLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
+  const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
   const [pulseKey, setPulseKey] = useState(0);
   const prevCountRef = useRef(0);
