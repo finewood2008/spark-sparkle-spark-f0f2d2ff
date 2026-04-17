@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
@@ -108,6 +109,26 @@ export default function ChatLayout() {
             <span className="text-[14px]">✨</span>
           </div>
           <span className="text-[16px] font-semibold text-[#333]">火花</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => {
+                  const { messages, clearMessages, setSuggestions, setSelectedContentId } =
+                    useAppStore.getState();
+                  if (messages.length === 0) return;
+                  clearMessages();
+                  setSuggestions([]);
+                  setSelectedContentId(null);
+                  toast.success('已开始新对话');
+                }}
+                aria-label="新对话"
+                className="ml-1 w-7 h-7 rounded-md flex items-center justify-center text-[#999] hover:text-[#FF6B1A] hover:bg-[#F0EFED] transition-colors"
+              >
+                <MessageSquarePlus size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">新对话</TooltipContent>
+          </Tooltip>
         </div>
         <div className="flex items-center gap-1">
           <Tooltip>
