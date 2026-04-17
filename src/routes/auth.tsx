@@ -43,11 +43,14 @@ function AuthPage() {
   const [lockUntil, setLockUntil] = useState(0);
   const [lockRemain, setLockRemain] = useState(0);
 
-  // register (邮箱 + OTP)
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  // register (邮箱 → OTP → 设置密码)
+  const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
   const [regEmail, setRegEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [showNewPwd, setShowNewPwd] = useState(false);
 
   // forgot password
   const [forgotOpen, setForgotOpen] = useState(false);
