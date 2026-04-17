@@ -509,7 +509,7 @@ function AuthPage() {
               disabled={loading}
               className="spark-btn-primary w-full h-11 text-base"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>验证并登录 <ArrowRight size={16} /></>}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <>验证邮箱 <ArrowRight size={16} /></>}
             </button>
             <div className="flex items-center justify-between text-xs">
               <button
@@ -528,6 +528,60 @@ function AuthPage() {
                 {countdown > 0 ? `${countdown}s 后重发` : '重新发送'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Register: set-password step */}
+        {tab === 'register' && step === 'password' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <p className="text-sm text-muted-foreground text-center">
+              邮箱 <span className="text-foreground font-medium">{regEmail}</span> 已验证 ✓
+              <br />
+              请设置一个登录密码（至少 8 位）
+            </p>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="spark-input pl-9 pr-10"
+                type={showNewPwd ? 'text' : 'password'}
+                placeholder="新密码（至少 8 位）"
+                autoComplete="new-password"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPwd(!showNewPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showNewPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="spark-input pl-9"
+                type={showNewPwd ? 'text' : 'password'}
+                placeholder="再次输入密码"
+                autoComplete="new-password"
+                value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetPassword()}
+              />
+            </div>
+            {confirmPwd && newPwd !== confirmPwd && (
+              <p className="ml-1 flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle size={12} /> 两次输入的密码不一致
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleSetPassword}
+              disabled={loading || !newPwd || !confirmPwd}
+              className="spark-btn-primary w-full h-11 text-base"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <>完成注册 <ArrowRight size={16} /></>}
+            </button>
           </div>
         )}
 
