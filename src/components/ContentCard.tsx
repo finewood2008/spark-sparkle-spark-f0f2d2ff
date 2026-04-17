@@ -5,6 +5,8 @@ import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
