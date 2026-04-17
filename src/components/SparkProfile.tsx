@@ -252,9 +252,7 @@ export default function SparkProfile({ open, onOpenChange }: SparkProfileProps) 
           <SheetDescription className="text-[13px] text-[#999] mt-1 text-center">
             填写品牌信息并启用后，火花创作的所有内容都会自动关联你的品牌。
           </SheetDescription>
-          <p className="text-[11px] text-[#BBB] mt-2 text-center">
-            按 <kbd className="px-1.5 py-0.5 rounded bg-[#F0EFED] text-[#999] font-mono text-[10px]">Esc</kbd> 或点击外部区域关闭
-          </p>
+          <p className="text-[11px] text-[#BBB] mt-2 text-center">按 Esc 关闭</p>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto">
