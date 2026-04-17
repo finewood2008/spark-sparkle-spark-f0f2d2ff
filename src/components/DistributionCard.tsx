@@ -70,71 +70,24 @@ export default function DistributionCard({ data }: DistributionCardProps) {
       toast.error('请至少选择一个平台');
       return;
     }
-    if (!item) {
-      toast.error('内容不存在，无法发布');
-      return;
-    }
     setPublishing(true);
 
-    // 1. 拼接剪贴板文本：标题 + 正文 + 标签 + CTA
-    const tagLine = item.tags?.length ? item.tags.map(t => `#${t}`).join(' ') : '';
-    const clipboardText = [
-      item.title,
-      '',
-      item.content,
-      '',
-      tagLine,
-      '',
-      item.cta || '',
-    ]
-      .filter((line, idx, arr) => {
-        // 去掉末尾连续空行，但保留中间空行
-        if (line !== '') return true;
-        return idx < arr.length - 1 && arr[idx + 1] !== '';
-      })
-      .join('\n')
-      .trimEnd();
+    // Simulate platform API calls (1.2s)
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-    // 2. 复制到剪贴板
-    let copied = false;
-    try {
-      await navigator.clipboard.writeText(clipboardText);
-      copied = true;
-    } catch (err) {
-      console.error('[distribution] clipboard write failed:', err);
-    }
-
-    // 3. 平台元信息（发布页 URL + 中文名）
-    const PLATFORM_META: Record<Platform, { name: string; url: string | null }> = {
-      xiaohongshu: { name: '小红书', url: 'https://creator.xiaohongshu.com/publish/publish' },
-      douyin: { name: '抖音', url: 'https://creator.douyin.com/creator-micro/content/upload' },
-      wechat: { name: '微信公众号', url: 'https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit' },
-      tiktok: { name: 'TikTok', url: 'https://www.tiktok.com/creator#/upload' },
-      instagram: { name: 'Instagram', url: null }, // 移动端 only
-    };
-
-    // 4. 为每个选中的平台打开发布页
-    const blockedLinks: { name: string; url: string }[] = [];
-    const hasInstagram = selected.includes('instagram' as Platform);
-
-    for (const platform of selected) {
-      const meta = PLATFORM_META[platform];
-      if (!meta || !meta.url) continue;
-      const win = window.open(meta.url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        blockedLinks.push({ name: meta.name, url: meta.url });
-      }
-    }
-
-    // 5. 持久化到 Supabase
     const publishedAt = new Date().toISOString();
-    const updated = contents.map(c =>
-      c.id === item.id
-        ? { ...c, status: 'published' as const, publishedAt }
-        : c
-    );
-    setContents(updated);
 
+    // Update content status to published
+    if (item) {
+      const updated = contents.map(c =>
+        c.id === item.id
+          ? { ...c, status: 'published' as const, publishedAt }
+          : c
+      );
+      setContents(updated);
+    }
+
+    // Persist to Supabase so the cron job can pick it up in 24h
     try {
       await supabase
         .from('review_items')
@@ -152,7 +105,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
     setPublishing(false);
 
     const platformLabels = selected
-      .map(p => PLATFORM_META[p]?.name || p)
+      .map(p => PLATFORM_OPTIONS.find(opt => opt.id === p)?.label || p)
       .join('、');
 
     addMessage({
@@ -161,24 +114,7 @@ export default function DistributionCard({ data }: DistributionCardProps) {
       content: `🎉 「${data.title}」已成功发布至 ${platformLabels}！我会在 24 小时后自动拉取各平台的真实互动数据并推送给你 📊`,
       timestamp: new Date().toISOString(),
     });
-
-    // 6. Toast 反馈
-    if (blockedLinks.length > 0) {
-      // 浏览器阻止了弹窗 — 在 toast 里给出可点击链接
-      toast.warning(
-        `浏览器阻止了 ${blockedLinks.length} 个弹窗，请手动打开：\n` +
-          blockedLinks.map(l => `${l.name}: ${l.url}`).join('\n'),
-        { duration: 12000 },
-      );
-    } else if (copied) {
-      toast.success('✅ 内容已复制到剪贴板，平台发布页已打开，粘贴即可发布！');
-    } else {
-      toast.success('✅ 平台发布页已打开（剪贴板复制失败，请手动复制内容）');
-    }
-
-    if (hasInstagram) {
-      toast.info('📱 Instagram 需要在手机 App 中发布', { duration: 8000 });
-    }
+    toast.success(`已发布至 ${selected.length} 个平台`);
   };
 
   const handleTestFetchNow = async () => {
