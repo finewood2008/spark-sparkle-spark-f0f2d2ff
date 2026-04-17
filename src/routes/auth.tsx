@@ -43,11 +43,14 @@ function AuthPage() {
   const [lockUntil, setLockUntil] = useState(0);
   const [lockRemain, setLockRemain] = useState(0);
 
-  // register (邮箱 + OTP)
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  // register (邮箱 → OTP → 设置密码)
+  const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
   const [regEmail, setRegEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [showNewPwd, setShowNewPwd] = useState(false);
 
   // forgot password
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -252,17 +255,45 @@ function AuthPage() {
       toast.error(error?.message || '验证码错误或已过期');
       return;
     }
+    // 邮箱验证通过 — 进入设置密码步骤（此时已有 session，可调用 updateUser）
+    toast.success('邮箱验证成功，请设置登录密码');
+    setStep('password');
+  };
+
+  const handleSetPassword = async () => {
+    const pErr = validatePwd(newPwd);
+    if (pErr) {
+      toast.error(pErr);
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      toast.error('两次输入的密码不一致');
+      return;
+    }
+    setLoading(true);
+    const { data: updateData, error } = await supabase.auth.updateUser({
+      password: newPwd,
+    });
+    if (error || !updateData.user) {
+      setLoading(false);
+      toast.error(error?.message || '密码设置失败，请重试');
+      return;
+    }
+    // 拿到当前 session（verifyOtp 已建立）
+    const { data: sessionData } = await supabase.auth.getSession();
+    setLoading(false);
+
     login(
       {
-        id: data.user.id,
-        username: data.user.email?.split('@')[0] || 'user',
-        nickname: data.user.email?.split('@')[0] || '火花用户',
+        id: updateData.user.id,
+        username: updateData.user.email?.split('@')[0] || 'user',
+        nickname: updateData.user.email?.split('@')[0] || '火花用户',
         avatar: '',
-        email: data.user.email || undefined,
+        email: updateData.user.email || undefined,
       },
-      data.session?.access_token || '',
+      sessionData.session?.access_token || '',
     );
-    toast.success('注册成功，欢迎加入火花！');
+    toast.success('注册完成，欢迎加入火花！');
     navigate({ to: '/' });
   };
 
@@ -478,7 +509,7 @@ function AuthPage() {
               disabled={loading}
               className="spark-btn-primary w-full h-11 text-base"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>验证并登录 <ArrowRight size={16} /></>}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <>验证邮箱 <ArrowRight size={16} /></>}
             </button>
             <div className="flex items-center justify-between text-xs">
               <button
@@ -497,6 +528,60 @@ function AuthPage() {
                 {countdown > 0 ? `${countdown}s 后重发` : '重新发送'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Register: set-password step */}
+        {tab === 'register' && step === 'password' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <p className="text-sm text-muted-foreground text-center">
+              邮箱 <span className="text-foreground font-medium">{regEmail}</span> 已验证 ✓
+              <br />
+              请设置一个登录密码（至少 8 位）
+            </p>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="spark-input pl-9 pr-10"
+                type={showNewPwd ? 'text' : 'password'}
+                placeholder="新密码（至少 8 位）"
+                autoComplete="new-password"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPwd(!showNewPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showNewPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="spark-input pl-9"
+                type={showNewPwd ? 'text' : 'password'}
+                placeholder="再次输入密码"
+                autoComplete="new-password"
+                value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetPassword()}
+              />
+            </div>
+            {confirmPwd && newPwd !== confirmPwd && (
+              <p className="ml-1 flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle size={12} /> 两次输入的密码不一致
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleSetPassword}
+              disabled={loading || !newPwd || !confirmPwd}
+              className="spark-btn-primary w-full h-11 text-base"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <>完成注册 <ArrowRight size={16} /></>}
+            </button>
           </div>
         )}
 
