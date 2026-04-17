@@ -116,45 +116,44 @@ export default function LandingPage() {
   return (
     <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
       {/* Background decorations */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Subtle grid */}
         <div
-          className="absolute inset-0 opacity-[0.35]"
+          className="absolute inset-0 opacity-60"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)',
+              'linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)',
             backgroundSize: '48px 48px',
             maskImage:
-              'radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%)',
+              'radial-gradient(ellipse at 50% 30%, black 30%, transparent 75%)',
             WebkitMaskImage:
-              'radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%)',
+              'radial-gradient(ellipse at 50% 30%, black 30%, transparent 75%)',
           }}
         />
         {/* Orange glow blobs with parallax */}
         <div
           ref={blob1Ref}
-          className="absolute -top-32 left-1/2 w-[720px] h-[720px] rounded-full blur-3xl opacity-40 will-change-transform"
+          className="absolute -top-40 left-1/2 w-[720px] h-[720px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,140,66,0.35) 0%, rgba(255,140,66,0) 65%)',
+              'radial-gradient(circle, rgba(255,140,66,0.55) 0%, rgba(255,140,66,0) 65%)',
             transform: 'translate3d(-50%, 0, 0)',
-            transition: 'transform 0.1s linear',
           }}
         />
         <div
           ref={blob2Ref}
-          className="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full blur-3xl opacity-30 will-change-transform"
+          className="absolute top-1/3 -left-40 w-[520px] h-[520px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,107,26,0.25) 0%, rgba(255,107,26,0) 70%)',
+              'radial-gradient(circle, rgba(255,107,26,0.4) 0%, rgba(255,107,26,0) 70%)',
           }}
         />
         <div
           ref={blob3Ref}
-          className="absolute bottom-0 -right-32 w-[520px] h-[520px] rounded-full blur-3xl opacity-25 will-change-transform"
+          className="absolute bottom-0 -right-40 w-[560px] h-[560px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,180,120,0.3) 0%, rgba(255,180,120,0) 70%)',
+              'radial-gradient(circle, rgba(255,180,120,0.45) 0%, rgba(255,180,120,0) 70%)',
           }}
         />
       </div>
