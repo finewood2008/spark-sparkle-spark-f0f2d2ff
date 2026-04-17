@@ -124,13 +124,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => {
-                  const { messages, clearMessages, setSuggestions, setSelectedContentId } =
-                    useAppStore.getState();
+                  const { messages } = useAppStore.getState();
                   if (messages.length === 0) return;
-                  clearMessages();
-                  setSuggestions([]);
-                  setSelectedContentId(null);
-                  toast.success('已开始新对话');
+                  setConfirmNewChatOpen(true);
                 }}
                 aria-label="新对话"
                 className="ml-1 w-7 h-7 rounded-md flex items-center justify-center text-[#999] hover:text-[#FF6B1A] hover:bg-[#F0EFED] transition-colors"
