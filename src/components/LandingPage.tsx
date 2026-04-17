@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
-import SparkLogo from './SparkLogo';
 
 const TYPING_PHRASES = [
   '告诉火花你想做什么...',
@@ -173,7 +172,7 @@ export default function LandingPage() {
               className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 spark-shadow"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
             >
-              <SparkLogo size={34} className="text-white" />
+              <span className="text-3xl">✨</span>
             </div>
             <h1 className="text-5xl sm:text-6xl font-bold text-[#1F1F1F] tracking-tight">
               火花
