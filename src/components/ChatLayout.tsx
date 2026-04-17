@@ -11,6 +11,16 @@ import SettingsPage from '../pages/SettingsPage';
 import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 import { useMemorySync } from '../hooks/useMemorySync';
@@ -21,6 +31,7 @@ export default function ChatLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
+  const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
   const [pulseKey, setPulseKey] = useState(0);
   const prevCountRef = useRef(0);
@@ -113,13 +124,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => {
-                  const { messages, clearMessages, setSuggestions, setSelectedContentId } =
-                    useAppStore.getState();
+                  const { messages } = useAppStore.getState();
                   if (messages.length === 0) return;
-                  clearMessages();
-                  setSuggestions([]);
-                  setSelectedContentId(null);
-                  toast.success('已开始新对话');
+                  setConfirmNewChatOpen(true);
                 }}
                 aria-label="新对话"
                 className="ml-1 w-7 h-7 rounded-md flex items-center justify-center text-[#999] hover:text-[#FF6B1A] hover:bg-[#F0EFED] transition-colors"
