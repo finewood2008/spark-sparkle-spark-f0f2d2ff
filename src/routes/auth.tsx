@@ -255,17 +255,45 @@ function AuthPage() {
       toast.error(error?.message || '验证码错误或已过期');
       return;
     }
+    // 邮箱验证通过 — 进入设置密码步骤（此时已有 session，可调用 updateUser）
+    toast.success('邮箱验证成功，请设置登录密码');
+    setStep('password');
+  };
+
+  const handleSetPassword = async () => {
+    const pErr = validatePwd(newPwd);
+    if (pErr) {
+      toast.error(pErr);
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      toast.error('两次输入的密码不一致');
+      return;
+    }
+    setLoading(true);
+    const { data: updateData, error } = await supabase.auth.updateUser({
+      password: newPwd,
+    });
+    if (error || !updateData.user) {
+      setLoading(false);
+      toast.error(error?.message || '密码设置失败，请重试');
+      return;
+    }
+    // 拿到当前 session（verifyOtp 已建立）
+    const { data: sessionData } = await supabase.auth.getSession();
+    setLoading(false);
+
     login(
       {
-        id: data.user.id,
-        username: data.user.email?.split('@')[0] || 'user',
-        nickname: data.user.email?.split('@')[0] || '火花用户',
+        id: updateData.user.id,
+        username: updateData.user.email?.split('@')[0] || 'user',
+        nickname: updateData.user.email?.split('@')[0] || '火花用户',
         avatar: '',
-        email: data.user.email || undefined,
+        email: updateData.user.email || undefined,
       },
-      data.session?.access_token || '',
+      sessionData.session?.access_token || '',
     );
-    toast.success('注册成功，欢迎加入火花！');
+    toast.success('注册完成，欢迎加入火花！');
     navigate({ to: '/' });
   };
 
