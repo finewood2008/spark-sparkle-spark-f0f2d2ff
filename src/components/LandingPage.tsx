@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
 
@@ -69,6 +69,48 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const placeholder = useTypewriter(TYPING_PHRASES);
 
+  const blob1Ref = useRef<HTMLDivElement>(null);
+  const blob2Ref = useRef<HTMLDivElement>(null);
+  const blob3Ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const target = { x: 0, y: 0 };
+    const current = { x: 0, y: 0 };
+    let rafId = 0;
+
+    const onMove = (e: MouseEvent) => {
+      // -1 ~ 1 范围，相对屏幕中心
+      target.x = (e.clientX / window.innerWidth) * 2 - 1;
+      target.y = (e.clientY / window.innerHeight) * 2 - 1;
+    };
+
+    const tick = () => {
+      // 缓动跟随
+      current.x += (target.x - current.x) * 0.06;
+      current.y += (target.y - current.y) * 0.06;
+
+      if (blob1Ref.current) {
+        blob1Ref.current.style.transform = `translate3d(calc(-50% + ${current.x * 28}px), ${current.y * 22}px, 0)`;
+      }
+      if (blob2Ref.current) {
+        blob2Ref.current.style.transform = `translate3d(${current.x * -40}px, ${current.y * -30}px, 0)`;
+      }
+      if (blob3Ref.current) {
+        blob3Ref.current.style.transform = `translate3d(${current.x * 50}px, ${current.y * 36}px, 0)`;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   const goAuth = () => navigate({ to: '/auth' });
 
   return (
@@ -88,31 +130,31 @@ export default function LandingPage() {
               'radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%)',
           }}
         />
-        {/* Orange glow blobs */}
+        {/* Orange glow blobs with parallax */}
         <div
-          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[720px] rounded-full blur-3xl opacity-40"
+          ref={blob1Ref}
+          className="absolute -top-32 left-1/2 w-[720px] h-[720px] rounded-full blur-3xl opacity-40 will-change-transform"
           style={{
             background:
               'radial-gradient(circle, rgba(255,140,66,0.35) 0%, rgba(255,140,66,0) 65%)',
-            animation: 'spark-blob 12s ease-in-out infinite',
+            transform: 'translate3d(-50%, 0, 0)',
+            transition: 'transform 0.1s linear',
           }}
         />
         <div
-          className="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full blur-3xl opacity-30"
+          ref={blob2Ref}
+          className="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full blur-3xl opacity-30 will-change-transform"
           style={{
             background:
               'radial-gradient(circle, rgba(255,107,26,0.25) 0%, rgba(255,107,26,0) 70%)',
-            animation: 'spark-blob 16s ease-in-out infinite',
-            animationDelay: '-4s',
           }}
         />
         <div
-          className="absolute bottom-0 -right-32 w-[520px] h-[520px] rounded-full blur-3xl opacity-25"
+          ref={blob3Ref}
+          className="absolute bottom-0 -right-32 w-[520px] h-[520px] rounded-full blur-3xl opacity-25 will-change-transform"
           style={{
             background:
               'radial-gradient(circle, rgba(255,180,120,0.3) 0%, rgba(255,180,120,0) 70%)',
-            animation: 'spark-blob 14s ease-in-out infinite',
-            animationDelay: '-8s',
           }}
         />
       </div>
