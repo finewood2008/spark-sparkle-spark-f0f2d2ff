@@ -136,7 +136,7 @@ export default function LandingPage() {
           className="absolute -top-40 left-1/2 w-[720px] h-[720px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,140,66,0.55) 0%, rgba(255,140,66,0) 65%)',
+              'radial-gradient(circle, rgba(255,165,110,0.32) 0%, rgba(255,165,110,0) 65%)',
             transform: 'translate3d(-50%, 0, 0)',
           }}
         />
@@ -145,7 +145,7 @@ export default function LandingPage() {
           className="absolute top-1/3 -left-40 w-[520px] h-[520px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,107,26,0.4) 0%, rgba(255,107,26,0) 70%)',
+              'radial-gradient(circle, rgba(255,150,100,0.24) 0%, rgba(255,150,100,0) 70%)',
           }}
         />
         <div
@@ -153,7 +153,7 @@ export default function LandingPage() {
           className="absolute bottom-0 -right-40 w-[560px] h-[560px] rounded-full blur-3xl will-change-transform"
           style={{
             background:
-              'radial-gradient(circle, rgba(255,180,120,0.45) 0%, rgba(255,180,120,0) 70%)',
+              'radial-gradient(circle, rgba(255,200,160,0.28) 0%, rgba(255,200,160,0) 70%)',
           }}
         />
       </div>
