@@ -595,7 +595,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
   };
 
-  const handleChat = async (_text: string) => {
+  const handleChat = async (text: string) => {
     const currentMessages = useAppStore.getState().messages;
     const history = currentMessages
       .filter(m => m.id !== 'welcome')
@@ -611,28 +611,66 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       timestamp: new Date().toISOString(),
     });
 
-    await streamChat({
-      messages: history,
-      mode: 'chat',
-      brandContext: getBrandContext(),
-      onDelta: (chunk) => {
-        assistantContent += chunk;
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === assistantId ? { ...m, content: assistantContent } : m
-        );
-        useAppStore.setState({ messages: updated });
-      },
-      onDone: () => setIsGenerating(false),
-      onError: (errMsg) => {
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === assistantId ? { ...m, content: `⚠️ ${errMsg}` } : m
-        );
-        useAppStore.setState({ messages: updated });
-        setIsGenerating(false);
-      },
-    });
+    try {
+      await streamChat({
+        messages: history,
+        mode: 'chat',
+        brandContext: getBrandContext(),
+        onDelta: (chunk) => {
+          assistantContent += chunk;
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === assistantId ? { ...m, content: assistantContent } : m
+          );
+          useAppStore.setState({ messages: updated });
+        },
+        onDone: () => {
+          // If nothing came back, treat as failure
+          if (!assistantContent.trim()) {
+            const msgs = useAppStore.getState().messages;
+            const updated = msgs.map(m =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: 'AI 没有返回任何内容',
+                    error: { message: '可能是网络中断或服务暂时不可用', retryPrompt: text, retryMode: 'chat' as const },
+                  }
+                : m
+            );
+            useAppStore.setState({ messages: updated });
+          }
+          setIsGenerating(false);
+        },
+        onError: (errMsg) => {
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: '生成回复时出错了',
+                  error: { message: errMsg, retryPrompt: text, retryMode: 'chat' as const },
+                }
+              : m
+          );
+          useAppStore.setState({ messages: updated });
+          setIsGenerating(false);
+        },
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : '网络请求失败';
+      const msgs = useAppStore.getState().messages;
+      const updated = msgs.map(m =>
+        m.id === assistantId
+          ? {
+              ...m,
+              content: '连接 AI 服务失败',
+              error: { message: errMsg, retryPrompt: text, retryMode: 'chat' as const },
+            }
+          : m
+      );
+      useAppStore.setState({ messages: updated });
+      setIsGenerating(false);
+    }
   };
 
   const handleGenerate = async (text: string) => {
