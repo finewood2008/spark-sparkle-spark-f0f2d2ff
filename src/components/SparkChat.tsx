@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip } from 'lucide-react';
+import { Send, Paperclip, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
