@@ -218,6 +218,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     const textToPolish = editing ? editContent : item.content;
     if (!textToPolish.trim()) return;
 
+    setActionError('polish', null);
     setUndoStack(prev => [...prev, editing ? editContent : item.content]);
     setAiLoading('polish');
     if (!editing) {
@@ -233,12 +234,17 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       platform: item.platform,
       onDelta: (chunk) => { result += chunk; },
       onDone: () => {
+        if (!result.trim()) {
+          setActionError('polish', 'AI 没有返回内容，请重试');
+          setAiLoading(null);
+          return;
+        }
         setEditContent(result);
         setAiLoading(null);
         toast.success('AI 润色完成');
       },
       onError: (err) => {
-        toast.error(err);
+        setActionError('polish', err || '润色失败');
         setAiLoading(null);
       },
     });
