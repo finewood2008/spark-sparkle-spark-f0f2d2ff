@@ -44,7 +44,7 @@ function OAuthAuthorizePage() {
     setDone(true);
     toast.success('授权成功，正在返回桌面客户端...');
     // Mock: in real flow would redirect to res.redirectUri
-    console.log('[OAuth] Code granted:', res.code, 'Redirect:', res.redirectUri);
+    // OAuth code granted — redirect to callback
   };
 
   // Not logged in -> show login prompt

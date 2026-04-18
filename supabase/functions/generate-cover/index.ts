@@ -5,6 +5,7 @@ import {
   optionsCors,
   requireUser,
   validatePayloadSize,
+  checkRateLimit,
 } from "../_shared/auth.ts";
 
 // Use Gemini's image-capable model via native generateContent endpoint
@@ -20,6 +21,7 @@ serve(async (req) => {
   try {
     await requireUser(req);
     validatePayloadSize(req);
+    checkRateLimit(req, { maxRequests: 10, windowSec: 60, keyPrefix: "gen-cover" });
 
     const { title, content, platform, style } = await req.json();
 
@@ -152,6 +154,12 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("[generate-cover] unexpected error:", e);
+    if (e instanceof Error && e.message.includes("Rate limit")) {
+      return new Response(
+        JSON.stringify({ error: e.message }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (e instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: e.message }),

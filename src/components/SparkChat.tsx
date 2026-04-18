@@ -1,436 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '../store/authStore';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData, Platform } from '../types/spark';
-import ContentCard from './ContentCard';
-import DataReportCard, { type ReportData } from './DataReportCard';
-import ReviewReminderCard from './ReviewReminderCard';
-import DistributionCard from './DistributionCard';
-import ScheduleCard from './ScheduleCard';
-import MetricsCard from './MetricsCard';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData } from '../types/spark';
 
-function SparkAvatar({ size = 32 }: { size?: number }) {
-  return (
-    <div
-      className="rounded-full flex items-center justify-center shrink-0"
-      style={{
-        width: size,
-        height: size,
-        background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)',
-      }}
-    >
-      <span style={{ fontSize: size * 0.45 }}>✨</span>
-    </div>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="relative">
-        <SparkAvatar size={32} />
-        <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-spark-orange animate-pulse" />
-      </div>
-      <div className="chat-bubble-assistant px-4 py-3 flex items-center gap-1.5">
-        <span className="text-[14px] text-[#999]">火花正在撰写中</span>
-        <span className="inline-flex gap-0.5">
-          {[0, 150, 300].map(d => (
-            <span
-              key={d}
-              className="w-1 h-1 rounded-full bg-[#999] inline-block"
-              style={{ animation: `spark-bounce 1.4s infinite ease-in-out both`, animationDelay: `${d}ms` }}
-            />
-          ))}
-        </span>
-        <span className="w-[2px] h-4 bg-spark-orange animate-pulse ml-1" />
-      </div>
-    </div>
-  );
-}
-
-function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }) {
-  const [report, setReport] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadLatestReport = async () => {
-      const { user, isAuthenticated } = useAuthStore.getState();
-      // Find the most recent published item
-      let itemsQuery = supabase
-        .from('review_items')
-        .select('id, title, platform, published_platforms, published_at')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(1);
-      itemsQuery = isAuthenticated && user?.id
-        ? itemsQuery.eq('user_id', user.id)
-        : itemsQuery.is('user_id', null).eq('device_id', 'default');
-
-      const { data: items } = await itemsQuery;
-      if (cancelled) return;
-      const latest = items?.[0];
-      if (!latest) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch aggregated metrics for that item
-      const { data: metricsRows } = await supabase
-        .from('content_metrics')
-        .select('*')
-        .eq('review_item_id', latest.id)
-        .eq('platform', 'all')
-        .order('fetched_at', { ascending: false })
-        .limit(1);
-      if (cancelled) return;
-      const m = metricsRows?.[0];
-      if (!m) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch 7-day growth + AI insight (best-effort, non-blocking on failure)
-      const { data: analysis } = await supabase.functions
-        .invoke('analyze-metrics', {
-          body: { contentId: latest.id, title: latest.title },
-        })
-        .catch(err => {
-          console.error('[welcome] analyze-metrics failed:', err);
-          return { data: null };
-        });
-      if (cancelled) return;
-      const a = (analysis ?? null) as {
-        hasData?: boolean;
-        sampleCount?: number;
-        growth?: { views: number; likes: number; comments: number; saves: number };
-        insight?: string;
-      } | null;
-
-      setReport({
-        title: latest.title || '(无标题)',
-        platform: (latest.platform as Platform) || 'xiaohongshu',
-        metrics: {
-          views: m.views || 0,
-          likes: m.likes || 0,
-          comments: m.comments || 0,
-          saves: m.saves || 0,
-        },
-        sparkComment: '',
-        sparkAdvice: m.ai_insight || '',
-        growth: a?.growth,
-        growthSampleCount: a?.sampleCount,
-        aiInsight: a?.insight,
-      });
-      setLoading(false);
-    };
-    loadLatestReport();
-    return () => { cancelled = true; };
-  }, []);
-
-  const suggestions = report
-    ? [
-        '帮我写一篇类似风格的新内容',
-        '分析一下这条内容为什么表现好',
-      ]
-    : [
-        '帮我写一篇小红书种草笔记',
-        '推荐几个最近热门的选题方向',
-      ];
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-        {/* Spark greeting */}
-        <div className="flex items-start gap-3">
-          <SparkAvatar size={32} />
-          <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
-            <p className="text-[14px] leading-[1.6] text-[#333]">
-              {loading
-                ? '早上好 ☀️ 我正在拉取最近的发布数据……'
-                : report
-                  ? '早上好 ☀️ 这是你最近一条发布内容的真实数据回流：'
-                  : '早上好 ☀️ 我是火花，你的内容创作搭子。还没有发布过内容，告诉我你想做什么吧～'}
-            </p>
-          </div>
-        </div>
-
-        {/* Real data report card (only if real data exists) */}
-        {report && (
-          <div className="flex items-start gap-3">
-            <SparkAvatar size={32} />
-            <div className="flex-1 min-w-0 max-w-[85%]">
-              <DataReportCard data={report} />
-            </div>
-          </div>
-        )}
-
-        {/* Spark suggestion */}
-        {!loading && (
-          <div className="flex items-start gap-3">
-            <SparkAvatar size={32} />
-            <div className="chat-bubble-assistant px-4 py-3 max-w-[80%]">
-              <p className="text-[14px] leading-[1.6] text-[#333]">
-                {report
-                  ? '基于这条内容的表现，要不要我帮你顺势再写一篇？告诉我你想做什么吧～'
-                  : '我可以帮你写小红书 / 公众号 / 抖音脚本，做选题分析，还能定时自动生成内容。告诉我你想做什么吧～'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
-  msg: ChatMessage;
-  onSend: (text: string) => void;
-  onCardAction: (action: string, item?: ContentItem) => void;
-  onRetry: (msg: ChatMessage) => void;
-}) {
-  const isUser = msg.role === 'user';
-
-  // Error bubble — friendly message + retry button
-  if (!isUser && msg.error) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] leading-[1.6] text-[#333]">
-                  {msg.content || '生成失败了，要不再试一次？'}
-                </p>
-                <p className="text-[12px] leading-[1.5] text-[#888] mt-1 break-words">
-                  {msg.error.message}
-                </p>
-                {msg.error.retryPrompt && (
-                  <button
-                    onClick={() => onRetry(msg)}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-spark-orange text-white text-[13px] hover:opacity-90 transition-opacity"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    重试
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Metrics card — 24h post-publish data report
-  if (!isUser && msg.metricsCard) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <MetricsCard data={msg.metricsCard} />
-        </div>
-      </div>
-    );
-  }
-
-  // Distribution card — content approved, choose platforms to publish
-  if (!isUser && msg.distribution) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <DistributionCard data={msg.distribution} />
-        </div>
-      </div>
-    );
-  }
-
-  // Schedule card — natural-language triggered task creation
-  if (!isUser && msg.scheduleCard) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <ScheduleCard data={msg.scheduleCard} />
-        </div>
-      </div>
-    );
-  }
-
-  // Review reminder card — simplified pointer to /review (replaces ReviewCard in chat)
-  if (!isUser && msg.reviewReminder) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <ReviewReminderCard
-            item={msg.reviewReminder.item}
-            taskName={msg.reviewReminder.taskName}
-            message={msg.reviewReminder.message}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Legacy: scheduled-task reviewing items routed via contentItem+reviewTask → render as reminder too
-  if (!isUser && msg.contentItem && (msg.reviewTask || msg.contentItem.status === 'reviewing')) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <ReviewReminderCard item={msg.contentItem} taskName={msg.reviewTask?.taskName} />
-        </div>
-      </div>
-    );
-  }
-
-  // Content card message
-  if (!isUser && msg.contentItem) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <ContentCard item={msg.contentItem} onAction={(action, item) => onCardAction(action, item)} />
-        </div>
-      </div>
-    );
-  }
-
-  // Data report message
-  if (!isUser && msg.reportData) {
-    return (
-      <div className="flex items-start gap-3">
-        <SparkAvatar size={32} />
-        <div className="flex-1 min-w-0 max-w-[85%]">
-          {msg.content && (
-            <div className="chat-bubble-assistant px-4 py-3 mb-2">
-              <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          )}
-          <DataReportCard
-            data={msg.reportData as unknown as ReportData}
-            onAction={(action) => onCardAction(action)}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (isUser) {
-    return (
-      <div className="flex justify-end">
-        <div className="chat-bubble-user px-4 py-3 max-w-[80%]">
-          <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-start gap-3">
-      <SparkAvatar size={32} />
-      <div className="flex-1 min-w-0 max-w-[80%]">
-        <div className="chat-bubble-assistant px-4 py-3">
-          <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
-        </div>
-
-        {/* Choice pills */}
-        {msg.choices && msg.choices.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {msg.choices.map(c => (
-              <button
-                key={c.id}
-                onClick={() => onSend(c.label)}
-                className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
-              >
-                {c.emoji && <span className="mr-1">{c.emoji}</span>}
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Quick action buttons */}
-        {msg.actions && msg.actions.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {msg.actions.map(a => (
-              <button
-                key={a.value}
-                onClick={() => onSend(a.value)}
-                className={`px-3 py-1.5 rounded-lg text-[13px] transition-colors ${
-                  a.variant === 'primary'
-                    ? 'bg-spark-orange text-white hover:opacity-90'
-                    : 'bg-[#F5F5F3] text-[#666] hover:bg-[#EEEDEB]'
-                }`}
-              >
-                {a.icon && <span className="mr-1">{a.icon}</span>}
-                {a.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Generate context-aware suggestions based on article content
-function generateSuggestions(title: string, content: string, tags?: string[]): ChoiceOption[] {
-  const suggestions: ChoiceOption[] = [
-    { id: 's1', label: '帮我润色一下这篇文章', emoji: '✨' },
-    { id: 's2', label: `给「${title.substring(0, 10)}」配一张封面图`, emoji: '🎨' },
-    { id: 's3', label: '换一种更活泼的风格重写', emoji: '🔄' },
-  ];
-  if (content.length < 200) {
-    suggestions.push({ id: 's4', label: '内容太短了，帮我扩写一下', emoji: '📝' });
-  }
-  if (!tags || tags.length < 3) {
-    suggestions.push({ id: 's5', label: '帮我补充更多标签', emoji: '🏷️' });
-  }
-  if (content.length > 500) {
-    suggestions.push({ id: 's6', label: '太长了，帮我精简到300字以内', emoji: '✂️' });
-  }
-  return suggestions.slice(0, 4);
-}
+// Extracted sub-components
+import { TypingIndicator } from './chat/ChatAtoms';
+import { WelcomeState } from './chat/WelcomeState';
+import { MessageBubble } from './chat/MessageBubble';
+import { ChatInput } from './chat/ChatInput';
+import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
 
 export default function SparkChat({ getContext }: { getContext?: () => string }) {
   const {
@@ -488,26 +69,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     return parts.join('\n');
   }, [getContext]);
 
-  // Detect schedule-creation intent in natural language
-  const tryDetectScheduleIntent = (text: string): ScheduleCardData | null => {
-    const scheduleKeywords = /(每周|每天|每日|定时|定期|自动生成|自动发|计划|按时|每隔)/;
-    if (!scheduleKeywords.test(text)) return null;
-    const frequency: 'daily' | 'weekly' = /每周|周一|周二|周三|周四|周五|周六|周日/.test(text) ? 'weekly' : 'daily';
-    // Extract a topic guess: text after "关于" or "写" up to common stopwords
-    let topic = '';
-    const aboutMatch = text.match(/关于(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
-    if (aboutMatch) topic = aboutMatch[1].trim();
-    if (!topic) {
-      const writeMatch = text.match(/写(?:一篇|一个|点)?(.+?)(?:的|，|。|$|内容|文章|推文|笔记)/);
-      if (writeMatch) topic = writeMatch[1].trim();
-    }
-    return {
-      id: `${Date.now()}-plan`,
-      suggestedTopic: topic.slice(0, 30),
-      suggestedFrequency: frequency,
-    };
-  };
-
   const submitForReview = useCallback(async () => {
     // Find the most recent draft content item
     const all = useAppStore.getState().contents;
@@ -545,55 +106,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       },
     });
   }, [addMessage, setContents]);
-
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || isGenerating) return;
-    setInput('');
-
-    // Special-case: "提交审核" choice — skip AI, submit current draft
-    if (text.trim() === '提交审核') {
-      addMessage({
-        id: Date.now().toString(),
-        role: 'user',
-        content: '提交审核',
-        timestamp: new Date().toISOString(),
-      });
-      await submitForReview();
-      return;
-    }
-
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(userMsg);
-
-    // Schedule intent: short-circuit to a ScheduleCard instead of generating
-    const scheduleCard = tryDetectScheduleIntent(text);
-    if (scheduleCard) {
-      addMessage({
-        id: `${Date.now()}-sched-card`,
-        role: 'assistant',
-        content: '听起来你想创建一个定时任务，我帮你拟了一份计划，确认一下👇',
-        timestamp: new Date().toISOString(),
-        scheduleCard,
-      });
-      return;
-    }
-
-    setIsGenerating(true);
-
-    // Determine if this should generate an article or just chat
-    const isGenerate = /写|生成|创作|种草|文案|文章|笔记|帖子|推文/.test(text);
-
-    if (isGenerate) {
-      await handleGenerate(text.trim());
-    } else {
-      await handleChat(text.trim());
-    }
-  };
 
   const handleChat = async (text: string) => {
     const currentMessages = useAppStore.getState().messages;
@@ -806,6 +318,55 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
   };
 
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isGenerating) return;
+    setInput('');
+
+    // Special-case: "提交审核" choice — skip AI, submit current draft
+    if (text.trim() === '提交审核') {
+      addMessage({
+        id: Date.now().toString(),
+        role: 'user',
+        content: '提交审核',
+        timestamp: new Date().toISOString(),
+      });
+      await submitForReview();
+      return;
+    }
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(userMsg);
+
+    // Schedule intent: short-circuit to a ScheduleCard instead of generating
+    const scheduleCard = tryDetectScheduleIntent(text);
+    if (scheduleCard) {
+      addMessage({
+        id: `${Date.now()}-sched-card`,
+        role: 'assistant',
+        content: '听起来你想创建一个定时任务，我帮你拟了一份计划，确认一下👇',
+        timestamp: new Date().toISOString(),
+        scheduleCard,
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+
+    // Determine if this should generate an article or just chat
+    const isGenerate = /写|生成|创作|种草|文案|文章|笔记|帖子|推文/.test(text);
+
+    if (isGenerate) {
+      await handleGenerate(text.trim());
+    } else {
+      await handleChat(text.trim());
+    }
+  };
+
   const handleRetry = useCallback(async (msg: ChatMessage) => {
     if (!msg.error?.retryPrompt) return;
     // Remove the failed message, then re-run the original handler
@@ -850,13 +411,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     if (text) sendMessage(text);
   }, [pushDistributionCard]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Messages */}
@@ -880,66 +434,13 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       )}
 
       {/* Input */}
-      <div className="border-t border-[#EEEDEB] bg-[#FAFAF8]">
-        <div className="max-w-3xl mx-auto px-4 py-3">
-          <div className="flex items-end gap-2 bg-white rounded-[24px] border border-[#E5E4E2] px-4 py-2 shadow-sm">
-
-            <button className="text-[#999] hover:text-[#666] transition-colors pb-1.5">
-              <Paperclip size={18} />
-            </button>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="告诉火花你想做什么..."
-              rows={1}
-              className="flex-1 bg-transparent border-none outline-none resize-none text-[15px] text-[#333] placeholder:text-[#BBB] py-1.5 max-h-32 leading-[1.5]"
-              style={{ minHeight: '24px' }}
-              onInput={(e) => {
-                const t = e.currentTarget;
-                t.style.height = 'auto';
-                t.style.height = Math.min(t.scrollHeight, 128) + 'px';
-              }}
-            />
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || isGenerating}
-              className="w-9 h-9 rounded-full bg-spark-orange text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:opacity-90 transition-opacity"
-            >
-              <Send size={16} />
-            </button>
-          </div>
-          {/* Prompt templates - hide when input has content to avoid overwriting */}
-          <div className={`flex flex-wrap gap-2 mt-2 px-1 transition-opacity ${input.trim() ? 'hidden' : ''}`}>
-            {[
-              { label: '小红书种草', prompt: '帮我写一篇小红书种草笔记，主题是：' },
-              { label: '公众号长文', prompt: '帮我写一篇公众号长文，主题是：' },
-              { label: '抖音脚本', prompt: '帮我写一个抖音短视频脚本，主题是：' },
-            ].map(t => (
-              <button
-                key={t.label}
-                type="button"
-                onClick={() => {
-                  setInput(t.prompt);
-                  requestAnimationFrame(() => {
-                    const ta = inputRef.current;
-                    if (ta) {
-                      ta.focus();
-                      ta.setSelectionRange(t.prompt.length, t.prompt.length);
-                      ta.style.height = 'auto';
-                      ta.style.height = Math.min(ta.scrollHeight, 128) + 'px';
-                    }
-                  });
-                }}
-                className="px-3 py-1 rounded-full border border-[#E5E4E2] bg-white text-[12px] text-[#666] hover:border-spark-orange/40 hover:text-spark-orange transition-colors"
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <ChatInput
+        input={input}
+        setInput={setInput}
+        onSend={sendMessage}
+        isGenerating={isGenerating}
+        inputRef={inputRef}
+      />
     </div>
   );
 }

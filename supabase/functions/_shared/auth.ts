@@ -127,3 +127,63 @@ export function validatePayloadSize(
     throw new Error(`Payload too large (max ${maxBytes} bytes)`);
   }
 }
+
+// ── Rate Limiting ───────────────────────────────────────────────────
+
+/**
+ * Simple in-memory sliding-window rate limiter.
+ * Works within a single Deno isolate — limits bursts from the same
+ * IP or user during the isolate lifetime. Not a distributed rate limiter.
+ *
+ * Usage:
+ *   checkRateLimit(req, { maxRequests: 30, windowSec: 60 });
+ *
+ * Throws Error("Rate limit exceeded") when over limit.
+ */
+const rateLimitStore = new Map<string, number[]>();
+const RATE_LIMIT_CLEANUP_INTERVAL = 60_000; // 1 min
+let lastCleanup = Date.now();
+
+function cleanupStaleEntries(windowMs: number): void {
+  const now = Date.now();
+  if (now - lastCleanup < RATE_LIMIT_CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  const cutoff = now - windowMs;
+  for (const [key, timestamps] of rateLimitStore) {
+    const filtered = timestamps.filter((t) => t > cutoff);
+    if (filtered.length === 0) {
+      rateLimitStore.delete(key);
+    } else {
+      rateLimitStore.set(key, filtered);
+    }
+  }
+}
+
+export function checkRateLimit(
+  req: Request,
+  opts: { maxRequests?: number; windowSec?: number; keyPrefix?: string } = {},
+): void {
+  const { maxRequests = 30, windowSec = 60, keyPrefix = "" } = opts;
+  const windowMs = windowSec * 1000;
+
+  // Identify client by IP (from Deno.serve / proxy headers)
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("cf-connecting-ip") ||
+    "unknown";
+  const key = `${keyPrefix}:${ip}`;
+
+  cleanupStaleEntries(windowMs);
+
+  const now = Date.now();
+  const cutoff = now - windowMs;
+  const timestamps = (rateLimitStore.get(key) || []).filter((t) => t > cutoff);
+  timestamps.push(now);
+  rateLimitStore.set(key, timestamps);
+
+  if (timestamps.length > maxRequests) {
+    throw new Error(
+      `Rate limit exceeded (${maxRequests} requests per ${windowSec}s)`,
+    );
+  }
+}

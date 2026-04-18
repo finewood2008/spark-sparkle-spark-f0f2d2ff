@@ -5,6 +5,7 @@ import {
   optionsCors,
   requireUser,
   validatePayloadSize,
+  checkRateLimit,
 } from "../_shared/auth.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -113,6 +114,7 @@ Deno.serve(async (req) => {
   try {
     const userId = await requireUser(req);
     validatePayloadSize(req);
+    checkRateLimit(req, { maxRequests: 30, windowSec: 60, keyPrefix: "learn" });
 
     const { original, edited, contextTitle } = await req.json();
     if (typeof original !== "string" || typeof edited !== "string") {
@@ -178,6 +180,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ rules, persisted: rows.length }, corsHeaders);
   } catch (err) {
     console.error("[learn-from-edit] error:", err);
+    if (err instanceof Error && err.message.includes("Rate limit")) {
+      return new Response(
+        JSON.stringify({ error: err.message }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (err instanceof AuthError) {
       return jsonResponse({ error: err.message }, corsHeaders, 401);
     }

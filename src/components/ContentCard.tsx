@@ -5,6 +5,7 @@ import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
+import { getAuthToken } from '@/lib/auth-helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
@@ -306,8 +307,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setActionError('cover', null);
     setCoverLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || '';
+      const authToken = await getAuthToken();
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-cover`, {
         method: 'POST',
         headers: {
@@ -350,8 +350,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setTitleLoading(true);
     try {
       const currentContent = editing ? editContent : item.content;
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || '';
+      const authToken = await getAuthToken();
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
         method: 'POST',
         headers: {

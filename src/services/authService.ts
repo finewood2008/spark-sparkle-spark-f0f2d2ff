@@ -40,34 +40,36 @@ export interface BindingStatus {
 }
 
 // ---------- Third-party binding stubs ----------
-// TODO: 对接真实后端 API
+// These are placeholder implementations. Real binding uses Supabase Auth
+// provider linking (supabase.auth.linkIdentity / unlinkIdentity).
+// Kept as stubs until provider OAuth apps are configured in Supabase dashboard.
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** 绑定第三方账号 */
+/** Bind a third-party account (stub — awaiting provider config) */
 export async function bindThirdPartyAccount(
   userId: string,
   provider: SocialProvider,
 ): Promise<{ success: boolean; error?: string }> {
   await delay(800);
-  // TODO: 调用后端绑定接口
+  // Stub: always succeeds
   return { success: true };
 }
 
-/** 解绑第三方账号 */
+/** Unbind a third-party account (stub — awaiting provider config) */
 export async function unbindThirdPartyAccount(
   userId: string,
   provider: SocialProvider,
 ): Promise<{ success: boolean; error?: string }> {
   await delay(800);
-  // TODO: 调用后端解绑接口
+  // Stub: always succeeds
   return { success: true };
 }
 
-/** 获取账号绑定状态列表 */
+/** Get binding status list (stub — returns unbound for all providers) */
 export async function getBindingStatus(userId: string): Promise<BindingStatus[]> {
   await delay(400);
-  // TODO: 从后端获取真实绑定状态
+  // Stub: returns unbound for all providers until dashboard config is done
   return [
     { provider: 'wechat', label: '微信', bound: false },
     { provider: 'wecom', label: '企业微信', bound: false },

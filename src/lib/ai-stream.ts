@@ -1,20 +1,8 @@
 // Shared AI utilities for Lovable AI Gateway via Supabase edge functions
 import { loadUserPrefs } from './user-prefs';
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './env';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_URL } from './env';
+import { getAuthToken } from './auth-helpers';
 import { useMemoryStore } from '@/store/memoryStore';
-
-/**
- * Return the current user's access_token when logged in,
- * falling back to the anonymous publishable key for unauthenticated flows.
- */
-async function getAuthToken(): Promise<string> {
-  try {
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.access_token) return data.session.access_token;
-  } catch { /* fall through */ }
-  return SUPABASE_PUBLISHABLE_KEY;
-}
 
 type Msg = { role: 'user' | 'assistant' | 'system'; content: string };
 

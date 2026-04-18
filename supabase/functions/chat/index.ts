@@ -6,6 +6,7 @@ import {
   optionsCors,
   requireUser,
   validatePayloadSize,
+  checkRateLimit,
 } from "../_shared/auth.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -77,6 +78,7 @@ serve(async (req) => {
   try {
     await requireUser(req);
     validatePayloadSize(req);
+    checkRateLimit(req, { maxRequests: 20, windowSec: 60, keyPrefix: "chat" });
 
     const { messages, mode, platform, brandContext, presetId } = await req.json();
 
@@ -131,6 +133,12 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("chat error:", e);
+    if (e instanceof Error && e.message.includes("Rate limit")) {
+      return new Response(
+        JSON.stringify({ error: e.message }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (e instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: e.message }),
