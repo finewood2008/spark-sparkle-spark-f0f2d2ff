@@ -4,6 +4,7 @@ import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, Messag
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
+import SparkLogo from './SparkLogo';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import MemoryPanel from './MemoryPanel';
@@ -122,7 +123,7 @@ export default function ChatLayout() {
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
           >
-            <span className="text-[14px]">✨</span>
+            <SparkLogo size={18} className="text-white" />
           </div>
           <span className="text-[16px] font-semibold text-[#333]">火花</span>
           <Tooltip>
