@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save, ImageOff, Check, Trash2, FilePlus2 } from 'lucide-react';
+import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save, ImageOff } from 'lucide-react';
 import { useMemoryStore } from '@/store/memoryStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import type { BrandProfile, AnalysisResult, VisualIdentity } from '@/types/memory';
@@ -133,26 +133,20 @@ function VisualAssetGrid({ visual }: { visual: VisualIdentity }) {
 
 export function BrandProfileTab() {
   const brandProfile = useMemoryStore((s) => s.brandProfile);
-  const brandProfiles = useMemoryStore((s) => s.brandProfiles);
   const sourceUrls = useMemoryStore((s) => s.sourceUrls);
   const isAnalyzing = useMemoryStore((s) => s.isAnalyzing);
   const addSourceUrl = useMemoryStore((s) => s.addSourceUrl);
   const removeSourceUrl = useMemoryStore((s) => s.removeSourceUrl);
-  const setSourceUrls = useMemoryStore((s) => s.setSourceUrls);
-  const { analyzeUrls, saveAnalysisResult, activateBrandProfile, deleteBrandProfile } = useMemoryV2();
+  const { analyzeUrls, saveAnalysisResult } = useMemoryV2();
 
   const [urlInput, setUrlInput] = useState('');
   const [form, setForm] = useState<BrandProfile>(brandProfile ?? emptyProfile);
   const [dirty, setDirty] = useState(false);
   const [analysisPreview, setAnalysisPreview] = useState<AnalysisResult | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (brandProfile) {
       setForm(brandProfile);
-      setDirty(false);
-    } else {
-      setForm(emptyProfile);
       setDirty(false);
     }
   }, [brandProfile]);
@@ -208,44 +202,22 @@ export function BrandProfileTab() {
     }
   };
 
-  // Saving an analysis ALWAYS creates a new brand profile (and auto-activates it).
   const handleSaveAnalysis = async () => {
     if (!analysisPreview) return;
-    await saveAnalysisResult(analysisPreview, { mode: 'create' });
+    await saveAnalysisResult(analysisPreview);
     setAnalysisPreview(null);
-    toast.success('已新建品牌档案并设为激活');
+    toast.success('品牌档案已保存');
   };
 
-  // Manual edit on Markdown body updates the CURRENTLY ACTIVE profile in place.
   const handleManualSave = async () => {
     const result: AnalysisResult = {
       brandDoc: form.brandDoc,
       visualIdentity: form.visualIdentity,
       writingPatterns: [],
     };
-    await saveAnalysisResult(result, { mode: 'update', profileId: form.id });
+    await saveAnalysisResult(result);
     setDirty(false);
-    toast.success('已更新当前品牌档案');
-  };
-
-  const handleActivate = async (id: string) => {
-    if (!id) return;
-    await activateBrandProfile(id);
-    toast.success('已切换激活档案');
-  };
-
-  const handleDelete = async (id: string) => {
-    await deleteBrandProfile(id);
-    setConfirmDeleteId(null);
-    toast.success('档案已删除');
-  };
-
-  // Reset URL list and analysis preview to start a fresh capture.
-  const handleStartNew = () => {
-    setSourceUrls([]);
-    setAnalysisPreview(null);
-    setUrlInput('');
-    toast.info('请输入新品牌的 URL 开始分析');
+    toast.success('品牌档案已保存');
   };
 
   const docValue = form.brandDoc || '';
@@ -253,77 +225,6 @@ export function BrandProfileTab() {
 
   return (
     <div className="space-y-4">
-      {/* ============= 档案切换器（多档案管理） ============= */}
-      {brandProfiles.length > 0 && (
-        <section className="border border-[#E5E4E2] rounded-2xl p-3 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-[12px] font-medium text-[#666]">
-              品牌档案 · 共 {brandProfiles.length} 条
-            </div>
-            <button
-              onClick={handleStartNew}
-              className="text-[11px] text-orange-500 hover:text-orange-600 flex items-center gap-1 transition-colors"
-              title="开始新的品牌分析"
-            >
-              <FilePlus2 size={11} /> 新建
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            {brandProfiles.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${
-                  p.isActive
-                    ? 'border-orange-300 bg-orange-50/60'
-                    : 'border-[#F0EFED] bg-white hover:bg-[#FAFAF8]'
-                }`}
-              >
-                {p.isActive ? (
-                  <span className="flex items-center gap-1 text-[10px] text-orange-600 font-medium px-1.5 py-0.5 bg-orange-100 rounded">
-                    <Check size={10} /> 激活
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => p.id && handleActivate(p.id)}
-                    className="text-[10px] text-[#666] hover:text-orange-500 px-1.5 py-0.5 border border-[#E5E4E2] rounded hover:border-orange-300 transition-colors"
-                  >
-                    设为激活
-                  </button>
-                )}
-                <span className="flex-1 truncate text-[12px] text-[#333]" title={p.name}>
-                  {p.name || '未命名档案'}
-                </span>
-                {confirmDeleteId === p.id ? (
-                  <>
-                    <button
-                      onClick={() => p.id && handleDelete(p.id)}
-                      className="text-[10px] text-red-500 hover:text-red-600 px-1.5 py-0.5 border border-red-300 rounded transition-colors"
-                    >
-                      确认删除
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(null)}
-                      className="text-[10px] text-[#999] hover:text-[#666] px-1 transition-colors"
-                    >
-                      取消
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => p.id && setConfirmDeleteId(p.id)}
-                    className="text-[#CCC] hover:text-red-500 transition-colors"
-                    title="删除档案"
-                    aria-label="删除档案"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ============= Firecrawl URL 分析区 ============= */}
       <section className="border border-[#E5E4E2] rounded-2xl p-4 bg-gradient-to-br from-orange-50/50 to-white">
         <div className="flex items-center gap-2 mb-2">

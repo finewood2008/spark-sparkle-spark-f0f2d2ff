@@ -35,9 +35,6 @@ export interface MemoryEntry {
   confidence: number;
   evidence?: string;
   expiresAt?: string;
-  /** Only meaningful for layer='identity' + category='brand_profile'.
-   * Exactly one brand profile per owner can be active at a time (DB-enforced). */
-  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,12 +55,6 @@ export interface VisualIdentity {
 }
 
 export interface BrandProfile {
-  /** Memory entry id — used to identify this profile across multi-profile UI. */
-  id?: string;
-  /** Friendly name shown in the profile switcher (e.g. "半人马AI · 4月18日"). */
-  name?: string;
-  /** Whether this is the currently-active profile injected into prompts. */
-  isActive?: boolean;
   /** AI-generated, user-editable Markdown describing the whole brand. Source of truth for prompt injection. */
   brandDoc: string;
   /** Logo / colors / fonts, populated from Firecrawl branding format. URLs only — no upload. */

@@ -219,7 +219,6 @@ export type Database = {
           evidence: string | null
           expires_at: string | null
           id: string
-          is_active: boolean
           layer: string
           source: string | null
           source_url: string | null
@@ -235,7 +234,6 @@ export type Database = {
           evidence?: string | null
           expires_at?: string | null
           id?: string
-          is_active?: boolean
           layer: string
           source?: string | null
           source_url?: string | null
@@ -251,7 +249,6 @@ export type Database = {
           evidence?: string | null
           expires_at?: string | null
           id?: string
-          is_active?: boolean
           layer?: string
           source?: string | null
           source_url?: string | null

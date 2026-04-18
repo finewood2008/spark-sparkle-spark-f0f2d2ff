@@ -38,7 +38,6 @@ function rowToEntry(row: Record<string, unknown>): MemoryEntry {
     confidence: (row.confidence as number) ?? 1,
     evidence: (row.evidence as string) ?? undefined,
     expiresAt: (row.expires_at as string) ?? undefined,
-    isActive: (row.is_active as boolean) ?? false,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -57,40 +56,8 @@ function entryToRow(entry: MemoryEntry, userId: string) {
     confidence: entry.confidence,
     evidence: entry.evidence ?? null,
     expires_at: entry.expiresAt ?? null,
-    is_active: entry.isActive ?? false,
     created_at: entry.createdAt,
     updated_at: entry.updatedAt,
-  };
-}
-
-/** Build a BrandProfile object from a memory row. */
-function entryToBrandProfile(e: MemoryEntry): BrandProfile {
-  const c = e.content as Record<string, unknown>;
-  const brandDoc = (c.brandDoc as string) ?? '';
-  // Derive a friendly name: first H1 from brandDoc, else legacy brandName, else timestamp.
-  const h1Match = brandDoc.match(/^#\s+(.+?)$/m);
-  const derivedName =
-    (c.name as string) ||
-    h1Match?.[1]?.trim() ||
-    (c.brandName as string) ||
-    `品牌档案 ${new Date(e.createdAt).toLocaleDateString('zh-CN')}`;
-  return {
-    id: e.id,
-    name: derivedName,
-    isActive: e.isActive ?? false,
-    brandDoc,
-    visualIdentity: (c.visualIdentity as BrandProfile['visualIdentity']) ?? {},
-    sourceUrls: (c.sourceUrls as string[]) ?? [],
-    initialized: (c.initialized as boolean) ?? false,
-    brandName: (c.brandName as string) ?? undefined,
-    industry: (c.industry as string) ?? undefined,
-    mainBusiness: (c.mainBusiness as string) ?? undefined,
-    targetCustomer: (c.targetCustomer as string) ?? undefined,
-    differentiation: (c.differentiation as string) ?? undefined,
-    toneOfVoice: (c.toneOfVoice as string) ?? undefined,
-    keywords: (c.keywords as string[]) ?? undefined,
-    tabooWords: (c.tabooWords as string[]) ?? undefined,
-    brandStory: (c.brandStory as string) ?? undefined,
   };
 }
 
@@ -124,7 +91,7 @@ export function useMemoryV2() {
     if (!userId) {
       // Not logged in — clear store
       store.getState().setMemories([]);
-      store.getState().setBrandProfiles([]);
+      store.getState().setBrandProfile(null);
       store.getState().setSourceUrls([]);
       store.getState().setMemoryEnabled(false);
       return;
@@ -157,42 +124,48 @@ export function useMemoryV2() {
 
     store.getState().setMemories(validEntries);
 
-    // --- collect ALL brand_profile entries (multi-profile support) ---
-    const profileEntries = validEntries.filter(
+    // --- extract brand profile from identity layer ---
+    const profileEntry = validEntries.find(
       (e) => e.layer === 'identity' && e.category === 'brand_profile',
     );
+    if (profileEntry) {
+      const c = profileEntry.content as Record<string, unknown>;
+      const bp: BrandProfile = {
+        brandDoc: (c.brandDoc as string) ?? '',
+        visualIdentity: (c.visualIdentity as BrandProfile['visualIdentity']) ?? {},
+        sourceUrls: (c.sourceUrls as string[]) ?? [],
+        initialized: (c.initialized as boolean) ?? false,
+        // legacy
+        brandName: (c.brandName as string) ?? undefined,
+        industry: (c.industry as string) ?? undefined,
+        mainBusiness: (c.mainBusiness as string) ?? undefined,
+        targetCustomer: (c.targetCustomer as string) ?? undefined,
+        differentiation: (c.differentiation as string) ?? undefined,
+        toneOfVoice: (c.toneOfVoice as string) ?? undefined,
+        keywords: (c.keywords as string[]) ?? undefined,
+        tabooWords: (c.tabooWords as string[]) ?? undefined,
+        brandStory: (c.brandStory as string) ?? undefined,
+      };
+      store.getState().setBrandProfile(bp);
 
-    if (profileEntries.length > 0) {
-      // Sort newest first for display
-      const sorted = [...profileEntries].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      const profiles = sorted.map(entryToBrandProfile);
-
-      // Ensure exactly one is marked active. If none from DB, activate the newest.
-      if (!profiles.some((p) => p.isActive) && profiles.length > 0) {
-        profiles[0].isActive = true;
-      }
-
-      store.getState().setBrandProfiles(profiles);
-
-      const active = profiles.find((p) => p.isActive) ?? profiles[0];
-
-      // Auto-enable memory if active brand is initialized
-      if (active?.initialized) {
+      // Auto-enable memory if brand is initialized
+      if (bp.initialized) {
         store.getState().setMemoryEnabled(true);
       }
 
-      // Populate sourceUrls state from the active profile
-      if (active && active.sourceUrls.length > 0) {
+      // Populate sourceUrls state
+      if (bp.sourceUrls.length > 0) {
         store.getState().setSourceUrls(
-          active.sourceUrls.map(
-            (url): SourceUrl => ({ url, status: 'done' }),
+          bp.sourceUrls.map(
+            (url): SourceUrl => ({
+              url,
+              status: 'done',
+            }),
           ),
         );
       }
     } else {
-      store.getState().setBrandProfiles([]);
+      store.getState().setBrandProfile(null);
     }
   }, [store]);
 
@@ -323,50 +296,16 @@ export function useMemoryV2() {
   // saveAnalysisResult — write analysis into the memories table
   // -----------------------------------------------------------------------
   const saveAnalysisResult = useCallback(
-    async (result: AnalysisResult, options?: { mode?: 'create' | 'update'; profileId?: string; name?: string }) => {
+    async (result: AnalysisResult) => {
       const userId = getUserId();
       if (!userId) return;
 
-      const mode = options?.mode ?? 'create';
       const now = new Date().toISOString();
       const sourceUrls = store.getState().sourceUrls.map((s) => s.url);
 
-      // Pick or create the brand_profile entry id.
-      // - 'create': new uuid → adds a new profile row, becomes active.
-      // - 'update': reuse provided id (or current active id) → in-place edit.
-      let profileId = options?.profileId;
-      if (!profileId) {
-        if (mode === 'update') {
-          const active = store.getState().brandProfile;
-          profileId = active?.id;
-        }
-        if (!profileId) {
-          // Generate a uuid-ish id; DB has uuid default but we set it explicitly so we can reference it locally
-          profileId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-            ? crypto.randomUUID()
-            : `${userId}_bp_${Date.now()}`;
-        }
-      }
-
-      // For 'create' mode we must first deactivate any existing active row,
-      // otherwise the partial unique index will reject the new row.
-      if (mode === 'create') {
-        const { error: deactivateErr } = await db
-          .from('memories')
-          .update({ is_active: false })
-          .eq('user_id', userId)
-          .eq('layer', 'identity')
-          .eq('category', 'brand_profile')
-          .eq('is_active', true);
-        if (deactivateErr) {
-          console.error('[useMemoryV2] deactivate existing failed:', deactivateErr.message);
-          return;
-        }
-      }
-
-      // 1. brand_profile identity entry — always saved as active
+      // 1. brand_profile identity entry — Markdown doc + visual identity
       const brandProfileEntry: MemoryEntry = {
-        id: profileId,
+        id: `${userId}_brand_profile`,
         layer: 'identity',
         category: 'brand_profile',
         content: {
@@ -374,19 +313,17 @@ export function useMemoryV2() {
           visualIdentity: result.visualIdentity,
           sourceUrls,
           initialized: true,
-          name: options?.name,
         },
         source: 'firecrawl',
         confidence: 0.8,
-        isActive: true,
         createdAt: now,
         updatedAt: now,
       };
 
-      // 2. preference entries for each writing pattern (scoped per profile to avoid id collisions)
+      // 2. preference entries for each writing pattern
       const patternEntries: MemoryEntry[] = result.writingPatterns.map(
         (pattern, idx): MemoryEntry => ({
-          id: `${profileId}_pattern_${idx}`,
+          id: `${userId}_pattern_${idx}`,
           layer: 'preference',
           category: 'writing_style',
           content: {
@@ -413,89 +350,23 @@ export function useMemoryV2() {
         return;
       }
 
-      // Reload from DB so brandProfiles reflects the new + newly-deactivated rows
-      await loadMemories();
+      const existing = store.getState().memories;
+      const newIds = new Set(allEntries.map((e) => e.id));
+      const merged = [...existing.filter((e) => !newIds.has(e.id)), ...allEntries];
+      store.getState().setMemories(merged);
+
+      store.getState().setBrandProfile({
+        brandDoc: result.brandDoc,
+        visualIdentity: result.visualIdentity,
+        sourceUrls,
+        initialized: true,
+      });
+
+      store.getState().setMemoryEnabled(true);
+
       store.getState().setMemoryEnabled(true);
     },
-    [store, loadMemories],
-  );
-
-  // -----------------------------------------------------------------------
-  // activateBrandProfile — flip is_active flag (DB enforces uniqueness)
-  // -----------------------------------------------------------------------
-  const activateBrandProfile = useCallback(
-    async (profileId: string) => {
-      const userId = getUserId();
-      if (!userId) return;
-
-      // Optimistic local update
-      store.getState().setActiveBrandProfileLocal(profileId);
-
-      // Two-step: deactivate all, then activate target (avoids unique-index race)
-      const { error: deactivateErr } = await db
-        .from('memories')
-        .update({ is_active: false })
-        .eq('user_id', userId)
-        .eq('layer', 'identity')
-        .eq('category', 'brand_profile');
-      if (deactivateErr) {
-        console.error('[useMemoryV2] activate.deactivate failed:', deactivateErr.message);
-        await loadMemories();
-        return;
-      }
-
-      const { error: activateErr } = await db
-        .from('memories')
-        .update({ is_active: true })
-        .eq('id', profileId);
-      if (activateErr) {
-        console.error('[useMemoryV2] activate failed:', activateErr.message);
-      }
-
-      await loadMemories();
-    },
-    [store, loadMemories],
-  );
-
-  // -----------------------------------------------------------------------
-  // deleteBrandProfile — remove a brand profile (and re-activate fallback)
-  // -----------------------------------------------------------------------
-  const deleteBrandProfile = useCallback(
-    async (profileId: string) => {
-      const userId = getUserId();
-      if (!userId) return;
-
-      const wasActive = store.getState().brandProfiles.find((p) => p.id === profileId)?.isActive;
-
-      const { error } = await db
-        .from('memories')
-        .delete()
-        .eq('id', profileId)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('[useMemoryV2] deleteBrandProfile failed:', error.message);
-        return;
-      }
-
-      // If we deleted the active one, promote another to active in DB
-      if (wasActive) {
-        const remaining = store.getState().brandProfiles.filter((p) => p.id !== profileId);
-        if (remaining.length > 0) {
-          // Pick the newest remaining (already sorted newest-first in load)
-          const next = remaining[0];
-          if (next.id) {
-            await db
-              .from('memories')
-              .update({ is_active: true })
-              .eq('id', next.id);
-          }
-        }
-      }
-
-      await loadMemories();
-    },
-    [store, loadMemories],
+    [store],
   );
 
   // -----------------------------------------------------------------------
@@ -599,8 +470,6 @@ export function useMemoryV2() {
   return {
     analyzeUrls,
     saveAnalysisResult,
-    activateBrandProfile,
-    deleteBrandProfile,
     reloadMemories,
     persistEntry,
     persistAll,
