@@ -84,19 +84,19 @@ async function analyseWithGemini(
   apiKey: string,
 ): Promise<Record<string, unknown>> {
   const systemPrompt = `You are a brand analyst. Analyse the following web page content scraped from a brand's online presence.
-Extract the brand profile and return ONLY valid JSON (no markdown fences) with exactly these fields:
+Extract the brand profile and return ONLY valid JSON (no markdown fences) with exactly these fields (camelCase):
 
 {
-  "brand_name": "string – the brand name",
+  "brandName": "string – the brand name",
   "industry": "string – the industry or sector",
-  "main_business": "string – core products / services description",
-  "target_customer": "string – who the brand targets",
+  "mainBusiness": "string – core products / services description",
+  "targetCustomer": "string – who the brand targets",
   "differentiation": "string – unique selling points / competitive advantages",
-  "tone_of_voice": "string – the brand's communication tone",
+  "toneOfVoice": "string – the brand's communication tone",
   "keywords": ["string array – key terms the brand uses frequently"],
-  "taboo_words": ["string array – words or topics the brand avoids"],
-  "brand_story": "string – condensed brand narrative",
-  "writing_patterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
+  "tabooWords": ["string array – words or topics the brand avoids"],
+  "brandStory": "string – condensed brand narrative",
+  "writingPatterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
 }
 
 If certain fields cannot be determined, use an empty string or empty array.
@@ -233,7 +233,26 @@ Deno.serve(async (req) => {
     // Truncate to ~120k chars to stay within Gemini context window
     const truncated = combinedMarkdown.slice(0, 120_000);
 
-    const analysis = await analyseWithGemini(truncated, geminiKey);
+    const rawAnalysis = await analyseWithGemini(truncated, geminiKey);
+
+    // Normalize to camelCase AnalysisResult shape (defensive: Gemini may slip back to snake_case)
+    const a = rawAnalysis as Record<string, unknown>;
+    const asStr = (v: unknown) => (typeof v === "string" ? v : "");
+    const asArr = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+    const analysis = {
+      brandName: asStr(a.brandName ?? a.brand_name),
+      industry: asStr(a.industry),
+      mainBusiness: asStr(a.mainBusiness ?? a.main_business),
+      targetCustomer: asStr(a.targetCustomer ?? a.target_customer),
+      differentiation: asStr(a.differentiation),
+      toneOfVoice: asStr(a.toneOfVoice ?? a.tone_of_voice),
+      keywords: asArr(a.keywords),
+      tabooWords: asArr(a.tabooWords ?? a.taboo_words),
+      brandStory: asStr(a.brandStory ?? a.brand_story),
+      writingPatterns: asArr(a.writingPatterns ?? a.writing_patterns),
+    };
 
     return jsonResponse({
       user_id: userId,
