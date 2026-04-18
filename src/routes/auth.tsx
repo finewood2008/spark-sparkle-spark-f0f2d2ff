@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, KeyRound, ArrowLeft, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle, ShieldAlert } from 'lucide-react';
 import SparkLogo from '@/components/SparkLogo';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,14 +42,13 @@ function AuthPage() {
   const [lockUntil, setLockUntil] = useState(0);
   const [lockRemain, setLockRemain] = useState(0);
 
-  // register (邮箱 → OTP → 设置密码)
-  const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
+  // register (邮箱 + 密码 一步注册)
   const [regEmail, setRegEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [countdown, setCountdown] = useState(0);
-  const [newPwd, setNewPwd] = useState('');
-  const [confirmPwd, setConfirmPwd] = useState('');
-  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [regPwd, setRegPwd] = useState('');
+  const [regConfirmPwd, setRegConfirmPwd] = useState('');
+  const [showRegPwd, setShowRegPwd] = useState(false);
+  const [regEmailErr, setRegEmailErr] = useState('');
+  const [regPwdErr, setRegPwdErr] = useState('');
 
   // forgot password
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -61,11 +60,7 @@ function AuthPage() {
     if (isAuthenticated) navigate({ to: '/' });
   }, [isAuthenticated, navigate]);
 
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const t = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
+
 
   // 恢复锁定状态
   useEffect(() => {
@@ -200,82 +195,76 @@ function AuthPage() {
     navigate({ to: '/' });
   };
 
-  const handleSendOtp = async () => {
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail);
-    if (!emailOk) {
-      toast.error('请输入正确的邮箱');
+  const handleRegister = async () => {
+    const eErr = validateEmail(regEmail);
+    const pErr = validatePwd(regPwd);
+    setRegEmailErr(eErr);
+    setRegPwdErr(pErr);
+    if (eErr || pErr) return;
+    if (regPwd !== regConfirmPwd) {
+      setRegPwdErr('两次输入的密码不一致');
       return;
     }
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: regEmail,
-      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message || '验证码发送失败');
-      return;
-    }
-    setStep('otp');
-    setCountdown(60);
-    toast.success('验证码已发送，请查看邮箱');
-  };
 
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 6) {
-      toast.error('请输入 6 位验证码');
-      return;
-    }
     setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.signUp({
       email: regEmail,
-      token: otp,
-      type: 'email',
+      password: regPwd,
+      options: { emailRedirectTo: window.location.origin },
     });
-    setLoading(false);
+
     if (error || !data.user) {
-      toast.error(error?.message || '验证码错误或已过期');
-      return;
-    }
-    // 邮箱验证通过 — 进入设置密码步骤（此时已有 session，可调用 updateUser）
-    toast.success('邮箱验证成功，请设置登录密码');
-    setStep('password');
-  };
-
-  const handleSetPassword = async () => {
-    const pErr = validatePwd(newPwd);
-    if (pErr) {
-      toast.error(pErr);
-      return;
-    }
-    if (newPwd !== confirmPwd) {
-      toast.error('两次输入的密码不一致');
-      return;
-    }
-    setLoading(true);
-    const { data: updateData, error } = await supabase.auth.updateUser({
-      password: newPwd,
-    });
-    if (error || !updateData.user) {
       setLoading(false);
-      toast.error(error?.message || '密码设置失败，请重试');
+      const msg = error?.message?.toLowerCase() || '';
+      if (msg.includes('already') || msg.includes('registered')) {
+        setRegEmailErr('该邮箱已被注册，请直接登录');
+      } else {
+        toast.error(error?.message || '注册失败，请重试');
+      }
       return;
     }
-    // 拿到当前 session（verifyOtp 已建立）
-    const { data: sessionData } = await supabase.auth.getSession();
-    setLoading(false);
 
+    // 已开启 auto-confirm，signUp 直接返回 session，可立即登录
+    if (data.session) {
+      setLoading(false);
+      login(
+        {
+          id: data.user.id,
+          username: data.user.email?.split('@')[0] || 'user',
+          nickname: data.user.email?.split('@')[0] || '火花用户',
+          avatar: '',
+          email: data.user.email || undefined,
+        },
+        data.session.access_token,
+      );
+      toast.success('注册成功，欢迎加入火花！');
+      navigate({ to: '/' });
+      return;
+    }
+
+    // 兜底：若没有 session，尝试用密码登录一次
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+      email: regEmail,
+      password: regPwd,
+    });
+    setLoading(false);
+    if (signInErr || !signInData.user || !signInData.session) {
+      toast.success('注册成功，请前往登录');
+      setTab('login');
+      setLoginEmail(regEmail);
+      return;
+    }
     login(
       {
-        id: updateData.user.id,
-        username: updateData.user.email?.split('@')[0] || 'user',
-        nickname: updateData.user.email?.split('@')[0] || '火花用户',
+        id: signInData.user.id,
+        username: signInData.user.email?.split('@')[0] || 'user',
+        nickname: signInData.user.email?.split('@')[0] || '火花用户',
         avatar: '',
-        email: updateData.user.email || undefined,
+        email: signInData.user.email || undefined,
       },
-      sessionData.session?.access_token || '',
+      signInData.session.access_token,
     );
-    toast.success('注册完成，欢迎加入火花！');
+    toast.success('注册成功，欢迎加入火花！');
     navigate({ to: '/' });
   };
 
@@ -327,7 +316,7 @@ function AuthPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setTab('register'); setStep('email'); }}
+            onClick={() => { setTab('register'); }}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
               tab === 'register' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -423,7 +412,7 @@ function AuthPage() {
               还没有账号？
               <button
                 type="button"
-                onClick={() => { setTab('register'); setStep('email'); }}
+                onClick={() => { setTab('register'); }}
                 className="text-spark-orange hover:underline ml-1"
               >
                 立即注册
@@ -432,27 +421,77 @@ function AuthPage() {
           </div>
         )}
 
-        {/* Register: email step */}
-        {tab === 'register' && step === 'email' && (
+        {/* Register form (单步：邮箱 + 密码) */}
+        {tab === 'register' && (
           <div className="space-y-4 animate-in fade-in duration-300">
+            <div>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 ${regEmailErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  placeholder="邮箱"
+                  type="email"
+                  autoComplete="email"
+                  value={regEmail}
+                  onChange={(e) => { setRegEmail(e.target.value); if (regEmailErr) setRegEmailErr(''); }}
+                  onBlur={() => regEmail && setRegEmailErr(validateEmail(regEmail))}
+                />
+              </div>
+              {regEmailErr && (
+                <p className="mt-1.5 ml-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} /> {regEmailErr}
+                </p>
+              )}
+            </div>
+            <div>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className={`spark-input pl-9 pr-10 ${regPwdErr ? 'border-destructive focus:ring-destructive/30' : ''}`}
+                  type={showRegPwd ? 'text' : 'password'}
+                  placeholder="密码（至少 8 位）"
+                  autoComplete="new-password"
+                  value={regPwd}
+                  onChange={(e) => { setRegPwd(e.target.value); if (regPwdErr) setRegPwdErr(''); }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRegPwd(!showRegPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showRegPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
             <div className="relative">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 className="spark-input pl-9"
-                placeholder="邮箱"
-                type="email"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendOtp()}
+                type={showRegPwd ? 'text' : 'password'}
+                placeholder="再次输入密码"
+                autoComplete="new-password"
+                value={regConfirmPwd}
+                onChange={(e) => setRegConfirmPwd(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
               />
             </div>
+            {regConfirmPwd && regPwd !== regConfirmPwd && (
+              <p className="ml-1 flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle size={12} /> 两次输入的密码不一致
+              </p>
+            )}
+            {regPwdErr && (
+              <p className="ml-1 flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle size={12} /> {regPwdErr}
+              </p>
+            )}
             <button
               type="button"
-              onClick={handleSendOtp}
-              disabled={loading}
+              onClick={handleRegister}
+              disabled={loading || !regEmail || !regPwd || !regConfirmPwd}
               className="spark-btn-primary w-full h-11 text-base"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>获取验证码 <ArrowRight size={16} /></>}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <>注册并登录 <ArrowRight size={16} /></>}
             </button>
             <p className="text-center text-xs text-muted-foreground pt-1">
               已有账号？
@@ -464,106 +503,6 @@ function AuthPage() {
                 直接登录
               </button>
             </p>
-          </div>
-        )}
-
-        {/* Register: OTP step */}
-        {tab === 'register' && step === 'otp' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <p className="text-sm text-muted-foreground text-center">
-              验证码已发送至 <span className="text-foreground font-medium">{regEmail}</span>
-            </p>
-            <div className="relative">
-              <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9 tracking-[0.4em] text-center font-mono"
-                placeholder="6 位验证码"
-                inputMode="numeric"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={(e) => e.key === 'Enter' && handleVerifyOtp()}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleVerifyOtp}
-              disabled={loading}
-              className="spark-btn-primary w-full h-11 text-base"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>验证邮箱 <ArrowRight size={16} /></>}
-            </button>
-            <div className="flex items-center justify-between text-xs">
-              <button
-                type="button"
-                onClick={() => { setStep('email'); setOtp(''); }}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-              >
-                <ArrowLeft size={12} /> 修改邮箱
-              </button>
-              <button
-                type="button"
-                onClick={handleSendOtp}
-                disabled={countdown > 0 || loading}
-                className="text-spark-orange hover:underline disabled:text-muted-foreground disabled:no-underline"
-              >
-                {countdown > 0 ? `${countdown}s 后重发` : '重新发送'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Register: set-password step */}
-        {tab === 'register' && step === 'password' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <p className="text-sm text-muted-foreground text-center">
-              邮箱 <span className="text-foreground font-medium">{regEmail}</span> 已验证 ✓
-              <br />
-              请设置一个登录密码（至少 8 位）
-            </p>
-            <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9 pr-10"
-                type={showNewPwd ? 'text' : 'password'}
-                placeholder="新密码（至少 8 位）"
-                autoComplete="new-password"
-                value={newPwd}
-                onChange={(e) => setNewPwd(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPwd(!showNewPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showNewPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="spark-input pl-9"
-                type={showNewPwd ? 'text' : 'password'}
-                placeholder="再次输入密码"
-                autoComplete="new-password"
-                value={confirmPwd}
-                onChange={(e) => setConfirmPwd(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSetPassword()}
-              />
-            </div>
-            {confirmPwd && newPwd !== confirmPwd && (
-              <p className="ml-1 flex items-center gap-1 text-xs text-destructive">
-                <AlertCircle size={12} /> 两次输入的密码不一致
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={handleSetPassword}
-              disabled={loading || !newPwd || !confirmPwd}
-              className="spark-btn-primary w-full h-11 text-base"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <>完成注册 <ArrowRight size={16} /></>}
-            </button>
           </div>
         )}
 
