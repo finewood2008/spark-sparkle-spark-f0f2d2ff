@@ -6,6 +6,23 @@ import {
   listDeviceTokens,
   revokeDeviceToken,
 } from '@/functions/device-tokens.functions';
+import { supabase } from '@/integrations/supabase/client';
+
+/** Get auth headers for TSS server functions (they don't auto-attach Supabase JWT). */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Convert a thrown Response (from middleware) into a readable Error message. */
+async function toReadableError(e: unknown): Promise<Error> {
+  if (e instanceof Response) {
+    const text = await e.text().catch(() => '');
+    return new Error(text || `请求失败 (${e.status})`);
+  }
+  return e instanceof Error ? e : new Error(String(e));
+}
 
 interface TokenRow {
   id: string;
@@ -38,10 +55,17 @@ export default function DeviceTokenManager() {
 
   const refresh = async () => {
     try {
-      const res = await listDeviceTokens();
+      const headers = await authHeaders();
+      if (!headers.Authorization) {
+        // Not signed in yet — render empty list, no error toast.
+        setTokens([]);
+        return;
+      }
+      const res = await listDeviceTokens({ headers });
       setTokens(res.tokens as TokenRow[]);
     } catch (e) {
-      console.warn('[device-tokens] list failed', e);
+      const err = await toReadableError(e);
+      console.warn('[device-tokens] list failed', err.message);
     } finally {
       setLoading(false);
     }
@@ -54,16 +78,22 @@ export default function DeviceTokenManager() {
   const handleCreate = async () => {
     setCreating(true);
     try {
+      const headers = await authHeaders();
+      if (!headers.Authorization) {
+        toast.error('请先登录后再创建 Token');
+        return;
+      }
       const res = await createDeviceToken({
         data: { label: newLabel.trim() || '桌面客户端' },
+        headers,
       });
       setIssuedToken(res.token);
       setNewLabel('');
       setShowCreate(false);
       await refresh();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '创建失败';
-      toast.error(msg);
+      const err = await toReadableError(e);
+      toast.error(err.message || '创建失败');
     } finally {
       setCreating(false);
     }
@@ -84,15 +114,15 @@ export default function DeviceTokenManager() {
   const handleRevoke = async (id: string) => {
     if (!confirm('吊销后桌面客户端将无法再上传数据，确认继续？')) return;
     try {
-      await revokeDeviceToken({ data: { id } });
+      const headers = await authHeaders();
+      await revokeDeviceToken({ data: { id }, headers });
       toast.success('Token 已吊销');
       await refresh();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '吊销失败';
-      toast.error(msg);
+      const err = await toReadableError(e);
+      toast.error(err.message || '吊销失败');
     }
   };
-
   const activeTokens = tokens.filter(t => !t.revoked_at);
 
   return (
