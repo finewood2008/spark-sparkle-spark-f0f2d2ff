@@ -74,6 +74,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  type ActionKey = 'cover' | 'polish' | 'title';
+  const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
+  const setActionError = (key: ActionKey, msg: string | null) =>
+    setActionErrors(prev => {
+      const next = { ...prev };
+      if (msg) next[key] = msg; else delete next[key];
+      return next;
+    });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
