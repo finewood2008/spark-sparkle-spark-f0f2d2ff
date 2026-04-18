@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus, Zap } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, MessageSquarePlus, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import MemoryPanel from './MemoryPanel';
-import SettingsPage from '../pages/SettingsPage';
 import SchedulePage from '../pages/SchedulePage';
 import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -30,7 +29,6 @@ import { useMemoryStore } from '../store/memoryStore';
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
@@ -212,18 +210,6 @@ export default function ChatLayout() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setSettingsOpen(true)}
-                aria-label="系统设置"
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-              >
-                <SettingsIcon size={18} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">系统设置</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
                 onClick={() => {
                   const { isAuthenticated } = useAuthStore.getState();
                   navigate({ to: isAuthenticated ? '/account' : '/auth' });
@@ -247,19 +233,6 @@ export default function ChatLayout() {
 
       {/* Memory panel (v2) */}
       <MemoryPanel open={profileOpen} onOpenChange={setProfileOpen} />
-
-      {/* Settings drawer */}
-      <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <SheetContent side="right" className="w-full max-w-md p-0 bg-[#FAFAF8] flex flex-col">
-          <SheetHeader className="px-4 py-3 border-b border-[#EEEDEB]">
-            <SheetTitle className="text-sm font-semibold text-[#333] text-left">系统设置</SheetTitle>
-            <p className="text-[11px] text-[#BBB] text-left">按 Esc 关闭</p>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden">
-            <SettingsPage />
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {/* Review center drawer */}
       <Sheet open={reviewOpen} onOpenChange={setReviewOpen}>
