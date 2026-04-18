@@ -9,6 +9,16 @@ import { createServerFn } from '@tanstack/react-start';
 import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 
+/**
+ * 本地开发缺少 SUPABASE_SERVICE_ROLE_KEY 时，限流功能直接降级为 no-op，
+ * 避免登录流程被一个 dev-only 的密钥缺失炸成白屏。
+ * 线上环境密钥一定存在，正常生效。
+ */
+function isMissingAdminKeyError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('SUPABASE_SERVICE_ROLE_KEY');
+}
+
 const LOCK_TIERS = [
   { threshold: 20, windowMin: 60 * 24, lockSec: 60 * 60 * 24 }, // 20 次/24h → 锁 24h
   { threshold: 10, windowMin: 60, lockSec: 60 * 15 },           // 10 次/1h → 锁 15min
