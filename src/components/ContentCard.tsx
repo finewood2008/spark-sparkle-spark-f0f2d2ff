@@ -7,15 +7,7 @@ import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-
-// Hardcoded fallbacks (publishable anon key — safe to expose) so direct
-// fetch calls never break if Vite env replacement fails at build/runtime.
-const FALLBACK_SUPABASE_URL = 'https://rbrsjjxtpyjmmjbidtyp.supabase.co';
-const FALLBACK_SUPABASE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJicnNqanh0cHlqbW1qYmlkdHlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDY1MzUsImV4cCI6MjA5MTc4MjUzNX0.lvVTfqgtzu0JbVwji5cTZZUP97uJ1pDkcUhBbWed1cc';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_KEY;
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY as SUPABASE_KEY } from '@/lib/env';
 
 interface ContentCardProps {
   item: ContentItem;
