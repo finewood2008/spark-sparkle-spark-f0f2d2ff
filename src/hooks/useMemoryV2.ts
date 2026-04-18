@@ -131,17 +131,20 @@ export function useMemoryV2() {
     if (profileEntry) {
       const c = profileEntry.content as Record<string, unknown>;
       const bp: BrandProfile = {
-        brandName: (c.brandName as string) ?? '',
-        industry: (c.industry as string) ?? '',
-        mainBusiness: (c.mainBusiness as string) ?? '',
-        targetCustomer: (c.targetCustomer as string) ?? '',
-        differentiation: (c.differentiation as string) ?? '',
-        toneOfVoice: (c.toneOfVoice as string) ?? '',
-        keywords: (c.keywords as string[]) ?? [],
-        tabooWords: (c.tabooWords as string[]) ?? [],
-        brandStory: (c.brandStory as string) ?? undefined,
+        brandDoc: (c.brandDoc as string) ?? '',
+        visualIdentity: (c.visualIdentity as BrandProfile['visualIdentity']) ?? {},
         sourceUrls: (c.sourceUrls as string[]) ?? [],
         initialized: (c.initialized as boolean) ?? false,
+        // legacy
+        brandName: (c.brandName as string) ?? undefined,
+        industry: (c.industry as string) ?? undefined,
+        mainBusiness: (c.mainBusiness as string) ?? undefined,
+        targetCustomer: (c.targetCustomer as string) ?? undefined,
+        differentiation: (c.differentiation as string) ?? undefined,
+        toneOfVoice: (c.toneOfVoice as string) ?? undefined,
+        keywords: (c.keywords as string[]) ?? undefined,
+        tabooWords: (c.tabooWords as string[]) ?? undefined,
+        brandStory: (c.brandStory as string) ?? undefined,
       };
       store.getState().setBrandProfile(bp);
 
