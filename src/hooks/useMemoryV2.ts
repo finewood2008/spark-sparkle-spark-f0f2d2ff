@@ -38,6 +38,7 @@ function rowToEntry(row: Record<string, unknown>): MemoryEntry {
     confidence: (row.confidence as number) ?? 1,
     evidence: (row.evidence as string) ?? undefined,
     expiresAt: (row.expires_at as string) ?? undefined,
+    isActive: (row.is_active as boolean) ?? false,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -56,8 +57,40 @@ function entryToRow(entry: MemoryEntry, userId: string) {
     confidence: entry.confidence,
     evidence: entry.evidence ?? null,
     expires_at: entry.expiresAt ?? null,
+    is_active: entry.isActive ?? false,
     created_at: entry.createdAt,
     updated_at: entry.updatedAt,
+  };
+}
+
+/** Build a BrandProfile object from a memory row. */
+function entryToBrandProfile(e: MemoryEntry): BrandProfile {
+  const c = e.content as Record<string, unknown>;
+  const brandDoc = (c.brandDoc as string) ?? '';
+  // Derive a friendly name: first H1 from brandDoc, else legacy brandName, else timestamp.
+  const h1Match = brandDoc.match(/^#\s+(.+?)$/m);
+  const derivedName =
+    (c.name as string) ||
+    h1Match?.[1]?.trim() ||
+    (c.brandName as string) ||
+    `品牌档案 ${new Date(e.createdAt).toLocaleDateString('zh-CN')}`;
+  return {
+    id: e.id,
+    name: derivedName,
+    isActive: e.isActive ?? false,
+    brandDoc,
+    visualIdentity: (c.visualIdentity as BrandProfile['visualIdentity']) ?? {},
+    sourceUrls: (c.sourceUrls as string[]) ?? [],
+    initialized: (c.initialized as boolean) ?? false,
+    brandName: (c.brandName as string) ?? undefined,
+    industry: (c.industry as string) ?? undefined,
+    mainBusiness: (c.mainBusiness as string) ?? undefined,
+    targetCustomer: (c.targetCustomer as string) ?? undefined,
+    differentiation: (c.differentiation as string) ?? undefined,
+    toneOfVoice: (c.toneOfVoice as string) ?? undefined,
+    keywords: (c.keywords as string[]) ?? undefined,
+    tabooWords: (c.tabooWords as string[]) ?? undefined,
+    brandStory: (c.brandStory as string) ?? undefined,
   };
 }
 
