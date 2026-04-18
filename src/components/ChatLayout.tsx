@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus, Zap } from 'lucide-react';
+import { FileText, User, Brain, Inbox, Settings as SettingsIcon, MessageSquarePlus, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,8 +31,9 @@ export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Unified "Content Center": top = auto-tasks, bottom = review list
+  const [centerOpen, setCenterOpen] = useState(false);
+  const [scheduleCollapsed, setScheduleCollapsed] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
   const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
@@ -99,8 +100,8 @@ export default function ChatLayout() {
             toast.success(`${taskName} 已生成新内容`, {
               description: title.length > 40 ? `${title.slice(0, 40)}…` : title,
               action: {
-                label: '去审核',
-                onClick: () => setReviewOpen(true),
+                label: '去查看',
+                onClick: () => setCenterOpen(true),
               },
               duration: 6000,
             });
