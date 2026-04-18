@@ -112,7 +112,16 @@ export default function LandingPage() {
     };
   }, []);
 
-  const goAuth = () => navigate({ to: '/auth' });
+  const goAuth = (prompt?: string) => {
+    if (prompt) {
+      try {
+        sessionStorage.setItem('spark.pendingPrompt', prompt);
+      } catch {
+        /* ignore storage errors */
+      }
+    }
+    navigate({ to: '/auth' });
+  };
 
   return (
     <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
