@@ -50,28 +50,34 @@
   - `analyzeUrls(urls)`：调 edge function，更新 sourceUrls 状态
   - `saveAnalysisResult(result)`：写入 identity + preference 记忆
 
-### 🔄 Phase 4 — 前端记忆面板 UI（进行中）
+### ✅ Phase 4 — 前端记忆面板 UI（已完成）
 
-**目标**：替换旧的 `SparkProfile.tsx`（19 684 字符、单页表单），改成一个宽抽屉，3 个 Tab：
+替换旧的 `SparkProfile.tsx`（19 684 字符、单页表单），改成一个宽抽屉（520px），3 个 Tab：
 
-1. **品牌档案**（identity）
+1. **品牌档案**（identity） — `src/components/memory/BrandProfileTab.tsx`
    - Firecrawl URL 输入 + 「分析」按钮
    - 抓取状态列表（pending / fetching / done / error）
-   - 分析结果预览 + 编辑 + 保存
-2. **偏好规则**（preference）
-   - 按 category 分组列表
+   - 分析结果预览 + 保存并应用
+   - 手动编辑表单（品牌名/行业/主营/目标客户/差异化/语气/关键词/禁用词/品牌故事）
+2. **偏好规则**（preference） — `src/components/memory/PreferenceTab.tsx`
+   - 按 category 分组列表，6 种类别各自配色
    - 每条可 `confirm`（打勾）/ `delete`
    - 未确认规则显示为 `?`，确认后为 `✓`
-3. **上下文记忆**（context）
+   - 空状态引导
+3. **上下文记忆**（context） — `src/components/memory/ContextTab.tsx`
    - 最近 7 天内的 session summary / recent_content / schedule
-   - 显示过期时间倒计时
+   - 显示过期时间倒计时（< 1 天变橙色警示）
+   - 「清空全部」快捷操作
 
-待实现文件：
-- [ ] `src/components/MemoryPanel.tsx`（主抽屉）
-- [ ] `src/components/memory/BrandProfileTab.tsx`
-- [ ] `src/components/memory/PreferenceTab.tsx`
-- [ ] `src/components/memory/ContextTab.tsx`
-- [ ] 在 `ChatLayout` 里挂载入口（替换 SparkProfile 的触发点）
+主抽屉 `src/components/MemoryPanel.tsx`：
+- 顶部开关：点击 toggle 开启/关闭记忆注入
+- Tab 导航带 count badge
+- 底部 footer 显示记忆注入状态
+
+ChatLayout 挂载：
+- `SparkProfile` → `MemoryPanel`
+- 同时挂载 `useMemoryV2()` 进行初次加载
+- `getContextForChat`：v2 开启时优先用 `useMemoryStore.getFullContext('chat')`，否则 fallback 到旧 `useMemorySync.getFullContext()`（双写过渡）
 
 ### ⏸ Phase 5 — 自动学习（未开始）
 

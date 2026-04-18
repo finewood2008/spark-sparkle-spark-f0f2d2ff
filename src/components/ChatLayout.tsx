@@ -6,7 +6,7 @@ import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
-import SparkProfile from './SparkProfile';
+import MemoryPanel from './MemoryPanel';
 import SettingsPage from '../pages/SettingsPage';
 import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -24,6 +24,8 @@ import {
 import { toast } from 'sonner';
 
 import { useMemorySync } from '../hooks/useMemorySync';
+import { useMemoryV2 } from '../hooks/useMemoryV2';
+import { useMemoryStore } from '../store/memoryStore';
 
 export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -37,6 +39,14 @@ export default function ChatLayout() {
   const prevCountRef = useRef(0);
 
   const { getFullContext } = useMemorySync();
+  // Load new v2 memory system in parallel (panel reads from memoryStore).
+  useMemoryV2();
+  const memoryV2Enabled = useMemoryStore((s) => s.memoryEnabled);
+  const getV2Context = useMemoryStore((s) => s.getFullContext);
+
+  // Prefer v2 context when the new system is enabled; otherwise fall back.
+  const getContextForChat = () =>
+    memoryV2Enabled ? getV2Context('chat') : getFullContext();
 
   useEffect(() => {
     if (reviewingCount > prevCountRef.current) {
@@ -221,13 +231,13 @@ export default function ChatLayout() {
       </header>
 
       {/* Chat with memory context */}
-      <SparkChat getContext={getFullContext} />
+      <SparkChat getContext={getContextForChat} />
 
       {/* Draft drawer */}
       <DraftDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
 
-      {/* Memory profile modal */}
-      <SparkProfile open={profileOpen} onOpenChange={setProfileOpen} />
+      {/* Memory panel (v2) */}
+      <MemoryPanel open={profileOpen} onOpenChange={setProfileOpen} />
 
       {/* Settings drawer */}
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
