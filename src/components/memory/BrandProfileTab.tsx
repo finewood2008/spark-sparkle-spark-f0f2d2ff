@@ -62,11 +62,17 @@ export function BrandProfileTab() {
     setTabooInput('');
   };
 
+  const normalizeUrl = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
   const handleAddUrl = () => {
-    const url = urlInput.trim();
+    const url = normalizeUrl(urlInput);
     if (!url) return;
-    if (!/^https?:\/\//i.test(url)) {
-      toast.error('请输入完整的 URL (http:// 或 https://)');
+    if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(url)) {
+      toast.error('请输入有效的网址');
       return;
     }
     if (sourceUrls.some((s) => s.url === url)) {
@@ -79,9 +85,9 @@ export function BrandProfileTab() {
 
   const handleAnalyze = async () => {
     // If user typed a URL but didn't click "添加", add it automatically
-    const trimmed = urlInput.trim();
-    if (trimmed && /^https?:\/\//i.test(trimmed) && !sourceUrls.some((s) => s.url === trimmed)) {
-      addSourceUrl({ url: trimmed, status: 'pending' });
+    const normalized = normalizeUrl(urlInput);
+    if (normalized && !sourceUrls.some((s) => s.url === normalized)) {
+      addSourceUrl({ url: normalized, status: 'pending' });
       setUrlInput('');
     }
 
@@ -147,7 +153,7 @@ export function BrandProfileTab() {
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
-            placeholder="https://..."
+            placeholder="www.example.com 或 https://..."
             className={fieldClass}
           />
           <button
