@@ -253,6 +253,77 @@ export function BrandProfileTab() {
 
   return (
     <div className="space-y-4">
+      {/* ============= 档案切换器（多档案管理） ============= */}
+      {brandProfiles.length > 0 && (
+        <section className="border border-[#E5E4E2] rounded-2xl p-3 bg-white">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[12px] font-medium text-[#666]">
+              品牌档案 · 共 {brandProfiles.length} 条
+            </div>
+            <button
+              onClick={handleStartNew}
+              className="text-[11px] text-orange-500 hover:text-orange-600 flex items-center gap-1 transition-colors"
+              title="开始新的品牌分析"
+            >
+              <FilePlus2 size={11} /> 新建
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {brandProfiles.map((p) => (
+              <div
+                key={p.id}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${
+                  p.isActive
+                    ? 'border-orange-300 bg-orange-50/60'
+                    : 'border-[#F0EFED] bg-white hover:bg-[#FAFAF8]'
+                }`}
+              >
+                {p.isActive ? (
+                  <span className="flex items-center gap-1 text-[10px] text-orange-600 font-medium px-1.5 py-0.5 bg-orange-100 rounded">
+                    <Check size={10} /> 激活
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => p.id && handleActivate(p.id)}
+                    className="text-[10px] text-[#666] hover:text-orange-500 px-1.5 py-0.5 border border-[#E5E4E2] rounded hover:border-orange-300 transition-colors"
+                  >
+                    设为激活
+                  </button>
+                )}
+                <span className="flex-1 truncate text-[12px] text-[#333]" title={p.name}>
+                  {p.name || '未命名档案'}
+                </span>
+                {confirmDeleteId === p.id ? (
+                  <>
+                    <button
+                      onClick={() => p.id && handleDelete(p.id)}
+                      className="text-[10px] text-red-500 hover:text-red-600 px-1.5 py-0.5 border border-red-300 rounded transition-colors"
+                    >
+                      确认删除
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="text-[10px] text-[#999] hover:text-[#666] px-1 transition-colors"
+                    >
+                      取消
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => p.id && setConfirmDeleteId(p.id)}
+                    className="text-[#CCC] hover:text-red-500 transition-colors"
+                    title="删除档案"
+                    aria-label="删除档案"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ============= Firecrawl URL 分析区 ============= */}
       <section className="border border-[#E5E4E2] rounded-2xl p-4 bg-gradient-to-br from-orange-50/50 to-white">
         <div className="flex items-center gap-2 mb-2">
