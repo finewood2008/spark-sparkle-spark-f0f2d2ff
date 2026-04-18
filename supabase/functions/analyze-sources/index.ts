@@ -84,19 +84,19 @@ async function analyseWithGemini(
   apiKey: string,
 ): Promise<Record<string, unknown>> {
   const systemPrompt = `You are a brand analyst. Analyse the following web page content scraped from a brand's online presence.
-Extract the brand profile and return ONLY valid JSON (no markdown fences) with exactly these fields:
+Extract the brand profile and return ONLY valid JSON (no markdown fences) with exactly these fields (camelCase):
 
 {
-  "brand_name": "string – the brand name",
+  "brandName": "string – the brand name",
   "industry": "string – the industry or sector",
-  "main_business": "string – core products / services description",
-  "target_customer": "string – who the brand targets",
+  "mainBusiness": "string – core products / services description",
+  "targetCustomer": "string – who the brand targets",
   "differentiation": "string – unique selling points / competitive advantages",
-  "tone_of_voice": "string – the brand's communication tone",
+  "toneOfVoice": "string – the brand's communication tone",
   "keywords": ["string array – key terms the brand uses frequently"],
-  "taboo_words": ["string array – words or topics the brand avoids"],
-  "brand_story": "string – condensed brand narrative",
-  "writing_patterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
+  "tabooWords": ["string array – words or topics the brand avoids"],
+  "brandStory": "string – condensed brand narrative",
+  "writingPatterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
 }
 
 If certain fields cannot be determined, use an empty string or empty array.
