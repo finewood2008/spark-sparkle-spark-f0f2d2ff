@@ -259,6 +259,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   };
 
   const handleGenerateCover = async () => {
+    setActionError('cover', null);
     setCoverLoading(true);
     try {
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-cover`, {
@@ -276,7 +277,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: '生成失败' }));
-        toast.error(err.error || '配图生成失败');
+        setActionError('cover', err.error || '配图生成失败，请重试');
         setCoverLoading(false);
         return;
       }
@@ -291,10 +292,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         setContents(updated);
         toast.success('配图生成成功！');
       } else {
-        toast.error('未能生成配图，请重试');
+        setActionError('cover', '未能生成配图，请重试');
       }
     } catch {
-      toast.error('配图生成失败');
+      setActionError('cover', '网络异常，配图生成失败');
     }
     setCoverLoading(false);
   };
