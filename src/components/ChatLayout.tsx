@@ -298,6 +298,29 @@ export default function ChatLayout() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* New conversation confirm dialog */}
+      <AlertDialog open={confirmNewChatOpen} onOpenChange={setConfirmNewChatOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>开始新对话？</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前对话历史将被清空，确认开始新对话吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                useAppStore.getState().clearMessages();
+                setConfirmNewChatOpen(false);
+              }}
+            >
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
