@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip } from 'lucide-react';
+import { Send, Paperclip, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { streamChat } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
@@ -188,12 +188,46 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
   );
 }
 
-function MessageBubble({ msg, onSend, onCardAction }: {
+function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
   msg: ChatMessage;
   onSend: (text: string) => void;
   onCardAction: (action: string, item?: ContentItem) => void;
+  onRetry: (msg: ChatMessage) => void;
 }) {
   const isUser = msg.role === 'user';
+
+  // Error bubble — friendly message + retry button
+  if (!isUser && msg.error) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] leading-[1.6] text-[#333]">
+                  {msg.content || '生成失败了，要不再试一次？'}
+                </p>
+                <p className="text-[12px] leading-[1.5] text-[#888] mt-1 break-words">
+                  {msg.error.message}
+                </p>
+                {msg.error.retryPrompt && (
+                  <button
+                    onClick={() => onRetry(msg)}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-spark-orange text-white text-[13px] hover:opacity-90 transition-opacity"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    重试
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Metrics card — 24h post-publish data report
   if (!isUser && msg.metricsCard) {
@@ -561,7 +595,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
   };
 
-  const handleChat = async (_text: string) => {
+  const handleChat = async (text: string) => {
     const currentMessages = useAppStore.getState().messages;
     const history = currentMessages
       .filter(m => m.id !== 'welcome')
@@ -577,28 +611,66 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       timestamp: new Date().toISOString(),
     });
 
-    await streamChat({
-      messages: history,
-      mode: 'chat',
-      brandContext: getBrandContext(),
-      onDelta: (chunk) => {
-        assistantContent += chunk;
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === assistantId ? { ...m, content: assistantContent } : m
-        );
-        useAppStore.setState({ messages: updated });
-      },
-      onDone: () => setIsGenerating(false),
-      onError: (errMsg) => {
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === assistantId ? { ...m, content: `⚠️ ${errMsg}` } : m
-        );
-        useAppStore.setState({ messages: updated });
-        setIsGenerating(false);
-      },
-    });
+    try {
+      await streamChat({
+        messages: history,
+        mode: 'chat',
+        brandContext: getBrandContext(),
+        onDelta: (chunk) => {
+          assistantContent += chunk;
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === assistantId ? { ...m, content: assistantContent } : m
+          );
+          useAppStore.setState({ messages: updated });
+        },
+        onDone: () => {
+          // If nothing came back, treat as failure
+          if (!assistantContent.trim()) {
+            const msgs = useAppStore.getState().messages;
+            const updated = msgs.map(m =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: 'AI 没有返回任何内容',
+                    error: { message: '可能是网络中断或服务暂时不可用', retryPrompt: text, retryMode: 'chat' as const },
+                  }
+                : m
+            );
+            useAppStore.setState({ messages: updated });
+          }
+          setIsGenerating(false);
+        },
+        onError: (errMsg) => {
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: '生成回复时出错了',
+                  error: { message: errMsg, retryPrompt: text, retryMode: 'chat' as const },
+                }
+              : m
+          );
+          useAppStore.setState({ messages: updated });
+          setIsGenerating(false);
+        },
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : '网络请求失败';
+      const msgs = useAppStore.getState().messages;
+      const updated = msgs.map(m =>
+        m.id === assistantId
+          ? {
+              ...m,
+              content: '连接 AI 服务失败',
+              error: { message: errMsg, retryPrompt: text, retryMode: 'chat' as const },
+            }
+          : m
+      );
+      useAppStore.setState({ messages: updated });
+      setIsGenerating(false);
+    }
   };
 
   const handleGenerate = async (text: string) => {
@@ -614,86 +686,139 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     const userPrefs = loadUserPrefs();
     const platform = userPrefs.defaultPlatform;
 
-    await streamChat({
-      messages: [{ role: 'user', content: `请为"${text}"这个主题生成一篇文章。写作风格：${userPrefs.writingStyle}，语气：${userPrefs.writingTone}` }],
-      mode: 'generate',
-      platform,
-      brandContext: getBrandContext(),
-      onDelta: (chunk) => {
-        rawContent += chunk;
-        // Show progress
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === statusId ? { ...m, content: '正在为你创作内容...' } : m
-        );
-        useAppStore.setState({ messages: updated });
-      },
-      onDone: () => {
-        let parsed: { title: string; content: string; cta: string; tags: string[] };
-        try {
-          let cleaned = rawContent.trim();
-          if (cleaned.startsWith('```')) {
-            cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    try {
+      await streamChat({
+        messages: [{ role: 'user', content: `请为"${text}"这个主题生成一篇文章。写作风格：${userPrefs.writingStyle}，语气：${userPrefs.writingTone}` }],
+        mode: 'generate',
+        platform,
+        brandContext: getBrandContext(),
+        onDelta: (chunk) => {
+          rawContent += chunk;
+          // Show progress
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === statusId ? { ...m, content: '正在为你创作内容...' } : m
+          );
+          useAppStore.setState({ messages: updated });
+        },
+        onDone: () => {
+          // Empty response → treat as failure with retry
+          if (!rawContent.trim()) {
+            const msgs = useAppStore.getState().messages;
+            const updated = msgs.map(m =>
+              m.id === statusId
+                ? {
+                    ...m,
+                    content: '没收到 AI 返回的内容',
+                    error: { message: '可能是网络中断或服务暂时不可用', retryPrompt: text, retryMode: 'generate' as const },
+                  }
+                : m
+            );
+            useAppStore.setState({ messages: updated });
+            setIsGenerating(false);
+            return;
           }
-          parsed = JSON.parse(cleaned);
-        } catch {
-          parsed = { title: text, content: rawContent, cta: '', tags: [] };
-        }
 
-        const newItem: ContentItem = {
-          id: Date.now().toString(),
-          title: parsed.title || text,
-          content: parsed.content || rawContent,
-          platform,
-          status: 'draft',
-          tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-          cta: parsed.cta || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          autoGenerated: true,
-        };
+          let parsed: { title: string; content: string; cta: string; tags: string[] };
+          try {
+            let cleaned = rawContent.trim();
+            if (cleaned.startsWith('```')) {
+              cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+            parsed = JSON.parse(cleaned);
+          } catch {
+            parsed = { title: text, content: rawContent, cta: '', tags: [] };
+          }
 
-        const currentContents = useAppStore.getState().contents;
-        setContents([newItem, ...currentContents]);
-        setSelectedContentId(newItem.id);
+          const newItem: ContentItem = {
+            id: Date.now().toString(),
+            title: parsed.title || text,
+            content: parsed.content || rawContent,
+            platform,
+            status: 'draft',
+            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            cta: parsed.cta || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            autoGenerated: true,
+          };
 
-        // Generate context-aware suggestions; prepend a "提交审核" action
-        const suggestions: ChoiceOption[] = [
-          { id: `submit-review-${newItem.id}`, label: '提交审核', emoji: '✅' },
-          ...generateSuggestions(parsed.title, parsed.content, parsed.tags),
-        ].slice(0, 4);
+          const currentContents = useAppStore.getState().contents;
+          setContents([newItem, ...currentContents]);
+          setSelectedContentId(newItem.id);
 
-        // Update message with content card and suggestions
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === statusId
-            ? { ...m, content: '✅ 已为你创作完成！', contentItem: newItem }
-            : m
-        );
-        useAppStore.setState({ messages: updated });
+          // Generate context-aware suggestions; prepend a "提交审核" action
+          const suggestions: ChoiceOption[] = [
+            { id: `submit-review-${newItem.id}`, label: '提交审核', emoji: '✅' },
+            ...generateSuggestions(parsed.title, parsed.content, parsed.tags),
+          ].slice(0, 4);
 
-        // Add a follow-up message with suggestions
-        const suggestId = (Date.now() + 2).toString();
-        addMessage({
-          id: suggestId,
-          role: 'assistant',
-          content: '📋 你可以直接提交审核，或先让我帮你优化：',
-          timestamp: new Date().toISOString(),
-          choices: suggestions,
-        });
+          // Update message with content card and suggestions
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === statusId
+              ? { ...m, content: '✅ 已为你创作完成！', contentItem: newItem }
+              : m
+          );
+          useAppStore.setState({ messages: updated });
 
-        setIsGenerating(false);
-      },
-      onError: (errMsg) => {
-        const msgs = useAppStore.getState().messages;
-        const updated = msgs.map(m =>
-          m.id === statusId ? { ...m, content: `⚠️ 生成失败：${errMsg}` } : m
-        );
-        useAppStore.setState({ messages: updated });
-        setIsGenerating(false);
-      },
-    });
+          // Add a follow-up message with suggestions
+          const suggestId = (Date.now() + 2).toString();
+          addMessage({
+            id: suggestId,
+            role: 'assistant',
+            content: '📋 你可以直接提交审核，或先让我帮你优化：',
+            timestamp: new Date().toISOString(),
+            choices: suggestions,
+          });
+
+          setIsGenerating(false);
+        },
+        onError: (errMsg) => {
+          const msgs = useAppStore.getState().messages;
+          const updated = msgs.map(m =>
+            m.id === statusId
+              ? {
+                  ...m,
+                  content: '生成失败了',
+                  error: { message: errMsg, retryPrompt: text, retryMode: 'generate' as const },
+                }
+              : m
+          );
+          useAppStore.setState({ messages: updated });
+          setIsGenerating(false);
+        },
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : '网络请求失败';
+      const msgs = useAppStore.getState().messages;
+      const updated = msgs.map(m =>
+        m.id === statusId
+          ? {
+              ...m,
+              content: '连接 AI 服务失败',
+              error: { message: errMsg, retryPrompt: text, retryMode: 'generate' as const },
+            }
+          : m
+      );
+      useAppStore.setState({ messages: updated });
+      setIsGenerating(false);
+    }
   };
+
+  const handleRetry = useCallback(async (msg: ChatMessage) => {
+    if (!msg.error?.retryPrompt) return;
+    // Remove the failed message, then re-run the original handler
+    const msgs = useAppStore.getState().messages.filter(m => m.id !== msg.id);
+    useAppStore.setState({ messages: msgs });
+    setIsGenerating(true);
+    if (msg.error.retryMode === 'generate') {
+      await handleGenerate(msg.error.retryPrompt);
+    } else {
+      await handleChat(msg.error.retryPrompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setIsGenerating]);
 
   const pushDistributionCard = useCallback((item: ContentItem) => {
     const distribution: DistributionData = {
@@ -746,6 +871,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                 msg={msg}
                 onSend={sendMessage}
                 onCardAction={handleCardAction}
+                onRetry={handleRetry}
               />
             ))}
             {isGenerating && <TypingIndicator />}

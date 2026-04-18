@@ -48,6 +48,14 @@ export interface ChatMessage {
   distribution?: DistributionData;
   scheduleCard?: ScheduleCardData;
   metricsCard?: MetricsCardData;
+  /** When set, renders an error bubble with a retry action */
+  error?: {
+    message: string;
+    /** Original user prompt to retry; if absent, retry button is hidden */
+    retryPrompt?: string;
+    /** Which handler to invoke on retry */
+    retryMode?: 'chat' | 'generate';
+  };
 }
 
 export interface MetricsCardData {
