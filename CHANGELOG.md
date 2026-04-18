@@ -2,6 +2,38 @@
 
 本文档记录 火花 Spark 的所有重要改动。格式参考 Keep a Changelog，版本号遵循 SemVer。
 
+## [0.3.0] — 2026-04-19
+
+### 安全加固 + 架构优化
+
+两阶段改造：Phase 1 安全加固，Phase 2 架构清理。总计 75 文件变更，净减 ~3400 行代码。
+
+#### Added
+- `supabase/functions/_shared/auth.ts` 共享安全模块（6 导出）：
+  getCorsHeaders / optionsCors / requireUser / requireCronAuth / validatePayloadSize / checkRateLimit
+- `src/lib/auth-helpers.ts`：getAuthToken / getCurrentSession / requireSession
+  统一 10+ 处重复的 supabase.auth.getSession() 调用
+- Edge Functions 滑动窗口 rate limiting：
+  chat/ai-edit 20次/分, generate-cover/analyze-sources 10次/分, learn-from-edit 30次/分
+  超限返回 HTTP 429
+- SparkChat 拆分为 5 个子模块 (src/components/chat/)：
+  ChatAtoms / ChatInput / MessageBubble / WelcomeState / chat-utils
+
+#### Changed
+- Edge Functions: verify_jwt=true (chat/ai-edit/generate-cover/learn-from-edit/analyze-sources)
+- CORS: 消除 `*` 通配符，改为 ALLOWED_ORIGIN 白名单或项目域名推导
+- 输入校验: messages 50 条 / 10K 字符上限, text 20K, payload 100KB
+- 前端 AI 调用 (ai-stream / ContentCard) 改用 session access_token 替代 anon key
+- 路由守卫: /account, /review 添加 beforeLoad + ssr:false
+- ChatLayout: DraftDrawer / MemoryPanel / SchedulePage / ReviewPage 改为 React.lazy
+  review count 延迟 1s, realtime subscription 延迟 500ms
+- SparkChat 主文件: 945 行 → 446 行
+
+#### Removed
+- 41 个未使用的 shadcn/ui 组件 (46 → 5)
+- 生产环境 console.log (oauth.authorize.tsx)
+- authService.ts 中的误导性 TODO 注释（改为 stub 标注）
+
 ## [0.2.1] — 2026-04-19
 
 ### 自动学习 + 智能注入
