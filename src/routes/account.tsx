@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
 import DeviceTokenManager from '@/components/DeviceTokenManager';
+import TonePresetCard from '@/components/settings/TonePresetCard';
+import AIEngineCard from '@/components/settings/AIEngineCard';
 
 export const Route = createFileRoute('/account')({
   head: () => ({
@@ -470,6 +472,12 @@ function AccountPage() {
             </button>
           </div>
         </div>
+
+        {/* Tone preset (原系统设置) */}
+        <TonePresetCard />
+
+        {/* AI engine info (原系统设置) */}
+        <AIEngineCard />
 
         {/* Desktop client tokens */}
         <DeviceTokenManager />
