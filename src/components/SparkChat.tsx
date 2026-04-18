@@ -188,12 +188,46 @@ function WelcomeState({ onSuggestion }: { onSuggestion: (text: string) => void }
   );
 }
 
-function MessageBubble({ msg, onSend, onCardAction }: {
+function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
   msg: ChatMessage;
   onSend: (text: string) => void;
   onCardAction: (action: string, item?: ContentItem) => void;
+  onRetry: (msg: ChatMessage) => void;
 }) {
   const isUser = msg.role === 'user';
+
+  // Error bubble — friendly message + retry button
+  if (!isUser && msg.error) {
+    return (
+      <div className="flex items-start gap-3">
+        <SparkAvatar size={32} />
+        <div className="flex-1 min-w-0 max-w-[85%]">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] leading-[1.6] text-[#333]">
+                  {msg.content || '生成失败了，要不再试一次？'}
+                </p>
+                <p className="text-[12px] leading-[1.5] text-[#888] mt-1 break-words">
+                  {msg.error.message}
+                </p>
+                {msg.error.retryPrompt && (
+                  <button
+                    onClick={() => onRetry(msg)}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-spark-orange text-white text-[13px] hover:opacity-90 transition-opacity"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    重试
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Metrics card — 24h post-publish data report
   if (!isUser && msg.metricsCard) {
