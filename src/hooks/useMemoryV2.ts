@@ -323,16 +323,50 @@ export function useMemoryV2() {
   // saveAnalysisResult — write analysis into the memories table
   // -----------------------------------------------------------------------
   const saveAnalysisResult = useCallback(
-    async (result: AnalysisResult) => {
+    async (result: AnalysisResult, options?: { mode?: 'create' | 'update'; profileId?: string; name?: string }) => {
       const userId = getUserId();
       if (!userId) return;
 
+      const mode = options?.mode ?? 'create';
       const now = new Date().toISOString();
       const sourceUrls = store.getState().sourceUrls.map((s) => s.url);
 
-      // 1. brand_profile identity entry — Markdown doc + visual identity
+      // Pick or create the brand_profile entry id.
+      // - 'create': new uuid → adds a new profile row, becomes active.
+      // - 'update': reuse provided id (or current active id) → in-place edit.
+      let profileId = options?.profileId;
+      if (!profileId) {
+        if (mode === 'update') {
+          const active = store.getState().brandProfile;
+          profileId = active?.id;
+        }
+        if (!profileId) {
+          // Generate a uuid-ish id; DB has uuid default but we set it explicitly so we can reference it locally
+          profileId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+            ? crypto.randomUUID()
+            : `${userId}_bp_${Date.now()}`;
+        }
+      }
+
+      // For 'create' mode we must first deactivate any existing active row,
+      // otherwise the partial unique index will reject the new row.
+      if (mode === 'create') {
+        const { error: deactivateErr } = await db
+          .from('memories')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .eq('layer', 'identity')
+          .eq('category', 'brand_profile')
+          .eq('is_active', true);
+        if (deactivateErr) {
+          console.error('[useMemoryV2] deactivate existing failed:', deactivateErr.message);
+          return;
+        }
+      }
+
+      // 1. brand_profile identity entry — always saved as active
       const brandProfileEntry: MemoryEntry = {
-        id: `${userId}_brand_profile`,
+        id: profileId,
         layer: 'identity',
         category: 'brand_profile',
         content: {
@@ -340,17 +374,19 @@ export function useMemoryV2() {
           visualIdentity: result.visualIdentity,
           sourceUrls,
           initialized: true,
+          name: options?.name,
         },
         source: 'firecrawl',
         confidence: 0.8,
+        isActive: true,
         createdAt: now,
         updatedAt: now,
       };
 
-      // 2. preference entries for each writing pattern
+      // 2. preference entries for each writing pattern (scoped per profile to avoid id collisions)
       const patternEntries: MemoryEntry[] = result.writingPatterns.map(
         (pattern, idx): MemoryEntry => ({
-          id: `${userId}_pattern_${idx}`,
+          id: `${profileId}_pattern_${idx}`,
           layer: 'preference',
           category: 'writing_style',
           content: {
@@ -377,23 +413,89 @@ export function useMemoryV2() {
         return;
       }
 
-      const existing = store.getState().memories;
-      const newIds = new Set(allEntries.map((e) => e.id));
-      const merged = [...existing.filter((e) => !newIds.has(e.id)), ...allEntries];
-      store.getState().setMemories(merged);
-
-      store.getState().setBrandProfile({
-        brandDoc: result.brandDoc,
-        visualIdentity: result.visualIdentity,
-        sourceUrls,
-        initialized: true,
-      });
-
-      store.getState().setMemoryEnabled(true);
-
+      // Reload from DB so brandProfiles reflects the new + newly-deactivated rows
+      await loadMemories();
       store.getState().setMemoryEnabled(true);
     },
-    [store],
+    [store, loadMemories],
+  );
+
+  // -----------------------------------------------------------------------
+  // activateBrandProfile — flip is_active flag (DB enforces uniqueness)
+  // -----------------------------------------------------------------------
+  const activateBrandProfile = useCallback(
+    async (profileId: string) => {
+      const userId = getUserId();
+      if (!userId) return;
+
+      // Optimistic local update
+      store.getState().setActiveBrandProfileLocal(profileId);
+
+      // Two-step: deactivate all, then activate target (avoids unique-index race)
+      const { error: deactivateErr } = await db
+        .from('memories')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('layer', 'identity')
+        .eq('category', 'brand_profile');
+      if (deactivateErr) {
+        console.error('[useMemoryV2] activate.deactivate failed:', deactivateErr.message);
+        await loadMemories();
+        return;
+      }
+
+      const { error: activateErr } = await db
+        .from('memories')
+        .update({ is_active: true })
+        .eq('id', profileId);
+      if (activateErr) {
+        console.error('[useMemoryV2] activate failed:', activateErr.message);
+      }
+
+      await loadMemories();
+    },
+    [store, loadMemories],
+  );
+
+  // -----------------------------------------------------------------------
+  // deleteBrandProfile — remove a brand profile (and re-activate fallback)
+  // -----------------------------------------------------------------------
+  const deleteBrandProfile = useCallback(
+    async (profileId: string) => {
+      const userId = getUserId();
+      if (!userId) return;
+
+      const wasActive = store.getState().brandProfiles.find((p) => p.id === profileId)?.isActive;
+
+      const { error } = await db
+        .from('memories')
+        .delete()
+        .eq('id', profileId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('[useMemoryV2] deleteBrandProfile failed:', error.message);
+        return;
+      }
+
+      // If we deleted the active one, promote another to active in DB
+      if (wasActive) {
+        const remaining = store.getState().brandProfiles.filter((p) => p.id !== profileId);
+        if (remaining.length > 0) {
+          // Pick the newest remaining (already sorted newest-first in load)
+          const next = remaining[0];
+          if (next.id) {
+            await db
+              .from('memories')
+              .update({ is_active: true })
+              .eq('id', next.id);
+          }
+        }
+      }
+
+      await loadMemories();
+    },
+    [store, loadMemories],
   );
 
   // -----------------------------------------------------------------------
