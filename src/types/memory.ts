@@ -39,18 +39,40 @@ export interface MemoryEntry {
   updatedAt: string;
 }
 
+export interface VisualIdentity {
+  logo?: string;
+  favicon?: string;
+  ogImage?: string;
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    textPrimary?: string;
+    textSecondary?: string;
+  };
+  fonts?: string[]; // font family names
+}
+
 export interface BrandProfile {
-  brandName: string;
-  industry: string;
-  mainBusiness: string;
-  targetCustomer: string;
-  differentiation: string;
-  toneOfVoice: string;
-  keywords: string[];
-  tabooWords: string[];
-  brandStory?: string;
+  /** AI-generated, user-editable Markdown describing the whole brand. Source of truth for prompt injection. */
+  brandDoc: string;
+  /** Logo / colors / fonts, populated from Firecrawl branding format. URLs only — no upload. */
+  visualIdentity: VisualIdentity;
   sourceUrls: string[];
   initialized: boolean;
+
+  // Legacy structured fields kept for backwards-compat with old saved profiles.
+  // New code should rely on `brandDoc`. These will be empty for fresh analyses.
+  brandName?: string;
+  industry?: string;
+  mainBusiness?: string;
+  targetCustomer?: string;
+  differentiation?: string;
+  toneOfVoice?: string;
+  keywords?: string[];
+  tabooWords?: string[];
+  brandStory?: string;
 }
 
 export interface PreferenceRule {
@@ -66,16 +88,12 @@ export interface SourceUrl {
   error?: string;
 }
 
-// Firecrawl 分析结果
+// Firecrawl 分析结果 — v2 returns a single Markdown brand doc + visual identity.
 export interface AnalysisResult {
-  brandName: string;
-  industry: string;
-  mainBusiness: string;
-  targetCustomer: string;
-  differentiation: string;
-  toneOfVoice: string;
-  keywords: string[];
-  tabooWords: string[];
-  brandStory: string;
+  /** Markdown describing the brand (sections: 品牌概述/主营/客户/差异化/语气/关键词/禁用词/品牌故事). */
+  brandDoc: string;
+  /** Logo / colors / fonts — URLs and values, no file upload. */
+  visualIdentity: VisualIdentity;
+  /** Writing-style preference rules extracted from the content. */
   writingPatterns: string[];
 }
