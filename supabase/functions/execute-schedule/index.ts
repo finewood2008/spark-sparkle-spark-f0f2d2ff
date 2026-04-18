@@ -141,7 +141,7 @@ async function loadBrandContext(
   if (!userId) return "";
 
   try {
-    const { data } = await admin
+    const { data } = await db
       .from("memories")
       .select("layer, category, content")
       .eq("user_id", userId)
