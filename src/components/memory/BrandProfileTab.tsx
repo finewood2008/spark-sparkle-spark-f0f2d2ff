@@ -20,7 +20,7 @@ const emptyProfile: BrandProfile = {
 };
 
 const fieldClass =
-  'w-full text-[14px] text-[#333] border border-[#E5E4E2] rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-400 bg-white transition-colors placeholder:text-[#CCC]';
+  'w-full text-[13px] text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white transition-colors placeholder:text-[#CCC]';
 
 export function BrandProfileTab() {
   const brandProfile = useMemoryStore((s) => s.brandProfile);
