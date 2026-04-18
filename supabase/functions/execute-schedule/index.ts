@@ -136,10 +136,12 @@ async function loadBrandContext(
   admin: ReturnType<typeof createClient>,
   userId: string | null,
 ): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
   if (!userId) return "";
 
   try {
-    const { data } = await admin
+    const { data } = await db
       .from("memories")
       .select("layer, category, content")
       .eq("user_id", userId)
