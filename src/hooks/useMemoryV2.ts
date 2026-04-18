@@ -383,16 +383,22 @@ export function useMemoryV2() {
         updatedAt: now,
       };
 
-      // 2. preference entries for each writing pattern (scoped per profile to avoid id collisions)
+      // 2. preference entries for each writing pattern (each gets its own uuid)
+      const newId = () =>
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
       const patternEntries: MemoryEntry[] = result.writingPatterns.map(
-        (pattern, idx): MemoryEntry => ({
-          id: `${profileId}_pattern_${idx}`,
+        (pattern): MemoryEntry => ({
+          id: newId(),
           layer: 'preference',
           category: 'writing_style',
           content: {
             rule: pattern,
             evidence: `从分析 ${sourceUrls.join(', ')} 自动提取`,
             confirmed: false,
+            profileId, // 关联到对应的品牌档案，方便后续按档案过滤
           },
           source: 'firecrawl',
           confidence: 0.6,
