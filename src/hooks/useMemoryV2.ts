@@ -251,7 +251,29 @@ export function useMemoryV2() {
           throw new Error(`analyze-sources failed (${response.status}): ${body}`);
         }
 
-        const result: AnalysisResult = await response.json();
+        const payload = (await response.json()) as {
+          analysis?: Record<string, unknown>;
+        } & Record<string, unknown>;
+
+        // Edge function returns { user_id, analysis, sources }.
+        // Gemini returns snake_case fields — normalize to camelCase AnalysisResult.
+        const a = (payload.analysis ?? payload) as Record<string, unknown>;
+        const asStr = (v: unknown) => (typeof v === 'string' ? v : '');
+        const asArr = (v: unknown): string[] =>
+          Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
+        const result: AnalysisResult = {
+          brandName: asStr(a.brand_name ?? a.brandName),
+          industry: asStr(a.industry),
+          mainBusiness: asStr(a.main_business ?? a.mainBusiness),
+          targetCustomer: asStr(a.target_customer ?? a.targetCustomer),
+          differentiation: asStr(a.differentiation),
+          toneOfVoice: asStr(a.tone_of_voice ?? a.toneOfVoice),
+          keywords: asArr(a.keywords),
+          tabooWords: asArr(a.taboo_words ?? a.tabooWords),
+          brandStory: asStr(a.brand_story ?? a.brandStory),
+          writingPatterns: asArr(a.writing_patterns ?? a.writingPatterns),
+        };
 
         // Update source URL statuses
         urls.forEach((url) => {
