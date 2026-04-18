@@ -99,6 +99,12 @@ Extract the brand profile and return ONLY valid JSON (no markdown fences) with e
   "writingPatterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
 }
 
+LANGUAGE RULE (critical):
+- Detect the dominant natural language of the scraped content.
+- All string values (brandName aside if it's a proper noun) MUST be written in that same language.
+- If the content is primarily in Chinese, respond in Chinese (中文). If English, respond in English. If mixed, follow the majority language.
+- Field KEYS stay in English exactly as listed above.
+
 If certain fields cannot be determined, use an empty string or empty array.
 Respond ONLY with the JSON object, nothing else.`;
 
