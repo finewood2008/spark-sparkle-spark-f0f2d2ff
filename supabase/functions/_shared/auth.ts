@@ -20,22 +20,37 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const explicitOrigin = Deno.env.get("ALLOWED_ORIGIN");
   const origin = req.headers.get("origin") || "";
 
-  let allowedOrigin: string;
+  // Build allowed origin set
+  const allowed = new Set<string>();
 
   if (explicitOrigin) {
-    // Support comma-separated list of allowed origins
-    const allowedList = explicitOrigin.split(",").map((o) => o.trim());
-    if (allowedList.includes(origin)) {
-      allowedOrigin = origin;
-    } else {
-      allowedOrigin = allowedList[0]; // Default to first configured origin
-    }
+    explicitOrigin.split(",").map((o) => o.trim()).filter(Boolean)
+      .forEach((o) => allowed.add(o));
+  }
+
+  // Always allow Supabase project's lovable.app subdomain
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const projectRef = supabaseUrl.match(
+    /https:\/\/([^.]+)\.supabase\.co/,
+  )?.[1];
+  if (projectRef) {
+    allowed.add(`https://${projectRef}.lovable.app`);
+  }
+
+  // Allow Lovable preview / staging hosts and known custom domains
+  const dynamicAllowed =
+    /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/i.test(origin) ||
+    /^https:\/\/[a-z0-9-]+\.lovable\.app$/i.test(origin) ||
+    /^https:\/\/[a-z0-9-]+\.lovable\.dev$/i.test(origin) ||
+    /^https:\/\/(www\.)?spark-geo\.com$/i.test(origin) ||
+    /^http:\/\/localhost(:\d+)?$/i.test(origin);
+
+  let allowedOrigin: string;
+  if (origin && (allowed.has(origin) || dynamicAllowed)) {
+    allowedOrigin = origin;
+  } else if (allowed.size > 0) {
+    allowedOrigin = Array.from(allowed)[0];
   } else {
-    // Fall back to Supabase project URL-based domain
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const projectRef = supabaseUrl.match(
-      /https:\/\/([^.]+)\.supabase\.co/,
-    )?.[1];
     allowedOrigin = projectRef
       ? `https://${projectRef}.lovable.app`
       : "https://localhost:3000";
@@ -43,6 +58,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
+    "Vary": "Origin",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
