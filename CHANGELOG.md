@@ -2,6 +2,29 @@
 
 本文档记录 火花 Spark 的所有重要改动。格式参考 Keep a Changelog，版本号遵循 SemVer。
 
+## [0.2.2] — 2026-04-18
+
+### Edge Functions 全面恢复（CORS + verify_jwt 双修）
+
+修复线上聊天「连接 AI 服务失败 / Failed to fetch」整片打不开的故障。两个独立根因叠加：
+
+#### Fixed
+- **CORS 白名单（真正根因）**：`supabase/functions/_shared/auth.ts` 的 `getCorsHeaders` 原本把 `Access-Control-Allow-Origin` 写死成 `${projectRef}.lovable.app`，导致 Preview 域 `*.lovableproject.com`、自定义域 `spark-geo.com`、`*.lovable.dev` 全部被浏览器 CORS 拦截，前端表现为 `Failed to fetch`。改为基于请求 origin 动态匹配 + `Vary: Origin`：
+  - 放行：`*.lovable.app` / `*.lovableproject.com` / `*.lovable.dev` / `spark-geo.com` / `localhost`
+  - 兼容 `ALLOWED_ORIGIN` 逗号分隔环境变量
+- **verify_jwt 网关拦截**：`chat / learn-from-edit / ai-edit / analyze-sources / generate-cover` 五个函数原 `verify_jwt = true`，但 Supabase 网关用旧 HS256 校验器去验新版 ES256 JWT，直接 401 拦截。统一改为 `verify_jwt = false`，由函数内 `requireUser(req)` 自行校验 ES256 token（代码侧本来就这么写，只是 toml 没切）。
+
+#### Verified
+端到端实测：
+- 聊天生成长文：UI 流式返回，console 零报错
+- 抓品牌档案 (analyze-sources)：UI 显示 brandDoc
+- ai-edit / generate-cover：curl 200 + SSE / JSON 正常
+
+#### Note
+顺手修了一处 `analyze-metrics` / `fetch-metrics` 中被截断的死代码（`Deno.e...Y")`），以及 `execute-schedule.loadBrandContext` 的 Supabase 客户端类型推断错误。
+
+---
+
 ## [0.2.1] — 2026-04-19
 
 ### 自动学习 + 智能注入
