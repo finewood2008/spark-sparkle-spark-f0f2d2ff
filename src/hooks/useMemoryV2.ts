@@ -124,7 +124,7 @@ export function useMemoryV2() {
     if (!userId) {
       // Not logged in — clear store
       store.getState().setMemories([]);
-      store.getState().setBrandProfile(null);
+      store.getState().setBrandProfiles([]);
       store.getState().setSourceUrls([]);
       store.getState().setMemoryEnabled(false);
       return;
@@ -157,48 +157,42 @@ export function useMemoryV2() {
 
     store.getState().setMemories(validEntries);
 
-    // --- extract brand profile from identity layer ---
-    const profileEntry = validEntries.find(
+    // --- collect ALL brand_profile entries (multi-profile support) ---
+    const profileEntries = validEntries.filter(
       (e) => e.layer === 'identity' && e.category === 'brand_profile',
     );
-    if (profileEntry) {
-      const c = profileEntry.content as Record<string, unknown>;
-      const bp: BrandProfile = {
-        brandDoc: (c.brandDoc as string) ?? '',
-        visualIdentity: (c.visualIdentity as BrandProfile['visualIdentity']) ?? {},
-        sourceUrls: (c.sourceUrls as string[]) ?? [],
-        initialized: (c.initialized as boolean) ?? false,
-        // legacy
-        brandName: (c.brandName as string) ?? undefined,
-        industry: (c.industry as string) ?? undefined,
-        mainBusiness: (c.mainBusiness as string) ?? undefined,
-        targetCustomer: (c.targetCustomer as string) ?? undefined,
-        differentiation: (c.differentiation as string) ?? undefined,
-        toneOfVoice: (c.toneOfVoice as string) ?? undefined,
-        keywords: (c.keywords as string[]) ?? undefined,
-        tabooWords: (c.tabooWords as string[]) ?? undefined,
-        brandStory: (c.brandStory as string) ?? undefined,
-      };
-      store.getState().setBrandProfile(bp);
 
-      // Auto-enable memory if brand is initialized
-      if (bp.initialized) {
+    if (profileEntries.length > 0) {
+      // Sort newest first for display
+      const sorted = [...profileEntries].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      const profiles = sorted.map(entryToBrandProfile);
+
+      // Ensure exactly one is marked active. If none from DB, activate the newest.
+      if (!profiles.some((p) => p.isActive) && profiles.length > 0) {
+        profiles[0].isActive = true;
+      }
+
+      store.getState().setBrandProfiles(profiles);
+
+      const active = profiles.find((p) => p.isActive) ?? profiles[0];
+
+      // Auto-enable memory if active brand is initialized
+      if (active?.initialized) {
         store.getState().setMemoryEnabled(true);
       }
 
-      // Populate sourceUrls state
-      if (bp.sourceUrls.length > 0) {
+      // Populate sourceUrls state from the active profile
+      if (active && active.sourceUrls.length > 0) {
         store.getState().setSourceUrls(
-          bp.sourceUrls.map(
-            (url): SourceUrl => ({
-              url,
-              status: 'done',
-            }),
+          active.sourceUrls.map(
+            (url): SourceUrl => ({ url, status: 'done' }),
           ),
         );
       }
     } else {
-      store.getState().setBrandProfile(null);
+      store.getState().setBrandProfiles([]);
     }
   }, [store]);
 
