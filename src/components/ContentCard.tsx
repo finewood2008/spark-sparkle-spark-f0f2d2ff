@@ -55,6 +55,45 @@ function AIFloatingToolbar({
   );
 }
 
+function InlineActionError({
+  label,
+  message,
+  loading,
+  onRetry,
+  onDismiss,
+}: {
+  label: string;
+  message: string;
+  loading: boolean;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px]">
+      <AlertCircle size={14} className="mt-0.5 shrink-0 text-red-500" />
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-red-700">{label}失败</div>
+        <div className="text-red-600/90 break-words">{message}</div>
+      </div>
+      <button
+        onClick={onRetry}
+        disabled={loading}
+        className="shrink-0 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+      >
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+        重试
+      </button>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 p-1 text-red-400 hover:text-red-600 transition-colors"
+        aria-label="关闭"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  );
+}
+
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
   const { contents, setContents, setLearnings, addMessage } = useAppStore();
   // Use live item from store if available, fall back to prop
