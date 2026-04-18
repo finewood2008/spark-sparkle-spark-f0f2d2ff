@@ -20,7 +20,6 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Verify JWT via Supabase client and return the user id. */
 async function getUserId(authHeader: string | null): Promise<string> {
   if (!authHeader) throw new Error("Missing Authorization header");
 
@@ -44,11 +43,15 @@ async function getUserId(authHeader: string | null): Promise<string> {
   return user.id;
 }
 
-/** Scrape a single URL via Firecrawl. Returns markdown or null on failure. */
-async function scrapeUrl(
-  url: string,
-  apiKey: string,
-): Promise<{ url: string; markdown: string | null; error?: string }> {
+interface ScrapeOutput {
+  url: string;
+  markdown: string | null;
+  branding: Record<string, unknown> | null;
+  error?: string;
+}
+
+/** Scrape a single URL via Firecrawl with markdown + branding. */
+async function scrapeUrl(url: string, apiKey: string): Promise<ScrapeOutput> {
   try {
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
@@ -56,57 +59,83 @@ async function scrapeUrl(
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ url, formats: ["markdown"] }),
+      body: JSON.stringify({
+        url,
+        formats: ["markdown", "branding"],
+        onlyMainContent: true,
+      }),
     });
 
     if (!res.ok) {
       const text = await res.text();
       console.error(`Firecrawl error for ${url}: ${res.status} ${text}`);
-      return { url, markdown: null, error: `Firecrawl ${res.status}` };
+      return { url, markdown: null, branding: null, error: `Firecrawl ${res.status}` };
     }
 
     const json = await res.json();
-    const markdown = json?.data?.markdown;
-    if (!markdown) {
-      return { url, markdown: null, error: "No markdown in response" };
+    const data = json?.data ?? {};
+    const markdown = data.markdown ?? null;
+    const branding = data.branding ?? null;
+    if (!markdown && !branding) {
+      return { url, markdown: null, branding: null, error: "Empty Firecrawl response" };
     }
-    return { url, markdown };
+    return { url, markdown, branding };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`Firecrawl fetch failed for ${url}: ${msg}`);
-    return { url, markdown: null, error: msg };
+    return { url, markdown: null, branding: null, error: msg };
   }
 }
 
-/** Call Gemini to analyse concatenated markdown and extract brand profile. */
+/** Ask Gemini to write a polished Markdown brand doc + writing patterns. */
 async function analyseWithGemini(
   markdownContent: string,
   apiKey: string,
-): Promise<Record<string, unknown>> {
-  const systemPrompt = `You are a brand analyst. Analyse the following web page content scraped from a brand's online presence.
-Extract the brand profile and return ONLY valid JSON (no markdown fences) with exactly these fields (camelCase):
+): Promise<{ brandDoc: string; writingPatterns: string[] }> {
+  const systemPrompt = `You are a brand strategist. From the scraped web content below, write a structured Markdown brand profile that an AI copywriter can use as context.
 
+OUTPUT FORMAT — return ONLY valid JSON (no fences) with exactly these two fields:
 {
-  "brandName": "string – the brand name",
-  "industry": "string – the industry or sector",
-  "mainBusiness": "string – core products / services description",
-  "targetCustomer": "string – who the brand targets",
-  "differentiation": "string – unique selling points / competitive advantages",
-  "toneOfVoice": "string – the brand's communication tone",
-  "keywords": ["string array – key terms the brand uses frequently"],
-  "tabooWords": ["string array – words or topics the brand avoids"],
-  "brandStory": "string – condensed brand narrative",
-  "writingPatterns": ["string array – noticeable writing style patterns, sentence structures, or rhetorical devices"]
+  "brandDoc": "string — Markdown document, see template below",
+  "writingPatterns": ["string array — concrete writing-style rules observed (3-8 items)"]
 }
+
+brandDoc Markdown template (fill in, keep section headers exactly):
+# {Brand Name}
+
+## 一句话定位 / Positioning
+{one-line tagline}
+
+## 主营业务 / Main Business
+{products / services}
+
+## 目标客户 / Target Customer
+{who they serve}
+
+## 差异化价值 / Differentiation
+{why choose them}
+
+## 语气风格 / Tone of Voice
+{communication tone}
+
+## 品牌关键词 / Keywords
+- keyword1
+- keyword2
+
+## 禁用词 / Words to Avoid
+- word1 (or "无" if none)
+
+## 品牌故事 / Brand Story
+{condensed narrative, 2-4 sentences}
 
 LANGUAGE RULE (critical):
 - Detect the dominant natural language of the scraped content.
-- All string values (brandName aside if it's a proper noun) MUST be written in that same language.
-- If the content is primarily in Chinese, respond in Chinese (中文). If English, respond in English. If mixed, follow the majority language.
-- Field KEYS stay in English exactly as listed above.
+- Write the entire brandDoc body in that same language (Chinese if content is mostly 中文, English if mostly English).
+- Section headers stay bilingual exactly as shown above.
+- writingPatterns array items follow the same language as the body.
 
-If certain fields cannot be determined, use an empty string or empty array.
-Respond ONLY with the JSON object, nothing else.`;
+If a section has no info, write "未提供" (Chinese) or "Not provided" (English) — never leave blank.
+Respond ONLY with the JSON object.`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -119,14 +148,12 @@ Respond ONLY with the JSON object, nothing else.`;
         {
           role: "user",
           parts: [
-            {
-              text: `Here is the scraped content from the brand's websites:\n\n${markdownContent}`,
-            },
+            { text: `Scraped content:\n\n${markdownContent}` },
           ],
         },
       ],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.3,
         maxOutputTokens: 4096,
       },
     }),
@@ -144,33 +171,95 @@ Respond ONLY with the JSON object, nothing else.`;
       ?.map((p: { text?: string }) => p.text || "")
       .join("") || "";
 
-  // Strip possible markdown code fences
   const cleaned = rawText
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
 
   try {
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+    return {
+      brandDoc: typeof parsed.brandDoc === "string" ? parsed.brandDoc : "",
+      writingPatterns: Array.isArray(parsed.writingPatterns)
+        ? parsed.writingPatterns.filter((x: unknown): x is string => typeof x === "string")
+        : [],
+    };
   } catch {
-    console.error("Failed to parse Gemini response as JSON:", cleaned);
-    throw new Error("Gemini returned invalid JSON");
+    console.error("Failed to parse Gemini response, using raw text as brandDoc:", cleaned.slice(0, 200));
+    return { brandDoc: cleaned, writingPatterns: [] };
   }
+}
+
+/** Merge branding payloads from multiple sources — first non-empty wins per field. */
+function mergeBranding(brandings: Array<Record<string, unknown> | null>): {
+  logo?: string;
+  favicon?: string;
+  ogImage?: string;
+  colors?: Record<string, string>;
+  fonts?: string[];
+} {
+  const result: {
+    logo?: string;
+    favicon?: string;
+    ogImage?: string;
+    colors?: Record<string, string>;
+    fonts?: string[];
+  } = {};
+
+  for (const b of brandings) {
+    if (!b) continue;
+    const images = (b.images as Record<string, unknown> | undefined) ?? {};
+    const colors = (b.colors as Record<string, unknown> | undefined) ?? {};
+    const fonts = b.fonts as Array<{ family?: string }> | undefined;
+
+    if (!result.logo) {
+      const logo = (images.logo as string) || (b.logo as string);
+      if (typeof logo === "string" && logo) result.logo = logo;
+    }
+    if (!result.favicon) {
+      const fav = images.favicon as string | undefined;
+      if (typeof fav === "string" && fav) result.favicon = fav;
+    }
+    if (!result.ogImage) {
+      const og = images.ogImage as string | undefined;
+      if (typeof og === "string" && og) result.ogImage = og;
+    }
+    if (!result.colors) {
+      const c: Record<string, string> = {};
+      for (const k of [
+        "primary",
+        "secondary",
+        "accent",
+        "background",
+        "textPrimary",
+        "textSecondary",
+      ]) {
+        const v = colors[k];
+        if (typeof v === "string" && v) c[k] = v;
+      }
+      if (Object.keys(c).length > 0) result.colors = c;
+    }
+    if (!result.fonts && Array.isArray(fonts)) {
+      const list = fonts
+        .map((f) => f?.family)
+        .filter((x): x is string => typeof x === "string" && x.length > 0);
+      if (list.length > 0) result.fonts = Array.from(new Set(list));
+    }
+  }
+
+  return result;
 }
 
 // ── Main Handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ── Auth ──────────────────────────────────────────────────────
     const userId = await getUserId(req.headers.get("Authorization"));
 
-    // ── Input validation ─────────────────────────────────────────
     const body = await req.json();
     const { urls } = body;
 
@@ -190,25 +279,20 @@ Deno.serve(async (req) => {
     if (invalidUrls.length > 0) {
       return jsonResponse(
         {
-          error: "Invalid URL(s) detected. Each URL must start with http:// or https://",
+          error: "Invalid URL(s). Each URL must start with http:// or https://",
           invalid: invalidUrls,
         },
         400,
       );
     }
 
-    // ── API keys ─────────────────────────────────────────────────
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!firecrawlKey) {
-      throw new Error("FIRECRAWL_API_KEY is not configured");
-    }
+    if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY is not configured");
 
-    const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) {
-      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
-    }
+    const geminiKey =
+      Deno.env.get("GOOGLE_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
-    // ── Scrape URLs ──────────────────────────────────────────────
     const scrapeResults = await Promise.all(
       urls.map((u: string) => scrapeUrl(u, firecrawlKey)),
     );
@@ -219,45 +303,22 @@ Deno.serve(async (req) => {
       .map((r) => ({ url: r.url, error: r.error }));
 
     if (succeeded.length === 0) {
-      return jsonResponse(
-        {
-          error: "All URLs failed to scrape",
-          failed,
-        },
-        422,
-      );
+      return jsonResponse({ error: "All URLs failed to scrape", failed }, 422);
     }
 
-    // ── Gemini Analysis ──────────────────────────────────────────
     const combinedMarkdown = succeeded
-      .map(
-        (r, i) =>
-          `--- Source ${i + 1}: ${r.url} ---\n\n${r.markdown}`,
-      )
+      .map((r, i) => `--- Source ${i + 1}: ${r.url} ---\n\n${r.markdown}`)
       .join("\n\n");
 
-    // Truncate to ~120k chars to stay within Gemini context window
     const truncated = combinedMarkdown.slice(0, 120_000);
 
-    const rawAnalysis = await analyseWithGemini(truncated, geminiKey);
-
-    // Normalize to camelCase AnalysisResult shape (defensive: Gemini may slip back to snake_case)
-    const a = rawAnalysis as Record<string, unknown>;
-    const asStr = (v: unknown) => (typeof v === "string" ? v : "");
-    const asArr = (v: unknown): string[] =>
-      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    const ai = await analyseWithGemini(truncated, geminiKey);
+    const visualIdentity = mergeBranding(scrapeResults.map((r) => r.branding));
 
     const analysis = {
-      brandName: asStr(a.brandName ?? a.brand_name),
-      industry: asStr(a.industry),
-      mainBusiness: asStr(a.mainBusiness ?? a.main_business),
-      targetCustomer: asStr(a.targetCustomer ?? a.target_customer),
-      differentiation: asStr(a.differentiation),
-      toneOfVoice: asStr(a.toneOfVoice ?? a.tone_of_voice),
-      keywords: asArr(a.keywords),
-      tabooWords: asArr(a.tabooWords ?? a.taboo_words),
-      brandStory: asStr(a.brandStory ?? a.brand_story),
-      writingPatterns: asArr(a.writingPatterns ?? a.writing_patterns),
+      brandDoc: ai.brandDoc,
+      visualIdentity,
+      writingPatterns: ai.writingPatterns,
     };
 
     return jsonResponse({
@@ -272,13 +333,11 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("analyze-sources error:", e);
     const message = e instanceof Error ? e.message : "Unknown error";
-
     const status =
       message.includes("Missing Authorization") ||
       message.includes("Invalid or expired")
         ? 401
         : 500;
-
     return jsonResponse({ error: message }, status);
   }
 });
