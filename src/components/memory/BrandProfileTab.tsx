@@ -251,75 +251,74 @@ export function BrandProfileTab() {
         )}
       </section>
 
-      {/* ============= 手动编辑区 ============= */}
-      <section className="space-y-4">
+      {/* ============= 手动编辑区（紧凑版） ============= */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-medium text-[#333]">手动编辑品牌档案</h3>
+          <h3 className="text-[14px] font-medium text-[#333]">手动编辑品牌档案</h3>
           {dirty && (
             <button
               onClick={handleManualSave}
-              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-[12px] flex items-center gap-1 hover:bg-orange-600 transition-colors"
+              className="px-2.5 py-1 bg-orange-500 text-white rounded-md text-[11px] flex items-center gap-1 hover:bg-orange-600 transition-colors"
             >
-              <Save size={12} /> 保存
+              <Save size={11} /> 保存
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[12px] font-medium text-[#999] mb-1 block">品牌名称</label>
+            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌名称</label>
             <input
               value={form.brandName}
               onChange={(e) => update({ brandName: e.target.value })}
               className={fieldClass}
-              placeholder="如：火花工作室"
+              placeholder="火花工作室"
             />
           </div>
           <div>
-            <label className="text-[12px] font-medium text-[#999] mb-1 block">所属行业</label>
+            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">所属行业</label>
             <input
               value={form.industry}
               onChange={(e) => update({ industry: e.target.value })}
               className={fieldClass}
-              placeholder="如：美妆护肤"
+              placeholder="美妆护肤"
             />
           </div>
         </div>
 
         <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">
-            主营业务 / 核心产品
-          </label>
+          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">主营业务</label>
           <textarea
             value={form.mainBusiness}
             onChange={(e) => update({ mainBusiness: e.target.value })}
-            className={`${fieldClass} resize-none h-[72px]`}
-            placeholder="简要描述你的主营业务和核心产品..."
+            className={`${fieldClass} resize-none h-[52px]`}
+            placeholder="主营业务和核心产品..."
           />
         </div>
 
-        <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">目标客户</label>
-          <textarea
-            value={form.targetCustomer}
-            onChange={(e) => update({ targetCustomer: e.target.value })}
-            className={`${fieldClass} resize-none h-[64px]`}
-            placeholder="如：25-35岁都市白领女性..."
-          />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">目标客户</label>
+            <textarea
+              value={form.targetCustomer}
+              onChange={(e) => update({ targetCustomer: e.target.value })}
+              className={`${fieldClass} resize-none h-[52px]`}
+              placeholder="如：25-35岁都市白领"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">差异化价值</label>
+            <textarea
+              value={form.differentiation}
+              onChange={(e) => update({ differentiation: e.target.value })}
+              className={`${fieldClass} resize-none h-[52px]`}
+              placeholder="为什么选你而非竞品？"
+            />
+          </div>
         </div>
 
         <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">差异化价值</label>
-          <textarea
-            value={form.differentiation}
-            onChange={(e) => update({ differentiation: e.target.value })}
-            className={`${fieldClass} resize-none h-[64px]`}
-            placeholder="为什么客户选你而不是竞品？"
-          />
-        </div>
-
-        <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">语气风格</label>
+          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">语气风格</label>
           <input
             value={form.toneOfVoice}
             onChange={(e) => update({ toneOfVoice: e.target.value })}
@@ -330,34 +329,34 @@ export function BrandProfileTab() {
 
         {/* 关键词 */}
         <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">品牌关键词</label>
-          <div className="flex gap-2 mb-2">
+          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌关键词</label>
+          <div className="flex gap-1.5 mb-1.5">
             <input
               value={keywordInput}
               onChange={(e) => setKeywordInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
               className={fieldClass}
-              placeholder="输入后按回车添加"
+              placeholder="回车添加"
             />
             <button
               onClick={addKeyword}
-              className="px-3 py-2 bg-white border border-[#E5E4E2] rounded-xl text-[13px] text-[#666] hover:bg-[#F0EFED] transition-colors"
+              className="px-2.5 py-1.5 bg-white border border-[#E5E4E2] rounded-lg text-[12px] text-[#666] hover:bg-[#F0EFED] transition-colors"
             >
-              <Plus size={14} />
+              <Plus size={12} />
             </button>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {form.keywords.map((k) => (
               <span
                 key={k}
-                className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-600 rounded-lg text-[12px]"
+                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[11px]"
               >
                 {k}
                 <button
                   onClick={() => update({ keywords: form.keywords.filter((x) => x !== k) })}
                   className="text-orange-400 hover:text-orange-700"
                 >
-                  <X size={10} />
+                  <X size={9} />
                 </button>
               </span>
             ))}
@@ -366,34 +365,34 @@ export function BrandProfileTab() {
 
         {/* 禁用词 */}
         <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">禁用词</label>
-          <div className="flex gap-2 mb-2">
+          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">禁用词</label>
+          <div className="flex gap-1.5 mb-1.5">
             <input
               value={tabooInput}
               onChange={(e) => setTabooInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTaboo())}
               className={fieldClass}
-              placeholder="写作中要避免的词"
+              placeholder="要避免的词"
             />
             <button
               onClick={addTaboo}
-              className="px-3 py-2 bg-white border border-[#E5E4E2] rounded-xl text-[13px] text-[#666] hover:bg-[#F0EFED] transition-colors"
+              className="px-2.5 py-1.5 bg-white border border-[#E5E4E2] rounded-lg text-[12px] text-[#666] hover:bg-[#F0EFED] transition-colors"
             >
-              <Plus size={14} />
+              <Plus size={12} />
             </button>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {form.tabooWords.map((t) => (
               <span
                 key={t}
-                className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg text-[12px]"
+                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-red-50 text-red-600 rounded text-[11px]"
               >
                 {t}
                 <button
                   onClick={() => update({ tabooWords: form.tabooWords.filter((x) => x !== t) })}
                   className="text-red-400 hover:text-red-700"
                 >
-                  <X size={10} />
+                  <X size={9} />
                 </button>
               </span>
             ))}
@@ -401,11 +400,11 @@ export function BrandProfileTab() {
         </div>
 
         <div>
-          <label className="text-[12px] font-medium text-[#999] mb-1 block">品牌故事（可选）</label>
+          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌故事（可选）</label>
           <textarea
             value={form.brandStory ?? ''}
             onChange={(e) => update({ brandStory: e.target.value })}
-            className={`${fieldClass} resize-none h-[96px]`}
+            className={`${fieldClass} resize-none h-[68px]`}
             placeholder="品牌的由来、愿景、价值观..."
           />
         </div>
