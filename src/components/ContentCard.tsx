@@ -300,6 +300,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setCoverLoading(false);
   };
   const handleRegenerateTitle = async () => {
+    setActionError('title', null);
     setTitleLoading(true);
     try {
       const currentContent = editing ? editContent : item.content;
@@ -317,7 +318,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       });
 
       if (!resp.ok) {
-        toast.error('标题生成失败');
+        setActionError('title', '标题生成失败，请重试');
         setTitleLoading(false);
         return;
       }
@@ -357,10 +358,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         setContents(updated);
         toast.success('标题已更新');
       } else {
-        toast.error('未能生成新标题');
+        setActionError('title', '未能生成新标题，请重试');
       }
     } catch {
-      toast.error('标题生成失败');
+      setActionError('title', '网络异常，标题生成失败');
     }
     setTitleLoading(false);
   };
