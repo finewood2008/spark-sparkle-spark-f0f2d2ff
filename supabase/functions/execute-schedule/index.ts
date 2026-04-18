@@ -120,6 +120,14 @@ async function generateArticle(
 
 // ── Brand Context Loader ────────────────────────────────────────────
 
+/**
+ * Build the same brand context that ChatLayout/SparkChat inject for chat+generate
+ * mode. Mirrors src/store/memoryStore.ts buildIdentityContext + buildPreferenceContext:
+ *   1. Prefer brand_profile.brandDoc (Markdown source of truth)
+ *   2. Fall back to legacy structured identity fields when brandDoc is empty
+ *   3. Append visual identity (colors / fonts) when present
+ *   4. Append all preference rules (generate mode includes unconfirmed rules)
+ */
 async function loadBrandContext(
   admin: ReturnType<typeof createClient>,
   userId: string | null,
@@ -137,23 +145,84 @@ async function loadBrandContext(
 
     const sections: string[] = [];
 
-    // Identity
+    // ── Identity layer ──────────────────────────────────────────────
     const identity = data.filter((r: { layer: string }) => r.layer === "identity");
-    if (identity.length > 0) {
-      const idLines = identity.map((r: { category: string; content: Record<string, unknown> }) => {
-        const val = r.content?.value ?? r.content?.values ?? "";
-        return `${r.category}: ${typeof val === "string" ? val : JSON.stringify(val)}`;
-      });
-      sections.push("【品牌身份】\n" + idLines.join("\n"));
+    const brandProfileRow = identity.find(
+      (r: { category: string }) => r.category === "brand_profile",
+    );
+    const profileContent = (brandProfileRow?.content ?? {}) as Record<string, unknown>;
+    const brandDoc = typeof profileContent.brandDoc === "string"
+      ? (profileContent.brandDoc as string).trim()
+      : "";
+
+    const idParts: string[] = [];
+    if (brandDoc.length > 0) {
+      idParts.push(brandDoc);
+    } else if (brandProfileRow) {
+      // Legacy structured fallback
+      const legacyLines: string[] = [];
+      const push = (label: string, key: string) => {
+        const v = profileContent[key];
+        if (typeof v === "string" && v.trim()) legacyLines.push(`${label}: ${v.trim()}`);
+      };
+      push("品牌名", "brandName");
+      push("行业", "industry");
+      push("主营业务", "mainBusiness");
+      push("目标客户", "targetCustomer");
+      push("差异化", "differentiation");
+      push("语气", "toneOfVoice");
+      const kw = profileContent.keywords;
+      if (Array.isArray(kw) && kw.length > 0) legacyLines.push(`关键词: ${kw.join("、")}`);
+      const taboo = profileContent.tabooWords;
+      if (Array.isArray(taboo) && taboo.length > 0) legacyLines.push(`禁用词: ${taboo.join("、")}`);
+      if (legacyLines.length > 0) legacyLines.unshift("【品牌档案】"), idParts.push(legacyLines.join("\n"));
     }
 
-    // Preferences
+    // Visual identity (colors / fonts) — useful even when brandDoc covers text
+    const visual = profileContent.visualIdentity as Record<string, unknown> | undefined;
+    if (visual && typeof visual === "object") {
+      const visualLines: string[] = [];
+      const colors = visual.colors as Record<string, string> | undefined;
+      if (colors) {
+        const colorPairs = Object.entries(colors)
+          .filter(([, v]) => typeof v === "string" && v)
+          .map(([k, v]) => `${k}=${v}`);
+        if (colorPairs.length > 0) visualLines.push(`品牌色: ${colorPairs.join(", ")}`);
+      }
+      const fonts = visual.fonts;
+      if (Array.isArray(fonts) && fonts.length > 0) {
+        visualLines.push(`字体: ${fonts.join(", ")}`);
+      }
+      if (visualLines.length > 0) {
+        idParts.push("【视觉识别】\n" + visualLines.join("\n"));
+      }
+    }
+
+    // Extra identity entries beyond brand_profile (brand_story, visual_identity)
+    const extraIdentity = identity.filter(
+      (r: { category: string }) => r.category !== "brand_profile",
+    );
+    for (const row of extraIdentity) {
+      const c = (row as { content: Record<string, unknown> }).content ?? {};
+      const val = c.value ?? c.text ?? "";
+      const text = typeof val === "string" ? val.trim() : JSON.stringify(val);
+      if (text) idParts.push(`【${(row as { category: string }).category}】\n${text}`);
+    }
+
+    if (idParts.length > 0) sections.push(idParts.join("\n\n"));
+
+    // ── Preference layer (generate mode: include all rules) ─────────
     const prefs = data.filter((r: { layer: string }) => r.layer === "preference");
     if (prefs.length > 0) {
-      const prefLines = prefs.map((r: { content: Record<string, unknown> }) => {
-        return `• ${(r.content as { rule?: string })?.rule ?? JSON.stringify(r.content)}`;
-      });
-      sections.push("【写作偏好】\n" + prefLines.join("\n"));
+      const prefLines = prefs
+        .map((r: { content: Record<string, unknown> }) => {
+          const rule = (r.content as { rule?: string })?.rule;
+          return typeof rule === "string" && rule.trim() ? `• ${rule.trim()}` : null;
+        })
+        .filter((x): x is string => x !== null);
+      if (prefLines.length > 0) {
+        sections.push("【写作偏好】\n" + prefLines.join("\n"));
+      }
     }
 
     return sections.join("\n\n");
