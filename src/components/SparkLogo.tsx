@@ -1,18 +1,20 @@
 /**
- * SparkLogo —— 极简火焰 🔥
+ * SparkLogo —— 实心火苗剪影 + 右上角小星点
  *
- * 单一火焰路径，品牌橘色渐变，无星星装饰。
- * 设计原则：够简洁放在 16px favicon 里也能辨认。
+ * 方案 B：参考 Firecrawl 的极简实心火苗剪影（单一封闭路径、纯色填充、
+ * 厚重轮廓），同时在右上角增加一颗小四角星，呼应「Spark / 火花」的
+ * 命名双关，与 Firecrawl 形成识别度差异。
  *
- * - gradient=true  → 品牌橘色渐变 (#FF8C42 → #FF5E1A)
- * - gradient=false → currentColor 单色（跟随父级颜色）
+ * - gradient=true 时使用品牌橘色线性渐变（用于深色/橘色圆底）
+ * - gradient=false 时使用 currentColor，由父级颜色继承（如 text-white）
+ * - 不再使用中心高光圆点
  */
 type Props = {
   size?: number;
   className?: string;
-  /** 使用品牌橘色渐变填充。false 时用 currentColor */
+  /** 是否使用品牌橘色渐变填充。false 时使用 currentColor 单色 */
   gradient?: boolean;
-  /** 渐变 id 前缀（同页面多实例避免冲突） */
+  /** gradient=true 时使用的渐变 id 前缀（同页面多实例避免冲突） */
   idPrefix?: string;
 };
 
@@ -29,7 +31,7 @@ export default function SparkLogo({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
@@ -37,29 +39,50 @@ export default function SparkLogo({
     >
       {gradient && (
         <defs>
-          <linearGradient id={gid} x1="10" y1="2" x2="22" y2="30" gradientUnits="userSpaceOnUse">
+          <linearGradient id={gid} x1="20" y1="6" x2="44" y2="60" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#FF8C42" />
-            <stop offset="100%" stopColor="#FF5E1A" />
+            <stop offset="100%" stopColor="#FF6B1A" />
           </linearGradient>
         </defs>
       )}
 
       {/*
-        火焰主体 — 一笔成型
-        外轮廓圆润饱满，左侧中段带内凹小火舌，
-        整体向右微倾，表达跃动感。
+        主体火苗：单一封闭路径
+        - 顶端尖头自 (28,6) 起笔，整体略向左偏给右上角星点留位
+        - 右侧曲线饱满外扩，底部圆润内收
+        - 左侧中段带一个内凹小火苗，营造火焰跳动感
       */}
       <path
         d="
-          M 16 2
-          C 16 2, 12 10, 12 14
-          C 12 15.5, 13 17, 14 17
-          C 14.5 17, 15 16, 14.5 14.5
-          C 14 13, 15 11, 16 9
-          C 17 11, 22 15, 22 21
-          C 22 26.5, 17.5 30, 14 30
-          C 8 30, 6 24, 6 20
-          C 6 14, 12 8, 16 2
+          M 28 6
+          C 32 18, 44 24, 46 38
+          C 48 50, 40 60, 28 60
+          C 16 60, 8 52, 9 41
+          C 10 34, 15 30, 18 32
+          C 20 33, 20 36, 19 38
+          C 18 40, 19 42, 21 42
+          C 26 42, 28 36, 26 28
+          C 24 20, 26 12, 28 6
+          Z
+        "
+        fill={fill}
+      />
+
+      {/*
+        右上角小四角星 —— 呼应「Spark / 火花」双关
+        以 (52,14) 为中心，四个尖角向外延伸，构成菱形十字星。
+        尺寸约为主火苗的 1/4，作为点缀不喧宾夺主。
+      */}
+      <path
+        d="
+          M 52 4
+          L 54 12
+          L 62 14
+          L 54 16
+          L 52 24
+          L 50 16
+          L 42 14
+          L 50 12
           Z
         "
         fill={fill}
