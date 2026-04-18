@@ -145,9 +145,16 @@ export const clearLoginFailures = createServerFn({ method: 'POST' })
   }))
   .handler(async ({ data }): Promise<{ success: boolean }> => {
     if (!data.email) return { success: true };
-    await supabaseAdmin
-      .from('login_attempts')
-      .delete()
-      .eq('email', data.email);
-    return { success: true };
+    try {
+      await supabaseAdmin
+        .from('login_attempts')
+        .delete()
+        .eq('email', data.email);
+      return { success: true };
+    } catch (err) {
+      if (isMissingAdminKeyError(err)) {
+        return { success: true };
+      }
+      throw err;
+    }
   });
