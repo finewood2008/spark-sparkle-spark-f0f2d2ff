@@ -7,6 +7,8 @@ import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
+import { useMemoryV2 } from '@/hooks/useMemoryV2';
+import { useMemoryStore } from '@/store/memoryStore';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY as SUPABASE_KEY } from '@/lib/env';
 
 interface ContentCardProps {
@@ -96,6 +98,9 @@ function InlineActionError({
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
   const { contents, setContents, setLearnings, addMessage } = useAppStore();
+  // v2 memory learning — extracts preference rules from edit diffs
+  const { learnFromEdit } = useMemoryV2();
+  const memoryV2Enabled = useMemoryStore((s) => s.memoryEnabled);
   // Use live item from store if available, fall back to prop
   const item = contents.find(c => c.id === itemProp.id) || itemProp;
   const [expanded, setExpanded] = useState(false);
@@ -427,7 +432,23 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       const diff = Math.abs(editContent.length - originalContent.length);
       const ratio = diff / Math.max(originalContent.length, 1);
       if (ratio > 0.05 || editContent !== originalContent) {
+        // v1 learning (legacy analyze-edit → learning_entries)
         learnFromEdits(originalContent, editContent);
+        // v2 learning (learn-from-edit → memories.preference) — fire & forget
+        if (memoryV2Enabled) {
+          learnFromEdit(originalContent, editContent, item.title).then((rules) => {
+            if (rules.length > 0) {
+              addMessage({
+                id: `memv2-learn-${Date.now()}`,
+                role: 'assistant',
+                content: `✨ 记忆 v2 从你的编辑中学到了：\n${rules
+                  .map((r) => `• ${r.rule}`)
+                  .join('\n')}\n\n前往「火花记忆 → 偏好规则」可以逐条确认后启用。`,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          });
+        }
       }
     }
     setOriginalContent(editContent);

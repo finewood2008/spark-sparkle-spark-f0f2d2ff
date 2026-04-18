@@ -386,6 +386,70 @@ export function useMemoryV2() {
   );
 
   // -----------------------------------------------------------------------
+  // learnFromEdit — call the learn-from-edit Edge Function
+  //   Extracts preference rules from the diff between AI-generated original
+  //   and user-edited content. The Edge Function writes rules to the
+  //   memories table (preference layer, confirmed=false). This is a
+  //   background learning op — callers should treat it as fire-and-forget
+  //   and never block the UI on its result.
+  // -----------------------------------------------------------------------
+  const learnFromEdit = useCallback(
+    async (
+      original: string,
+      edited: string,
+      contextTitle?: string,
+    ): Promise<{ rule: string; category: string; confidence: number }[]> => {
+      const userId = getUserId();
+      if (!userId) return [];
+      if (original === edited) return [];
+      if (original.length < 10 || edited.length < 10) return [];
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        if (!accessToken) return [];
+
+        const response = await fetch(functionsUrl('learn-from-edit'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ original, edited, contextTitle }),
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          console.warn(
+            `[useMemoryV2] learn-from-edit failed (${response.status}):`,
+            body,
+          );
+          return [];
+        }
+
+        const result = await response.json();
+        const rules = (result.rules ?? []) as {
+          rule: string;
+          category: string;
+          confidence: number;
+        }[];
+
+        if (rules.length > 0) {
+          // Reload so the new preference rules show up in the memory panel
+          await loadMemories();
+        }
+
+        return rules;
+      } catch (err) {
+        console.warn('[useMemoryV2] learnFromEdit error:', err);
+        return [];
+      }
+    },
+    [loadMemories],
+  );
+
+  // -----------------------------------------------------------------------
   // reloadMemories — public method to force a full reload
   // -----------------------------------------------------------------------
   const reloadMemories = useCallback(async () => {
@@ -425,5 +489,6 @@ export function useMemoryV2() {
     reloadMemories,
     persistEntry,
     persistAll,
+    learnFromEdit,
   };
 }

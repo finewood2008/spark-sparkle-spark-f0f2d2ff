@@ -1,8 +1,36 @@
 // Shared AI utilities for Lovable AI Gateway via Supabase edge functions
 import { loadUserPrefs } from './user-prefs';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY as SUPABASE_KEY } from './env';
+import { useMemoryStore } from '@/store/memoryStore';
 
 type Msg = { role: 'user' | 'assistant' | 'system'; content: string };
+
+/**
+ * Resolve the brand/memory context string for a given AI call mode.
+ *
+ * Precedence:
+ *   1. An explicit `brandContext` from the caller wins (ChatLayout already
+ *      composes its own v2 context upstream — don't double-inject).
+ *   2. Otherwise pull from the v2 memoryStore using mode-specific rules:
+ *        - chat     → identity + confirmed preferences + context facts
+ *        - generate → identity + all preferences (including unconfirmed,
+ *                     because draft tone should reflect auto-learned rules)
+ *        - analyze  → minimal brand identity only
+ *   3. Returns undefined when v2 is disabled or empty, preserving the
+ *      legacy no-context behavior for unauthenticated flows.
+ */
+function resolveBrandContext(
+  mode: 'chat' | 'generate' | 'analyze',
+  explicit?: string,
+): string | undefined {
+  if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+  try {
+    const v2 = useMemoryStore.getState().getFullContext(mode);
+    return v2 && v2.trim().length > 0 ? v2 : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function streamChat({
   messages,
@@ -22,13 +50,20 @@ export async function streamChat({
   onError?: (error: string) => void;
 }) {
   const presetId = loadUserPrefs().tonePreset;
+  const effectiveBrandContext = resolveBrandContext(mode, brandContext);
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${SUPABASE_KEY}`,
     },
-    body: JSON.stringify({ messages, mode, platform, brandContext, presetId }),
+    body: JSON.stringify({
+      messages,
+      mode,
+      platform,
+      brandContext: effectiveBrandContext,
+      presetId,
+    }),
   });
 
   if (!resp.ok) {
@@ -60,13 +95,22 @@ export async function streamEdit({
   onDone: () => void;
   onError?: (error: string) => void;
 }) {
+  // streamEdit handles selection-level rewrites (polish/rewrite/expand/shorten).
+  // We treat these as 'generate' mode so auto-learned preferences apply.
+  const effectiveBrandContext = resolveBrandContext('generate', brandContext);
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-edit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${SUPABASE_KEY}`,
     },
-    body: JSON.stringify({ action, text, fullContent, platform, brandContext }),
+    body: JSON.stringify({
+      action,
+      text,
+      fullContent,
+      platform,
+      brandContext: effectiveBrandContext,
+    }),
   });
 
   if (!resp.ok) {
