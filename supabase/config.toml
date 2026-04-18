@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.analyze-sources]
 verify_jwt = false
+
+[functions.execute-schedule]
+verify_jwt = false

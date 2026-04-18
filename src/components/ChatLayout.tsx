@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +8,7 @@ import SparkChat from './SparkChat';
 import DraftDrawer from './DraftDrawer';
 import MemoryPanel from './MemoryPanel';
 import SettingsPage from '../pages/SettingsPage';
+import SchedulePage from '../pages/SchedulePage';
 import ReviewPage from '../pages/ReviewPage';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -31,6 +32,7 @@ export default function ChatLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
   const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
@@ -186,6 +188,18 @@ export default function ChatLayout() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                onClick={() => setScheduleOpen(true)}
+                aria-label="自动任务"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
+              >
+                <Zap size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">自动任务</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
                 onClick={() => setProfileOpen(true)}
                 aria-label="火花记忆"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
@@ -262,6 +276,18 @@ export default function ChatLayout() {
           </div>
           <div className="flex-1 overflow-hidden">
             <ReviewPage embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Schedule task drawer */}
+      <Sheet open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <SheetContent side="right" className="w-full max-w-md p-0 bg-[#FAFAF8] flex flex-col">
+          <SheetHeader className="sr-only">
+            <SheetTitle>自动任务</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <SchedulePage />
           </div>
         </SheetContent>
       </Sheet>
