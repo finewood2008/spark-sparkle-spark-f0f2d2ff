@@ -1,26 +1,135 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save } from 'lucide-react';
+import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save, ImageOff } from 'lucide-react';
 import { useMemoryStore } from '@/store/memoryStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
-import type { BrandProfile, AnalysisResult } from '@/types/memory';
+import type { BrandProfile, AnalysisResult, VisualIdentity } from '@/types/memory';
 import { toast } from 'sonner';
 
 const emptyProfile: BrandProfile = {
-  brandName: '',
-  industry: '',
-  mainBusiness: '',
-  targetCustomer: '',
-  differentiation: '',
-  toneOfVoice: '',
-  keywords: [],
-  tabooWords: [],
-  brandStory: '',
+  brandDoc: '',
+  visualIdentity: {},
   sourceUrls: [],
   initialized: false,
 };
 
-const fieldClass =
+const EMPTY_DOC_TEMPLATE = `# 品牌名称
+
+## 一句话定位 / Positioning
+
+
+## 主营业务 / Main Business
+
+
+## 目标客户 / Target Customer
+
+
+## 差异化价值 / Differentiation
+
+
+## 语气风格 / Tone of Voice
+
+
+## 品牌关键词 / Keywords
+- 
+
+## 禁用词 / Words to Avoid
+- 无
+
+## 品牌故事 / Brand Story
+
+`;
+
+const inputClass =
   'w-full text-[13px] text-[#333] border border-[#E5E4E2] rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white transition-colors placeholder:text-[#CCC]';
+
+function VisualAssetGrid({ visual }: { visual: VisualIdentity }) {
+  const hasAnything =
+    visual.logo ||
+    visual.favicon ||
+    visual.ogImage ||
+    visual.colors ||
+    visual.fonts?.length;
+
+  if (!hasAnything) return null;
+
+  const colorEntries = visual.colors
+    ? Object.entries(visual.colors).filter(([, v]) => typeof v === 'string' && v)
+    : [];
+
+  return (
+    <section className="border border-[#E5E4E2] rounded-2xl p-3 bg-white space-y-3">
+      <div className="text-[12px] font-medium text-[#666]">视觉资产 / Visual Identity</div>
+
+      {/* Images row */}
+      {(visual.logo || visual.favicon || visual.ogImage) && (
+        <div className="grid grid-cols-3 gap-2">
+          {(['logo', 'favicon', 'ogImage'] as const).map((key) => {
+            const url = visual[key];
+            return (
+              <div key={key} className="space-y-1">
+                <div className="text-[10px] text-[#999] uppercase tracking-wide">{key}</div>
+                <div className="aspect-square border border-[#F0EFED] rounded-lg flex items-center justify-center bg-[#FAFAF8] overflow-hidden">
+                  {url ? (
+                    <img
+                      src={url}
+                      alt={key}
+                      className="max-w-full max-h-full object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <ImageOff size={16} className="text-[#CCC]" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Colors */}
+      {colorEntries.length > 0 && (
+        <div>
+          <div className="text-[10px] text-[#999] uppercase tracking-wide mb-1">Colors</div>
+          <div className="flex flex-wrap gap-1.5">
+            {colorEntries.map(([name, hex]) => (
+              <div
+                key={name}
+                className="flex items-center gap-1.5 border border-[#F0EFED] rounded-md px-1.5 py-1"
+                title={`${name}: ${hex}`}
+              >
+                <div
+                  className="w-4 h-4 rounded border border-[#E5E4E2]"
+                  style={{ background: hex as string }}
+                />
+                <span className="text-[10px] text-[#666] font-mono">{hex as string}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fonts */}
+      {visual.fonts && visual.fonts.length > 0 && (
+        <div>
+          <div className="text-[10px] text-[#999] uppercase tracking-wide mb-1">Fonts</div>
+          <div className="flex flex-wrap gap-1">
+            {visual.fonts.map((f) => (
+              <span
+                key={f}
+                className="text-[11px] px-2 py-0.5 bg-[#F0EFED] text-[#666] rounded"
+                style={{ fontFamily: f }}
+              >
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function BrandProfileTab() {
   const brandProfile = useMemoryStore((s) => s.brandProfile);
@@ -32,12 +141,9 @@ export function BrandProfileTab() {
 
   const [urlInput, setUrlInput] = useState('');
   const [form, setForm] = useState<BrandProfile>(brandProfile ?? emptyProfile);
-  const [keywordInput, setKeywordInput] = useState('');
-  const [tabooInput, setTabooInput] = useState('');
   const [dirty, setDirty] = useState(false);
   const [analysisPreview, setAnalysisPreview] = useState<AnalysisResult | null>(null);
 
-  // sync when profile loads
   useEffect(() => {
     if (brandProfile) {
       setForm(brandProfile);
@@ -48,18 +154,6 @@ export function BrandProfileTab() {
   const update = (patch: Partial<BrandProfile>) => {
     setForm((f) => ({ ...f, ...patch }));
     setDirty(true);
-  };
-
-  const addKeyword = () => {
-    const k = keywordInput.trim();
-    if (k && !form.keywords.includes(k)) update({ keywords: [...form.keywords, k] });
-    setKeywordInput('');
-  };
-
-  const addTaboo = () => {
-    const t = tabooInput.trim();
-    if (t && !form.tabooWords.includes(t)) update({ tabooWords: [...form.tabooWords, t] });
-    setTabooInput('');
   };
 
   const normalizeUrl = (raw: string): string => {
@@ -84,14 +178,12 @@ export function BrandProfileTab() {
   };
 
   const handleAnalyze = async () => {
-    // If user typed a URL but didn't click "添加", add it automatically
     const normalized = normalizeUrl(urlInput);
     if (normalized && !sourceUrls.some((s) => s.url === normalized)) {
       addSourceUrl({ url: normalized, status: 'pending' });
       setUrlInput('');
     }
 
-    // Re-read store after potential auto-add (use setTimeout to let state settle)
     await new Promise((r) => setTimeout(r, 0));
     const currentUrls = useMemoryStore.getState().sourceUrls;
     const pending = currentUrls.filter((s) => s.status === 'pending' || s.status === 'error');
@@ -118,77 +210,69 @@ export function BrandProfileTab() {
   };
 
   const handleManualSave = async () => {
-    // Build an AnalysisResult-shape from form and save
     const result: AnalysisResult = {
-      brandName: form.brandName,
-      industry: form.industry,
-      mainBusiness: form.mainBusiness,
-      targetCustomer: form.targetCustomer,
-      differentiation: form.differentiation,
-      toneOfVoice: form.toneOfVoice,
-      keywords: form.keywords,
-      tabooWords: form.tabooWords,
-      brandStory: form.brandStory ?? '',
+      brandDoc: form.brandDoc,
+      visualIdentity: form.visualIdentity,
       writingPatterns: [],
     };
     await saveAnalysisResult(result);
     setDirty(false);
-    toast.success('品牌档案已手动保存');
+    toast.success('品牌档案已保存');
   };
 
+  const docValue = form.brandDoc || '';
+  const showTemplate = !docValue && !brandProfile?.initialized;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ============= Firecrawl URL 分析区 ============= */}
       <section className="border border-[#E5E4E2] rounded-2xl p-4 bg-gradient-to-br from-orange-50/50 to-white">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <Sparkles size={16} className="text-orange-500" />
-          <h3 className="text-[15px] font-medium text-[#333]">从网页自动分析品牌</h3>
+          <h3 className="text-[14px] font-medium text-[#333]">从网页自动生成品牌档案</h3>
         </div>
-        <p className="text-[12px] text-[#999] mb-3">
-          输入你的官网、小红书/抖音主页或公众号文章链接，AI 会抓取并提炼品牌档案与写作偏好
+        <p className="text-[11px] text-[#999] mb-3">
+          输入官网或主页链接，AI 会抓取内容、LOGO、品牌色，生成可编辑的 Markdown 档案
         </p>
 
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-2">
           <input
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
-            placeholder="www.example.com 或 https://..."
-            className={fieldClass}
+            placeholder="www.example.com"
+            className={inputClass}
           />
           <button
             onClick={handleAddUrl}
-            className="px-4 py-2 bg-white border border-[#E5E4E2] rounded-xl text-[13px] text-[#666] hover:bg-[#F0EFED] transition-colors whitespace-nowrap"
+            className="px-3 py-2 bg-white border border-[#E5E4E2] rounded-xl text-[12px] text-[#666] hover:bg-[#F0EFED] transition-colors whitespace-nowrap"
           >
-            <Plus size={14} className="inline mr-1" />
+            <Plus size={12} className="inline mr-0.5" />
             添加
           </button>
         </div>
 
-        {/* URL 列表 */}
         {sourceUrls.length > 0 && (
-          <div className="space-y-1.5 mb-3">
+          <div className="space-y-1 mb-2">
             {sourceUrls.map((s) => (
               <div
                 key={s.url}
-                className="flex items-center gap-2 text-[12px] bg-white rounded-lg px-3 py-1.5 border border-[#F0EFED]"
+                className="flex items-center gap-2 text-[11px] bg-white rounded-lg px-2.5 py-1 border border-[#F0EFED]"
               >
-                {s.status === 'fetching' && (
-                  <Loader2 size={12} className="text-orange-500 animate-spin" />
-                )}
-                {s.status === 'done' && <CheckCircle2 size={12} className="text-green-500" />}
-                {s.status === 'error' && <AlertCircle size={12} className="text-red-500" />}
-                {s.status === 'pending' && <Globe size={12} className="text-[#999]" />}
+                {s.status === 'fetching' && <Loader2 size={11} className="text-orange-500 animate-spin" />}
+                {s.status === 'done' && <CheckCircle2 size={11} className="text-green-500" />}
+                {s.status === 'error' && <AlertCircle size={11} className="text-red-500" />}
+                {s.status === 'pending' && <Globe size={11} className="text-[#999]" />}
                 <span className="flex-1 truncate text-[#666]" title={s.url}>
                   {s.url}
                 </span>
-                {s.error && <span className="text-red-500 text-[11px]">{s.error}</span>}
+                {s.error && <span className="text-red-500 text-[10px]">{s.error}</span>}
                 <button
                   onClick={() => removeSourceUrl(s.url)}
                   className="text-[#CCC] hover:text-red-500 transition-colors"
                   aria-label="移除"
                 >
-                  <X size={12} />
+                  <X size={11} />
                 </button>
               </div>
             ))}
@@ -197,8 +281,8 @@ export function BrandProfileTab() {
 
         <button
           onClick={handleAnalyze}
-          disabled={isAnalyzing || (sourceUrls.length === 0 && !/^https?:\/\//i.test(urlInput.trim()))}
-          className="w-full py-2.5 bg-gradient-to-r from-orange-400 to-orange-500 text-white rounded-xl text-[13px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
+          disabled={isAnalyzing || (sourceUrls.length === 0 && !/^https?:\/\//i.test(normalizeUrl(urlInput)))}
+          className="w-full py-2 bg-gradient-to-r from-orange-400 to-orange-500 text-white rounded-xl text-[13px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
         >
           {isAnalyzing ? (
             <>
@@ -211,29 +295,22 @@ export function BrandProfileTab() {
           )}
         </button>
 
-        {/* 分析结果预览 */}
         {analysisPreview && (
-          <div className="mt-4 border border-orange-200 rounded-xl p-3 bg-orange-50/50">
-            <div className="text-[13px] font-medium text-[#333] mb-2">分析结果预览</div>
-            <div className="text-[12px] text-[#666] space-y-1">
-              <div>
-                <span className="text-[#999]">品牌：</span>
-                {analysisPreview.brandName}
-              </div>
-              <div>
-                <span className="text-[#999]">行业：</span>
-                {analysisPreview.industry}
-              </div>
-              <div>
-                <span className="text-[#999]">语气：</span>
-                {analysisPreview.toneOfVoice}
-              </div>
-              <div>
-                <span className="text-[#999]">写作模式：</span>
-                {analysisPreview.writingPatterns.length} 条
-              </div>
+          <div className="mt-3 border border-orange-200 rounded-xl p-3 bg-orange-50/50 space-y-2">
+            <div className="text-[12px] font-medium text-[#333]">分析结果预览</div>
+            <div className="text-[11px] text-[#666] max-h-32 overflow-auto whitespace-pre-wrap font-mono leading-relaxed">
+              {analysisPreview.brandDoc.slice(0, 600)}
+              {analysisPreview.brandDoc.length > 600 ? '...' : ''}
             </div>
-            <div className="flex gap-2 mt-3">
+            <div className="text-[11px] text-[#999]">
+              视觉资产：
+              {analysisPreview.visualIdentity.logo ? '✓ LOGO ' : ''}
+              {analysisPreview.visualIdentity.favicon ? '✓ Favicon ' : ''}
+              {analysisPreview.visualIdentity.colors ? '✓ 品牌色 ' : ''}
+              {analysisPreview.visualIdentity.fonts?.length ? '✓ 字体 ' : ''}
+              · 写作偏好 {analysisPreview.writingPatterns.length} 条
+            </div>
+            <div className="flex gap-2">
               <button
                 onClick={handleSaveAnalysis}
                 className="flex-1 py-1.5 bg-orange-500 text-white rounded-lg text-[12px] hover:bg-orange-600 transition-colors"
@@ -251,10 +328,13 @@ export function BrandProfileTab() {
         )}
       </section>
 
-      {/* ============= 手动编辑区（紧凑版） ============= */}
-      <section className="space-y-3">
+      {/* ============= 视觉资产预览 ============= */}
+      <VisualAssetGrid visual={form.visualIdentity} />
+
+      {/* ============= 品牌档案 Markdown 编辑器 ============= */}
+      <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-medium text-[#333]">手动编辑品牌档案</h3>
+          <h3 className="text-[14px] font-medium text-[#333]">品牌档案（Markdown）</h3>
           {dirty && (
             <button
               onClick={handleManualSave}
@@ -264,149 +344,18 @@ export function BrandProfileTab() {
             </button>
           )}
         </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌名称</label>
-            <input
-              value={form.brandName}
-              onChange={(e) => update({ brandName: e.target.value })}
-              className={fieldClass}
-              placeholder="火花工作室"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">所属行业</label>
-            <input
-              value={form.industry}
-              onChange={(e) => update({ industry: e.target.value })}
-              className={fieldClass}
-              placeholder="美妆护肤"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">主营业务</label>
-          <textarea
-            value={form.mainBusiness}
-            onChange={(e) => update({ mainBusiness: e.target.value })}
-            className={`${fieldClass} resize-none h-[52px]`}
-            placeholder="主营业务和核心产品..."
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">目标客户</label>
-            <textarea
-              value={form.targetCustomer}
-              onChange={(e) => update({ targetCustomer: e.target.value })}
-              className={`${fieldClass} resize-none h-[52px]`}
-              placeholder="如：25-35岁都市白领"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-medium text-[#999] mb-0.5 block">差异化价值</label>
-            <textarea
-              value={form.differentiation}
-              onChange={(e) => update({ differentiation: e.target.value })}
-              className={`${fieldClass} resize-none h-[52px]`}
-              placeholder="为什么选你而非竞品？"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">语气风格</label>
-          <input
-            value={form.toneOfVoice}
-            onChange={(e) => update({ toneOfVoice: e.target.value })}
-            className={fieldClass}
-            placeholder="如：亲切、专业、略带幽默"
-          />
-        </div>
-
-        {/* 关键词 */}
-        <div>
-          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌关键词</label>
-          <div className="flex gap-1.5 mb-1.5">
-            <input
-              value={keywordInput}
-              onChange={(e) => setKeywordInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
-              className={fieldClass}
-              placeholder="回车添加"
-            />
-            <button
-              onClick={addKeyword}
-              className="px-2.5 py-1.5 bg-white border border-[#E5E4E2] rounded-lg text-[12px] text-[#666] hover:bg-[#F0EFED] transition-colors"
-            >
-              <Plus size={12} />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {form.keywords.map((k) => (
-              <span
-                key={k}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[11px]"
-              >
-                {k}
-                <button
-                  onClick={() => update({ keywords: form.keywords.filter((x) => x !== k) })}
-                  className="text-orange-400 hover:text-orange-700"
-                >
-                  <X size={9} />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* 禁用词 */}
-        <div>
-          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">禁用词</label>
-          <div className="flex gap-1.5 mb-1.5">
-            <input
-              value={tabooInput}
-              onChange={(e) => setTabooInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTaboo())}
-              className={fieldClass}
-              placeholder="要避免的词"
-            />
-            <button
-              onClick={addTaboo}
-              className="px-2.5 py-1.5 bg-white border border-[#E5E4E2] rounded-lg text-[12px] text-[#666] hover:bg-[#F0EFED] transition-colors"
-            >
-              <Plus size={12} />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {form.tabooWords.map((t) => (
-              <span
-                key={t}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-red-50 text-red-600 rounded text-[11px]"
-              >
-                {t}
-                <button
-                  onClick={() => update({ tabooWords: form.tabooWords.filter((x) => x !== t) })}
-                  className="text-red-400 hover:text-red-700"
-                >
-                  <X size={9} />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-medium text-[#999] mb-0.5 block">品牌故事（可选）</label>
-          <textarea
-            value={form.brandStory ?? ''}
-            onChange={(e) => update({ brandStory: e.target.value })}
-            className={`${fieldClass} resize-none h-[68px]`}
-            placeholder="品牌的由来、愿景、价值观..."
-          />
+        <p className="text-[11px] text-[#999]">
+          AI 抓取后会自动填入。也可以手动编辑——这段文本会作为品牌上下文注入到所有生成中。
+        </p>
+        <textarea
+          value={docValue}
+          onChange={(e) => update({ brandDoc: e.target.value })}
+          placeholder={showTemplate ? EMPTY_DOC_TEMPLATE : '点击「开始分析」自动生成，或手动输入品牌信息...'}
+          className={`${inputClass} font-mono text-[12px] leading-relaxed min-h-[400px] resize-y`}
+          spellCheck={false}
+        />
+        <div className="text-[10px] text-[#CCC] text-right">
+          {docValue.length} 字符
         </div>
       </section>
     </div>
