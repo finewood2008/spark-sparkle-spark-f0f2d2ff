@@ -195,82 +195,76 @@ function AuthPage() {
     navigate({ to: '/' });
   };
 
-  const handleSendOtp = async () => {
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail);
-    if (!emailOk) {
-      toast.error('请输入正确的邮箱');
+  const handleRegister = async () => {
+    const eErr = validateEmail(regEmail);
+    const pErr = validatePwd(regPwd);
+    setRegEmailErr(eErr);
+    setRegPwdErr(pErr);
+    if (eErr || pErr) return;
+    if (regPwd !== regConfirmPwd) {
+      setRegPwdErr('两次输入的密码不一致');
       return;
     }
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: regEmail,
-      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message || '验证码发送失败');
-      return;
-    }
-    setStep('otp');
-    setCountdown(60);
-    toast.success('验证码已发送，请查看邮箱');
-  };
 
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 6) {
-      toast.error('请输入 6 位验证码');
-      return;
-    }
     setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.signUp({
       email: regEmail,
-      token: otp,
-      type: 'email',
+      password: regPwd,
+      options: { emailRedirectTo: window.location.origin },
     });
-    setLoading(false);
+
     if (error || !data.user) {
-      toast.error(error?.message || '验证码错误或已过期');
-      return;
-    }
-    // 邮箱验证通过 — 进入设置密码步骤（此时已有 session，可调用 updateUser）
-    toast.success('邮箱验证成功，请设置登录密码');
-    setStep('password');
-  };
-
-  const handleSetPassword = async () => {
-    const pErr = validatePwd(newPwd);
-    if (pErr) {
-      toast.error(pErr);
-      return;
-    }
-    if (newPwd !== confirmPwd) {
-      toast.error('两次输入的密码不一致');
-      return;
-    }
-    setLoading(true);
-    const { data: updateData, error } = await supabase.auth.updateUser({
-      password: newPwd,
-    });
-    if (error || !updateData.user) {
       setLoading(false);
-      toast.error(error?.message || '密码设置失败，请重试');
+      const msg = error?.message?.toLowerCase() || '';
+      if (msg.includes('already') || msg.includes('registered')) {
+        setRegEmailErr('该邮箱已被注册，请直接登录');
+      } else {
+        toast.error(error?.message || '注册失败，请重试');
+      }
       return;
     }
-    // 拿到当前 session（verifyOtp 已建立）
-    const { data: sessionData } = await supabase.auth.getSession();
-    setLoading(false);
 
+    // 已开启 auto-confirm，signUp 直接返回 session，可立即登录
+    if (data.session) {
+      setLoading(false);
+      login(
+        {
+          id: data.user.id,
+          username: data.user.email?.split('@')[0] || 'user',
+          nickname: data.user.email?.split('@')[0] || '火花用户',
+          avatar: '',
+          email: data.user.email || undefined,
+        },
+        data.session.access_token,
+      );
+      toast.success('注册成功，欢迎加入火花！');
+      navigate({ to: '/' });
+      return;
+    }
+
+    // 兜底：若没有 session，尝试用密码登录一次
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+      email: regEmail,
+      password: regPwd,
+    });
+    setLoading(false);
+    if (signInErr || !signInData.user || !signInData.session) {
+      toast.success('注册成功，请前往登录');
+      setTab('login');
+      setLoginEmail(regEmail);
+      return;
+    }
     login(
       {
-        id: updateData.user.id,
-        username: updateData.user.email?.split('@')[0] || 'user',
-        nickname: updateData.user.email?.split('@')[0] || '火花用户',
+        id: signInData.user.id,
+        username: signInData.user.email?.split('@')[0] || 'user',
+        nickname: signInData.user.email?.split('@')[0] || '火花用户',
         avatar: '',
-        email: updateData.user.email || undefined,
+        email: signInData.user.email || undefined,
       },
-      sessionData.session?.access_token || '',
+      signInData.session.access_token,
     );
-    toast.success('注册完成，欢迎加入火花！');
+    toast.success('注册成功，欢迎加入火花！');
     navigate({ to: '/' });
   };
 
