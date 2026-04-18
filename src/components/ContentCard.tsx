@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem, LearningEntry } from '../types/spark';
 import { toast } from 'sonner';
@@ -55,6 +55,45 @@ function AIFloatingToolbar({
   );
 }
 
+function InlineActionError({
+  label,
+  message,
+  loading,
+  onRetry,
+  onDismiss,
+}: {
+  label: string;
+  message: string;
+  loading: boolean;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px]">
+      <AlertCircle size={14} className="mt-0.5 shrink-0 text-red-500" />
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-red-700">{label}失败</div>
+        <div className="text-red-600/90 break-words">{message}</div>
+      </div>
+      <button
+        onClick={onRetry}
+        disabled={loading}
+        className="shrink-0 inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+      >
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+        重试
+      </button>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 p-1 text-red-400 hover:text-red-600 transition-colors"
+        aria-label="关闭"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  );
+}
+
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
   const { contents, setContents, setLearnings, addMessage } = useAppStore();
   // Use live item from store if available, fall back to prop
@@ -74,6 +113,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  type ActionKey = 'cover' | 'polish' | 'title';
+  const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
+  const setActionError = (key: ActionKey, msg: string | null) =>
+    setActionErrors(prev => {
+      const next = { ...prev };
+      if (msg) next[key] = msg; else delete next[key];
+      return next;
+    });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +257,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     const textToPolish = editing ? editContent : item.content;
     if (!textToPolish.trim()) return;
 
+    setActionError('polish', null);
     setUndoStack(prev => [...prev, editing ? editContent : item.content]);
     setAiLoading('polish');
     if (!editing) {
@@ -225,12 +273,17 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       platform: item.platform,
       onDelta: (chunk) => { result += chunk; },
       onDone: () => {
+        if (!result.trim()) {
+          setActionError('polish', 'AI 没有返回内容，请重试');
+          setAiLoading(null);
+          return;
+        }
         setEditContent(result);
         setAiLoading(null);
         toast.success('AI 润色完成');
       },
       onError: (err) => {
-        toast.error(err);
+        setActionError('polish', err || '润色失败');
         setAiLoading(null);
       },
     });
@@ -245,6 +298,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   };
 
   const handleGenerateCover = async () => {
+    setActionError('cover', null);
     setCoverLoading(true);
     try {
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-cover`, {
@@ -262,7 +316,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: '生成失败' }));
-        toast.error(err.error || '配图生成失败');
+        setActionError('cover', err.error || '配图生成失败，请重试');
         setCoverLoading(false);
         return;
       }
@@ -277,14 +331,15 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         setContents(updated);
         toast.success('配图生成成功！');
       } else {
-        toast.error('未能生成配图，请重试');
+        setActionError('cover', '未能生成配图，请重试');
       }
     } catch {
-      toast.error('配图生成失败');
+      setActionError('cover', '网络异常，配图生成失败');
     }
     setCoverLoading(false);
   };
   const handleRegenerateTitle = async () => {
+    setActionError('title', null);
     setTitleLoading(true);
     try {
       const currentContent = editing ? editContent : item.content;
@@ -302,7 +357,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       });
 
       if (!resp.ok) {
-        toast.error('标题生成失败');
+        setActionError('title', '标题生成失败，请重试');
         setTitleLoading(false);
         return;
       }
@@ -342,10 +397,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         setContents(updated);
         toast.success('标题已更新');
       } else {
-        toast.error('未能生成新标题');
+        setActionError('title', '未能生成新标题，请重试');
       }
     } catch {
-      toast.error('标题生成失败');
+      setActionError('title', '网络异常，标题生成失败');
     }
     setTitleLoading(false);
   };
@@ -634,6 +689,39 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       {/* Non-edit CTA preview */}
       {!editing && item.cta && (
         <p className="text-[12px] text-[#999] italic mt-2">👉 {item.cta}</p>
+      )}
+
+      {/* Inline action errors with retry */}
+      {(actionErrors.cover || actionErrors.polish || actionErrors.title) && (
+        <div className="mt-3 space-y-1.5">
+          {actionErrors.cover && (
+            <InlineActionError
+              label="AI 配图"
+              message={actionErrors.cover}
+              loading={coverLoading}
+              onRetry={handleGenerateCover}
+              onDismiss={() => setActionError('cover', null)}
+            />
+          )}
+          {actionErrors.polish && (
+            <InlineActionError
+              label="润色"
+              message={actionErrors.polish}
+              loading={aiLoading === 'polish'}
+              onRetry={handlePolish}
+              onDismiss={() => setActionError('polish', null)}
+            />
+          )}
+          {actionErrors.title && (
+            <InlineActionError
+              label="生成标题"
+              message={actionErrors.title}
+              loading={titleLoading}
+              onRetry={handleRegenerateTitle}
+              onDismiss={() => setActionError('title', null)}
+            />
+          )}
+        </div>
       )}
 
       {/* Actions */}
