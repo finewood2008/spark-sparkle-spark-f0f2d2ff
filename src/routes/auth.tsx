@@ -145,25 +145,8 @@ function AuthPage() {
     if (eErr || pErr) return;
 
     setLoading(true);
-    // 1. 后端预检：邮箱/IP 是否已被锁
-    try {
-      const pre = await checkLoginLock({ data: { email: loginEmail } });
-      if (pre.locked) {
-        const until = Date.now() + pre.remainSec * 1000;
-        setLockUntil(until);
-        try {
-          localStorage.setItem(LOCK_KEY, JSON.stringify({ count: MAX_ATTEMPTS, until }));
-        } catch {}
-        const reasonText = pre.reason === 'ip' ? '该网络' : '该账号';
-        toast.error(`${reasonText}登录失败次数过多，请 ${pre.remainSec} 秒后再试`);
-        setLoading(false);
-        return;
-      }
-    } catch {
-      // 后端不可用时降级到前端 localStorage 限流
-    }
-
-    // 2. 真正登录
+    // 直接登录（去掉了登录前的后端预检 RPC，节省一次往返）
+    // 锁定保护依然由：前端 localStorage 兜底 + 失败时 recordLoginFailure 返回最新锁状态 来保证
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPwd,
