@@ -6,6 +6,23 @@ import {
   listDeviceTokens,
   revokeDeviceToken,
 } from '@/functions/device-tokens.functions';
+import { supabase } from '@/integrations/supabase/client';
+
+/** Get auth headers for TSS server functions (they don't auto-attach Supabase JWT). */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Convert a thrown Response (from middleware) into a readable Error message. */
+async function toReadableError(e: unknown): Promise<Error> {
+  if (e instanceof Response) {
+    const text = await e.text().catch(() => '');
+    return new Error(text || `请求失败 (${e.status})`);
+  }
+  return e instanceof Error ? e : new Error(String(e));
+}
 
 interface TokenRow {
   id: string;
