@@ -209,6 +209,54 @@ export type Database = {
         }
         Relationships: []
       }
+      memories: {
+        Row: {
+          category: string
+          confidence: number | null
+          content: Json
+          created_at: string | null
+          device_id: string | null
+          evidence: string | null
+          expires_at: string | null
+          id: string
+          layer: string
+          source: string | null
+          source_url: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          confidence?: number | null
+          content?: Json
+          created_at?: string | null
+          device_id?: string | null
+          evidence?: string | null
+          expires_at?: string | null
+          id?: string
+          layer: string
+          source?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          confidence?: number | null
+          content?: Json
+          created_at?: string | null
+          device_id?: string | null
+          evidence?: string | null
+          expires_at?: string | null
+          id?: string
+          layer?: string
+          source?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       review_items: {
         Row: {
           auto_generated: boolean
