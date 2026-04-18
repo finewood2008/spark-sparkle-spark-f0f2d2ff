@@ -78,8 +78,18 @@ export function BrandProfileTab() {
   };
 
   const handleAnalyze = async () => {
-    const pending = sourceUrls.filter((s) => s.status === 'pending' || s.status === 'error');
-    const urls = pending.length > 0 ? pending.map((s) => s.url) : sourceUrls.map((s) => s.url);
+    // If user typed a URL but didn't click "添加", add it automatically
+    const trimmed = urlInput.trim();
+    if (trimmed && /^https?:\/\//i.test(trimmed) && !sourceUrls.some((s) => s.url === trimmed)) {
+      addSourceUrl({ url: trimmed, status: 'pending' });
+      setUrlInput('');
+    }
+
+    // Re-read store after potential auto-add (use setTimeout to let state settle)
+    await new Promise((r) => setTimeout(r, 0));
+    const currentUrls = useMemoryStore.getState().sourceUrls;
+    const pending = currentUrls.filter((s) => s.status === 'pending' || s.status === 'error');
+    const urls = pending.length > 0 ? pending.map((s) => s.url) : currentUrls.map((s) => s.url);
     if (urls.length === 0) {
       toast.error('请先添加至少一个 URL');
       return;
@@ -181,7 +191,7 @@ export function BrandProfileTab() {
 
         <button
           onClick={handleAnalyze}
-          disabled={isAnalyzing || sourceUrls.length === 0}
+          disabled={isAnalyzing || (sourceUrls.length === 0 && !/^https?:\/\//i.test(urlInput.trim()))}
           className="w-full py-2.5 bg-gradient-to-r from-orange-400 to-orange-500 text-white rounded-xl text-[13px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
         >
           {isAnalyzing ? (
