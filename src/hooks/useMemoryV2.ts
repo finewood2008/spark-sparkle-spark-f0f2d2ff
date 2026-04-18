@@ -258,17 +258,10 @@ export function useMemoryV2() {
           analysis?: AnalysisResult;
         };
 
-        // Edge function returns { user_id, analysis, sources } with analysis already in camelCase
+        // Edge function returns { user_id, analysis, sources } with analysis already in v2 shape
         const result: AnalysisResult = payload.analysis ?? {
-          brandName: '',
-          industry: '',
-          mainBusiness: '',
-          targetCustomer: '',
-          differentiation: '',
-          toneOfVoice: '',
-          keywords: [],
-          tabooWords: [],
-          brandStory: '',
+          brandDoc: '',
+          visualIdentity: {},
           writingPatterns: [],
         };
 
@@ -310,20 +303,14 @@ export function useMemoryV2() {
       const now = new Date().toISOString();
       const sourceUrls = store.getState().sourceUrls.map((s) => s.url);
 
-      // 1. Create / update brand_profile identity entry
+      // 1. brand_profile identity entry — Markdown doc + visual identity
       const brandProfileEntry: MemoryEntry = {
         id: `${userId}_brand_profile`,
         layer: 'identity',
         category: 'brand_profile',
         content: {
-          brandName: result.brandName,
-          industry: result.industry,
-          mainBusiness: result.mainBusiness,
-          targetCustomer: result.targetCustomer,
-          differentiation: result.differentiation,
-          toneOfVoice: result.toneOfVoice,
-          keywords: result.keywords,
-          tabooWords: result.tabooWords,
+          brandDoc: result.brandDoc,
+          visualIdentity: result.visualIdentity,
           sourceUrls,
           initialized: true,
         },
@@ -333,21 +320,7 @@ export function useMemoryV2() {
         updatedAt: now,
       };
 
-      // 2. Create brand_story identity entry if we have one
-      const storyEntry: MemoryEntry | null = result.brandStory
-        ? {
-            id: `${userId}_brand_story`,
-            layer: 'identity',
-            category: 'brand_story',
-            content: { brandStory: result.brandStory },
-            source: 'firecrawl',
-            confidence: 0.7,
-            createdAt: now,
-            updatedAt: now,
-          }
-        : null;
-
-      // 3. Create preference entries for each writing pattern
+      // 2. preference entries for each writing pattern
       const patternEntries: MemoryEntry[] = result.writingPatterns.map(
         (pattern, idx): MemoryEntry => ({
           id: `${userId}_pattern_${idx}`,
@@ -365,9 +338,8 @@ export function useMemoryV2() {
         }),
       );
 
-      const allEntries = [brandProfileEntry, ...(storyEntry ? [storyEntry] : []), ...patternEntries];
+      const allEntries = [brandProfileEntry, ...patternEntries];
 
-      // Persist to Supabase
       const rows = allEntries.map((e) => entryToRow(e, userId));
       const { error } = await db
         .from('memories')
@@ -378,26 +350,19 @@ export function useMemoryV2() {
         return;
       }
 
-      // Update local store
       const existing = store.getState().memories;
       const newIds = new Set(allEntries.map((e) => e.id));
       const merged = [...existing.filter((e) => !newIds.has(e.id)), ...allEntries];
       store.getState().setMemories(merged);
 
-      // Update brand profile
       store.getState().setBrandProfile({
-        brandName: result.brandName,
-        industry: result.industry,
-        mainBusiness: result.mainBusiness,
-        targetCustomer: result.targetCustomer,
-        differentiation: result.differentiation,
-        toneOfVoice: result.toneOfVoice,
-        keywords: result.keywords,
-        tabooWords: result.tabooWords,
-        brandStory: result.brandStory || undefined,
+        brandDoc: result.brandDoc,
+        visualIdentity: result.visualIdentity,
         sourceUrls,
         initialized: true,
       });
+
+      store.getState().setMemoryEnabled(true);
 
       store.getState().setMemoryEnabled(true);
     },
