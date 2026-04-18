@@ -144,10 +144,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ rules: [] });
     }
 
-    const geminiKey = Deno.env.get("GEMINI_API_KEY") ||
+    const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY") ||
+      Deno.env.get("GEMINI_API_KEY") ||
       Deno.env.get("GOOGLE_API_KEY");
     if (!geminiKey) {
-      return jsonResponse({ error: "GEMINI_API_KEY not configured" }, 500);
+      return jsonResponse({ error: "GOOGLE_GEMINI_API_KEY not configured" }, 500);
     }
 
     const rules = await extractRulesWithGemini(original, edited, geminiKey);

@@ -197,9 +197,9 @@ Deno.serve(async (req) => {
       throw new Error("FIRECRAWL_API_KEY is not configured");
     }
 
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) {
-      throw new Error("GEMINI_API_KEY is not configured");
+      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
     }
 
     // ── Scrape URLs ──────────────────────────────────────────────
