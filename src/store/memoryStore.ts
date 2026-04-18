@@ -13,6 +13,9 @@ import type {
 interface MemoryState {
   // --- data ---
   memories: MemoryEntry[];
+  /** All brand profiles owned by the current user. */
+  brandProfiles: BrandProfile[];
+  /** The currently active brand profile (derived from brandProfiles). */
   brandProfile: BrandProfile | null;
   preferences: MemoryEntry[];
   sourceUrls: SourceUrl[];
@@ -23,7 +26,11 @@ interface MemoryState {
 
   // --- setters ---
   setMemories: (memories: MemoryEntry[]) => void;
-  setBrandProfile: (bp: BrandProfile | null) => void;
+  setBrandProfiles: (profiles: BrandProfile[]) => void;
+  /** Locally mark one profile id as active (UI optimistic update). */
+  setActiveBrandProfileLocal: (id: string) => void;
+  /** Remove a profile from local state. */
+  removeBrandProfileLocal: (id: string) => void;
   addPreference: (entry: MemoryEntry) => void;
   removePreference: (id: string) => void;
   confirmPreference: (id: string) => void;
@@ -114,9 +121,15 @@ function buildContextLayer(memories: MemoryEntry[]): string {
 // Store
 // ---------------------------------------------------------------------------
 
+function pickActive(profiles: BrandProfile[]): BrandProfile | null {
+  if (profiles.length === 0) return null;
+  return profiles.find((p) => p.isActive) ?? profiles[0] ?? null;
+}
+
 export const useMemoryStore = create<MemoryState>((set, get) => ({
   // --- initial state ---
   memories: [],
+  brandProfiles: [],
   brandProfile: null,
   preferences: [],
   sourceUrls: [],
@@ -129,7 +142,34 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     set({ memories, preferences });
   },
 
-  setBrandProfile: (bp) => set({ brandProfile: bp }),
+  setBrandProfiles: (profiles) =>
+    set({
+      brandProfiles: profiles,
+      brandProfile: pickActive(profiles),
+    }),
+
+  setActiveBrandProfileLocal: (id) =>
+    set((s) => {
+      const updated = s.brandProfiles.map((p) => ({ ...p, isActive: p.id === id }));
+      return {
+        brandProfiles: updated,
+        brandProfile: pickActive(updated),
+      };
+    }),
+
+  removeBrandProfileLocal: (id) =>
+    set((s) => {
+      const updated = s.brandProfiles.filter((p) => p.id !== id);
+      const hadActive = updated.some((p) => p.isActive);
+      const finalList =
+        !hadActive && updated.length > 0
+          ? updated.map((p, idx) => ({ ...p, isActive: idx === 0 }))
+          : updated;
+      return {
+        brandProfiles: finalList,
+        brandProfile: pickActive(finalList),
+      };
+    }),
 
   addPreference: (entry) =>
     set((s) => {
