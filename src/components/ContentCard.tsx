@@ -652,6 +652,39 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         <p className="text-[12px] text-[#999] italic mt-2">👉 {item.cta}</p>
       )}
 
+      {/* Inline action errors with retry */}
+      {(actionErrors.cover || actionErrors.polish || actionErrors.title) && (
+        <div className="mt-3 space-y-1.5">
+          {actionErrors.cover && (
+            <InlineActionError
+              label="AI 配图"
+              message={actionErrors.cover}
+              loading={coverLoading}
+              onRetry={handleGenerateCover}
+              onDismiss={() => setActionError('cover', null)}
+            />
+          )}
+          {actionErrors.polish && (
+            <InlineActionError
+              label="润色"
+              message={actionErrors.polish}
+              loading={aiLoading === 'polish'}
+              onRetry={handlePolish}
+              onDismiss={() => setActionError('polish', null)}
+            />
+          )}
+          {actionErrors.title && (
+            <InlineActionError
+              label="生成标题"
+              message={actionErrors.title}
+              loading={titleLoading}
+              onRetry={handleRegenerateTitle}
+              onDismiss={() => setActionError('title', null)}
+            />
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[#F0EFED] flex-wrap">
         {!editing ? (
