@@ -409,6 +409,28 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
 
   const hasMessages = messages.length > 0;
 
+  // Pick up a pending prompt from the landing page (set in sessionStorage before /auth)
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('spark.pendingPrompt');
+      if (pending) {
+        sessionStorage.removeItem('spark.pendingPrompt');
+        setInput(pending);
+        requestAnimationFrame(() => {
+          const ta = inputRef.current;
+          if (ta) {
+            ta.focus();
+            ta.setSelectionRange(pending.length, pending.length);
+            ta.style.height = 'auto';
+            ta.style.height = Math.min(ta.scrollHeight, 128) + 'px';
+          }
+        });
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  }, []);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

@@ -112,7 +112,16 @@ export default function LandingPage() {
     };
   }, []);
 
-  const goAuth = () => navigate({ to: '/auth' });
+  const goAuth = (prompt?: string) => {
+    if (prompt) {
+      try {
+        sessionStorage.setItem('spark.pendingPrompt', prompt);
+      } catch {
+        /* ignore storage errors */
+      }
+    }
+    navigate({ to: '/auth' });
+  };
 
   return (
     <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
@@ -196,7 +205,7 @@ export default function LandingPage() {
           >
             <button
               type="button"
-              onClick={goAuth}
+              onClick={() => goAuth()}
               aria-label="开始对话"
               className="group w-full bg-white border border-[#EEEDEB] rounded-3xl flex items-center pl-5 pr-2 py-2 hover:border-[#FFCBA8] hover:shadow-md transition-all"
             >
@@ -228,7 +237,7 @@ export default function LandingPage() {
               <button
                 key={prompt}
                 type="button"
-                onClick={goAuth}
+                onClick={() => goAuth(prompt)}
                 className="px-4 py-2 rounded-full bg-white border border-[#EEEDEB] text-[13px] text-[#555] hover:border-[#FF6B1A] hover:text-[#FF6B1A] transition-colors"
               >
                 {prompt}
@@ -273,7 +282,7 @@ export default function LandingPage() {
           >
             <button
               type="button"
-              onClick={goAuth}
+              onClick={() => goAuth()}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-full text-white font-medium spark-shadow hover:opacity-95 hover:scale-[1.02] transition-all"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
             >
