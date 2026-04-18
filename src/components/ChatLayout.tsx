@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, Settings as SettingsIcon, MessageSquarePlus, Zap } from 'lucide-react';
+import { FileText, User, Brain, Inbox, Settings as SettingsIcon, MessageSquarePlus, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,8 +31,9 @@ export default function ChatLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Unified "Content Center": top = auto-tasks, bottom = review list
+  const [centerOpen, setCenterOpen] = useState(false);
+  const [scheduleCollapsed, setScheduleCollapsed] = useState(false);
   const [reviewingCount, setReviewingCount] = useState(0);
   const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
@@ -99,8 +100,8 @@ export default function ChatLayout() {
             toast.success(`${taskName} 已生成新内容`, {
               description: title.length > 40 ? `${title.slice(0, 40)}…` : title,
               action: {
-                label: '去审核',
-                onClick: () => setReviewOpen(true),
+                label: '去查看',
+                onClick: () => setCenterOpen(true),
               },
               duration: 6000,
             });
@@ -160,11 +161,11 @@ export default function ChatLayout() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setReviewOpen(true)}
-                aria-label="审核中心"
+                onClick={() => setCenterOpen(true)}
+                aria-label="内容中心"
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
-                <ClipboardCheck size={18} />
+                <Inbox size={18} />
                 {reviewingCount > 0 && (
                   <>
                     <span
@@ -182,20 +183,8 @@ export default function ChatLayout() {
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              审核中心{reviewingCount > 0 ? ` (${reviewingCount})` : ''}
+              内容中心{reviewingCount > 0 ? ` (${reviewingCount} 待审)` : ''}
             </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setScheduleOpen(true)}
-                aria-label="自动任务"
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
-              >
-                <Zap size={18} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">自动任务</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -261,36 +250,77 @@ export default function ChatLayout() {
         </SheetContent>
       </Sheet>
 
-      {/* Review center drawer */}
-      <Sheet open={reviewOpen} onOpenChange={setReviewOpen}>
+      {/* Content Center drawer — auto-tasks (top) + review queue (bottom) */}
+      <Sheet open={centerOpen} onOpenChange={setCenterOpen}>
         <SheetContent
           side="right"
           className="w-full sm:max-w-2xl p-0 bg-[#FAFAF8] flex flex-col gap-0"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>审核中心</SheetTitle>
+            <SheetTitle>内容中心</SheetTitle>
           </SheetHeader>
-          <div className="px-4 py-2 border-b border-[#EEEDEB] flex items-center justify-between">
-            <span className="text-sm font-semibold text-[#333]">审核中心</span>
+          <div className="px-4 py-2 border-b border-[#EEEDEB] flex items-center justify-between shrink-0">
+            <span className="text-sm font-semibold text-[#333]">
+              内容中心
+              {reviewingCount > 0 && (
+                <span className="ml-2 text-[11px] text-orange-500 font-medium">
+                  {reviewingCount} 条待审
+                </span>
+              )}
+            </span>
             <p className="text-[11px] text-[#BBB]">按 Esc 关闭</p>
           </div>
-          <div className="flex-1 overflow-hidden">
+
+          {/* Top: auto-task config (collapsible to save vertical space) */}
+          <div className="border-b border-[#EEEDEB] shrink-0 max-h-[55vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 pt-3 pb-1">
+              <div className="flex items-center gap-2">
+                <Zap size={14} className="text-orange-500" />
+                <span className="text-[13px] font-semibold text-[#333]">自动任务</span>
+              </div>
+              <button
+                onClick={() => setScheduleCollapsed((v) => !v)}
+                className="text-[11px] text-[#999] hover:text-[#666] flex items-center gap-1 px-2 py-1 rounded hover:bg-[#F0EFED] transition-colors"
+              >
+                {scheduleCollapsed ? (
+                  <>展开 <ChevronDown size={12} /></>
+                ) : (
+                  <>收起 <ChevronUp size={12} /></>
+                )}
+              </button>
+            </div>
+            {!scheduleCollapsed && <SchedulePage embedded />}
+          </div>
+
+          {/* Bottom: review queue (takes remaining height) */}
+          <div className="flex-1 min-h-0 overflow-hidden">
             <ReviewPage embedded />
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* Schedule task drawer */}
-      <Sheet open={scheduleOpen} onOpenChange={setScheduleOpen}>
-        <SheetContent side="right" className="w-full max-w-md p-0 bg-[#FAFAF8] flex flex-col">
-          <SheetHeader className="sr-only">
-            <SheetTitle>自动任务</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden">
-            <SchedulePage />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* New conversation confirm dialog */}
+      <AlertDialog open={confirmNewChatOpen} onOpenChange={setConfirmNewChatOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>开始新对话？</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前对话历史将被清空，确认开始新对话吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                useAppStore.getState().clearMessages();
+                setConfirmNewChatOpen(false);
+              }}
+            >
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

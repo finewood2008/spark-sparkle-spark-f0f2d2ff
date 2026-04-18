@@ -46,7 +46,11 @@ const FREQ_LABELS: Record<string, string> = {
   custom: '自定义',
 };
 
-export default function SchedulePage() {
+interface SchedulePageProps {
+  embedded?: boolean;
+}
+
+export default function SchedulePage({ embedded = false }: SchedulePageProps = {}) {
   const [config, setConfig] = useState<ScheduleConfig | null>(null);
   const [logs, setLogs] = useState<ScheduleLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +158,7 @@ export default function SchedulePage() {
 
   if (loading || !config) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className={embedded ? 'py-8 flex items-center justify-center' : 'h-full flex items-center justify-center'}>
         <Loader2 size={24} className="animate-spin text-orange-400" />
       </div>
     );
@@ -164,7 +168,7 @@ export default function SchedulePage() {
   const errorCount = logs.filter((l) => l.status === 'error').length;
 
   return (
-    <div className="h-full overflow-y-auto p-6 max-w-2xl mx-auto">
+    <div className={embedded ? 'p-5 max-w-2xl mx-auto' : 'h-full overflow-y-auto p-6 max-w-2xl mx-auto'}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
