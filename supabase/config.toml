@@ -1,13 +1,13 @@
 project_id = "rbrsjjxtpyjmmjbidtyp"
 
 [functions.chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.learn-from-edit]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-edit]
-verify_jwt = false
+verify_jwt = true
 
 [functions.fetch-metrics]
 verify_jwt = false
@@ -16,7 +16,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.analyze-sources]
-verify_jwt = false
+verify_jwt = true
 
 [functions.execute-schedule]
 verify_jwt = false
+
+[functions.generate-cover]
+verify_jwt = true

@@ -1,46 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  AuthError,
+  getCorsHeaders,
+  optionsCors,
+  requireUser,
+  validatePayloadSize,
+} from "../_shared/auth.ts";
 
 const URL_REGEX = /^https?:\/\/.+/i;
 const MAX_URLS = 10;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, corsHeaders: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-async function getUserId(authHeader: string | null): Promise<string> {
-  if (!authHeader) throw new Error("Missing Authorization header");
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase environment variables not configured");
-  }
-
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) throw new Error("Invalid or expired token");
-  return user.id;
 }
 
 interface ScrapeOutput {
@@ -253,22 +229,26 @@ function mergeBranding(brandings: Array<Record<string, unknown> | null>): {
 // ── Main Handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return optionsCors(req);
   }
 
   try {
-    const userId = await getUserId(req.headers.get("Authorization"));
+    const userId = await requireUser(req);
+    validatePayloadSize(req);
 
     const body = await req.json();
     const { urls } = body;
 
     if (!Array.isArray(urls) || urls.length === 0) {
-      return jsonResponse({ error: "urls must be a non-empty array" }, 400);
+      return jsonResponse({ error: "urls must be a non-empty array" }, corsHeaders, 400);
     }
     if (urls.length > MAX_URLS) {
       return jsonResponse(
         { error: `Too many URLs. Maximum is ${MAX_URLS}` },
+        corsHeaders,
         400,
       );
     }
@@ -282,6 +262,7 @@ Deno.serve(async (req) => {
           error: "Invalid URL(s). Each URL must start with http:// or https://",
           invalid: invalidUrls,
         },
+        corsHeaders,
         400,
       );
     }
@@ -303,7 +284,7 @@ Deno.serve(async (req) => {
       .map((r) => ({ url: r.url, error: r.error }));
 
     if (succeeded.length === 0) {
-      return jsonResponse({ error: "All URLs failed to scrape", failed }, 422);
+      return jsonResponse({ error: "All URLs failed to scrape", failed }, corsHeaders, 422);
     }
 
     const combinedMarkdown = succeeded
@@ -329,15 +310,12 @@ Deno.serve(async (req) => {
         succeeded: succeeded.length,
         failed,
       },
-    });
+    }, corsHeaders);
   } catch (e) {
     console.error("analyze-sources error:", e);
-    const message = e instanceof Error ? e.message : "Unknown error";
-    const status =
-      message.includes("Missing Authorization") ||
-      message.includes("Invalid or expired")
-        ? 401
-        : 500;
-    return jsonResponse({ error: message }, status);
+    if (e instanceof AuthError) {
+      return jsonResponse({ error: e.message }, corsHeaders, 401);
+    }
+    return jsonResponse({ error: "Internal server error" }, corsHeaders, 500);
   }
 });

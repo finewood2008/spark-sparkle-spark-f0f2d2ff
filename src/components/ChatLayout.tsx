@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { FileText, User, Brain, ClipboardCheck, MessageSquarePlus, Zap } from 'lucide-react';
+import { FileText, User, Brain, ClipboardCheck, MessageSquarePlus, Zap, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
-import DraftDrawer from './DraftDrawer';
-import MemoryPanel from './MemoryPanel';
-import SchedulePage from '../pages/SchedulePage';
-import ReviewPage from '../pages/ReviewPage';
+
+const DraftDrawer = lazy(() => import('./DraftDrawer'));
+const MemoryPanel = lazy(() => import('./MemoryPanel'));
+const SchedulePage = lazy(() => import('../pages/SchedulePage'));
+const ReviewPage = lazy(() => import('../pages/ReviewPage'));
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -27,6 +28,11 @@ import { useMemoryV2 } from '../hooks/useMemoryV2';
 import { useMemoryStore } from '../store/memoryStore';
 
 export default function ChatLayout() {
+  const LazyFallback = () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 size={20} className="animate-spin text-[#CCC]" />
+    </div>
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -63,15 +69,19 @@ export default function ChatLayout() {
       const { count, error } = await query;
       if (!error && typeof count === 'number') setReviewingCount(count);
     };
-    fetchCount();
-    // Refresh on tab focus so badge updates after returning from /review
+
+    // Defer initial fetch to avoid blocking first paint
+    const fetchTimer = setTimeout(() => fetchCount(), 1000);
+
     const onFocus = () => fetchCount();
     window.addEventListener('focus', onFocus);
 
-    // Realtime: badge auto-updates when scheduled tasks insert new review_items
-    const channel = supabase
-      .channel('review-items-badge')
-      .on(
+    // Defer realtime subscription
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const realtimeTimer = setTimeout(() => {
+      channel = supabase
+        .channel('review-items-badge')
+        .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'review_items' },
         (payload) => {
@@ -106,10 +116,13 @@ export default function ChatLayout() {
         },
       )
       .subscribe();
+    }, 500);
 
     return () => {
+      clearTimeout(fetchTimer);
+      clearTimeout(realtimeTimer);
       window.removeEventListener('focus', onFocus);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 
@@ -229,10 +242,18 @@ export default function ChatLayout() {
       <SparkChat getContext={getContextForChat} />
 
       {/* Draft drawer */}
-      <DraftDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      {drawerOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <DraftDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+        </Suspense>
+      )}
 
       {/* Memory panel (v2) */}
-      <MemoryPanel open={profileOpen} onOpenChange={setProfileOpen} />
+      {profileOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <MemoryPanel open={profileOpen} onOpenChange={setProfileOpen} />
+        </Suspense>
+      )}
 
       {/* Review center drawer */}
       <Sheet open={reviewOpen} onOpenChange={setReviewOpen}>
@@ -248,7 +269,9 @@ export default function ChatLayout() {
             <p className="text-[11px] text-[#BBB]">按 Esc 关闭</p>
           </div>
           <div className="flex-1 overflow-hidden">
-            <ReviewPage embedded />
+            <Suspense fallback={<LazyFallback />}>
+              <ReviewPage embedded />
+            </Suspense>
           </div>
         </SheetContent>
       </Sheet>
@@ -260,7 +283,9 @@ export default function ChatLayout() {
             <SheetTitle>自动任务</SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-hidden">
-            <SchedulePage />
+            <Suspense fallback={<LazyFallback />}>
+              <SchedulePage />
+            </Suspense>
           </div>
         </SheetContent>
       </Sheet>

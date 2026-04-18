@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2, Ruler, Megaphone, Image, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -16,6 +16,13 @@ export const Route = createFileRoute('/account')({
       { name: 'description', content: '管理你的火花账号和第三方绑定' },
     ],
   }),
+  ssr: false,
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: '/auth' });
+    }
+  },
   component: AccountPage,
 });
 

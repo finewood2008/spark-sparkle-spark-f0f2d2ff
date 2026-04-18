@@ -1,7 +1,20 @@
 // Shared AI utilities for Lovable AI Gateway via Supabase edge functions
 import { loadUserPrefs } from './user-prefs';
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY as SUPABASE_KEY } from './env';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './env';
+import { supabase } from '@/integrations/supabase/client';
 import { useMemoryStore } from '@/store/memoryStore';
+
+/**
+ * Return the current user's access_token when logged in,
+ * falling back to the anonymous publishable key for unauthenticated flows.
+ */
+async function getAuthToken(): Promise<string> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) return data.session.access_token;
+  } catch { /* fall through */ }
+  return SUPABASE_PUBLISHABLE_KEY;
+}
 
 type Msg = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -51,11 +64,12 @@ export async function streamChat({
 }) {
   const presetId = loadUserPrefs().tonePreset;
   const effectiveBrandContext = resolveBrandContext(mode, brandContext);
+  const token = await getAuthToken();
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       messages,
@@ -98,11 +112,12 @@ export async function streamEdit({
   // streamEdit handles selection-level rewrites (polish/rewrite/expand/shorten).
   // We treat these as 'generate' mode so auto-learned preferences apply.
   const effectiveBrandContext = resolveBrandContext('generate', brandContext);
+  const token = await getAuthToken();
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-edit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       action,

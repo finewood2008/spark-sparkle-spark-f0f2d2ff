@@ -1,12 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  AuthError,
+  getCorsHeaders,
+  optionsCors,
+  requireUser,
+  validatePayloadSize,
+} from "../_shared/auth.ts";
 
 // Use Gemini's image-capable model via native generateContent endpoint
 const IMAGE_MODEL = "gemini-2.5-flash-image";
@@ -14,10 +13,23 @@ const GEN_URL = (key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${key}`;
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req);
+
+  if (req.method === "OPTIONS") return optionsCors(req);
 
   try {
+    await requireUser(req);
+    validatePayloadSize(req);
+
     const { title, content, platform, style } = await req.json();
+
+    // Input validation: title max 200 chars
+    if (typeof title === "string" && title.length > 200) {
+      return new Response(
+        JSON.stringify({ error: "Title too long (max 200 chars)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
@@ -140,8 +152,14 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("[generate-cover] unexpected error:", e);
+    if (e instanceof AuthError) {
+      return new Response(
+        JSON.stringify({ error: e.message }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     return new Response(
-      JSON.stringify({ error: "封面生成出了点小问题，请稍后重试", code: "INTERNAL" }),
+      JSON.stringify({ error: "Internal server error", code: "INTERNAL" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

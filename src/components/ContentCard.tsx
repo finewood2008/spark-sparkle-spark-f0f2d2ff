@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import { useMemoryStore } from '@/store/memoryStore';
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY as SUPABASE_KEY } from '@/lib/env';
+import { SUPABASE_URL } from '@/lib/env';
 
 interface ContentCardProps {
   item: ContentItem;
@@ -306,11 +306,13 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setActionError('cover', null);
     setCoverLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || '';
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-cover`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           title: editing ? editTitle : item.title,
@@ -348,11 +350,13 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setTitleLoading(true);
     try {
       const currentContent = editing ? editContent : item.content;
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || '';
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           messages: [{ role: 'user', content: `请根据以下文章内容，重新生成一个吸引人的标题。只返回标题文字，不要任何解释或引号：\n\n${currentContent.substring(0, 500)}` }],

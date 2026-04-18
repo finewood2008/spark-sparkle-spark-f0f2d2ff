@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildChatPrompt, buildGeneratePrompt } from "./prompts.ts";
-
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  AuthError,
+  getCorsHeaders,
+  optionsCors,
+  requireUser,
+  validatePayloadSize,
+} from "../_shared/auth.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const STREAM_URL = (key: string) =>
@@ -71,10 +70,34 @@ function transformStream(upstream: ReadableStream<Uint8Array>): ReadableStream<U
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req);
+
+  if (req.method === "OPTIONS") return optionsCors(req);
 
   try {
+    await requireUser(req);
+    validatePayloadSize(req);
+
     const { messages, mode, platform, brandContext, presetId } = await req.json();
+
+    // Input validation: messages array max 50 items, each content max 10k chars
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: "messages must be a non-empty array" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (messages.length > 50) {
+      return new Response(JSON.stringify({ error: "Too many messages (max 50)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    for (const m of messages) {
+      if (typeof m.content === "string" && m.content.length > 10000) {
+        return new Response(JSON.stringify({ error: "Message content too long (max 10000 chars)" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
     const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
@@ -108,8 +131,14 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("chat error:", e);
+    if (e instanceof AuthError) {
+      return new Response(
+        JSON.stringify({ error: e.message }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "未知错误" }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

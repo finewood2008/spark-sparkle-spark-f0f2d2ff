@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  AuthError,
+  requireCronAuth,
+} from "../_shared/auth.ts";
 
 /**
  * execute-schedule — Server-side scheduled task executor
@@ -239,10 +243,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  // Optional: accept a secret token for auth
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Require cron/service authorization
+  try {
+    requireCronAuth(req);
+  } catch (e) {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
 

@@ -1,43 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  AuthError,
+  getCorsHeaders,
+  optionsCors,
+  requireUser,
+  validatePayloadSize,
+} from "../_shared/auth.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, corsHeaders: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-/**
- * Verify JWT via Supabase client and return the user id.
- * Throws if missing/invalid — caller should surface a 401.
- */
-async function getUserId(authHeader: string | null): Promise<string> {
-  if (!authHeader) throw new Error("Missing Authorization header");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase environment variables not configured");
-  }
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser();
-  if (error || !user) throw new Error("Invalid or expired token");
-  return user.id;
 }
 
 interface ExtractedRule {
@@ -125,34 +101,41 @@ ${edited}
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return optionsCors(req);
   }
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
+    return jsonResponse({ error: "Method not allowed" }, corsHeaders, 405);
   }
 
   try {
-    const userId = await getUserId(req.headers.get("authorization"));
+    const userId = await requireUser(req);
+    validatePayloadSize(req);
 
     const { original, edited, contextTitle } = await req.json();
     if (typeof original !== "string" || typeof edited !== "string") {
-      return jsonResponse({ error: "original/edited must be strings" }, 400);
+      return jsonResponse({ error: "original/edited must be strings" }, corsHeaders, 400);
     }
-    if (original === edited) return jsonResponse({ rules: [] });
+    // Input validation: text max 20k chars
+    if (original.length > 20000 || edited.length > 20000) {
+      return jsonResponse({ error: "Text too long (max 20000 chars)" }, corsHeaders, 400);
+    }
+    if (original === edited) return jsonResponse({ rules: [] }, corsHeaders);
     if (original.length < 10 || edited.length < 10) {
-      return jsonResponse({ rules: [] });
+      return jsonResponse({ rules: [] }, corsHeaders);
     }
 
     const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY") ||
       Deno.env.get("GEMINI_API_KEY") ||
       Deno.env.get("GOOGLE_API_KEY");
     if (!geminiKey) {
-      return jsonResponse({ error: "GOOGLE_GEMINI_API_KEY not configured" }, 500);
+      return jsonResponse({ error: "Internal server error" }, corsHeaders, 500);
     }
 
     const rules = await extractRulesWithGemini(original, edited, geminiKey);
-    if (rules.length === 0) return jsonResponse({ rules: [] });
+    if (rules.length === 0) return jsonResponse({ rules: [] }, corsHeaders);
 
     // Persist rules to `memories` table (preference layer, confirmed=false).
     // We use the service-role key to bypass RLS — the user_id is already
@@ -160,7 +143,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) {
-      return jsonResponse({ error: "Supabase service role key missing" }, 500);
+      return jsonResponse({ error: "Internal server error" }, corsHeaders, 500);
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
@@ -189,14 +172,15 @@ Deno.serve(async (req) => {
     const { error: insertError } = await admin.from("memories").insert(rows);
     if (insertError) {
       console.error("[learn-from-edit] insert failed:", insertError);
-      return jsonResponse({ error: insertError.message, rules }, 500);
+      return jsonResponse({ error: "Internal server error" }, corsHeaders, 500);
     }
 
-    return jsonResponse({ rules, persisted: rows.length });
+    return jsonResponse({ rules, persisted: rows.length }, corsHeaders);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[learn-from-edit] error:", message);
-    const status = /Authorization|token/i.test(message) ? 401 : 500;
-    return jsonResponse({ error: message }, status);
+    console.error("[learn-from-edit] error:", err);
+    if (err instanceof AuthError) {
+      return jsonResponse({ error: err.message }, corsHeaders, 401);
+    }
+    return jsonResponse({ error: "Internal server error" }, corsHeaders, 500);
   }
 });
