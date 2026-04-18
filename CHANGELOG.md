@@ -2,6 +2,23 @@
 
 本文档记录 火花 Spark 的所有重要改动。格式参考 Keep a Changelog，版本号遵循 SemVer。
 
+## [0.3.1] — 2026-04-19
+
+### 修复 Edge Functions "Failed to fetch"
+
+#### Fixed
+- `supabase/functions/_shared/auth.ts` CORS 白名单：动态匹配 `lovableproject.com` / `lovable.app` / `lovable.dev` / `spark-geo.com` / `localhost`，
+  并把请求 Origin 回显回去（之前硬编码项目 supabase 子域名，导致 Preview 和自定义域被拦截）
+- `supabase/config.toml` 5 个面向前端的函数（chat / ai-edit / generate-cover / learn-from-edit / analyze-sources）`verify_jwt` 回退为 `false`：
+  Supabase 网关 JWT 校验对 HS256/ES256 算法判定与 anon key 签名不匹配，会在到达函数前直接拒绝；
+  改由函数内 `requireUser(req)` 用 `supabase.auth.getUser(token)` 自行校验，等价安全
+- 重新部署全部 8 个 Edge Functions，端到端验证：聊天长文 ✅、ai-edit 润色 ✅、analyze-sources 抓取 ✅、generate-cover 封面 ✅
+
+### Note
+- 本节修正了 [0.3.0] "verify_jwt=true" 的描述：实际生产为 `false`，安全由函数内部校验保证
+
+---
+
 ## [0.3.0] — 2026-04-19
 
 ### 安全加固 + 架构优化
