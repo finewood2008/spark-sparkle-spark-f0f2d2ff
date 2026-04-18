@@ -871,6 +871,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                 msg={msg}
                 onSend={sendMessage}
                 onCardAction={handleCardAction}
+                onRetry={handleRetry}
               />
             ))}
             {isGenerating && <TypingIndicator />}
