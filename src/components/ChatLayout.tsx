@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
-import { useMemorySync } from '../hooks/useMemorySync';
 import { useMemoryV2 } from '../hooks/useMemoryV2';
 import { useMemoryStore } from '../store/memoryStore';
 
@@ -38,15 +37,11 @@ export default function ChatLayout() {
   const [pulseKey, setPulseKey] = useState(0);
   const prevCountRef = useRef(0);
 
-  const { getFullContext } = useMemorySync();
-  // Load new v2 memory system in parallel (panel reads from memoryStore).
+  // v2 unified memory system — panel + chat context both read from memoryStore.
   useMemoryV2();
-  const memoryV2Enabled = useMemoryStore((s) => s.memoryEnabled);
   const getV2Context = useMemoryStore((s) => s.getFullContext);
 
-  // Prefer v2 context when the new system is enabled; otherwise fall back.
-  const getContextForChat = () =>
-    memoryV2Enabled ? getV2Context('chat') : getFullContext();
+  const getContextForChat = () => getV2Context('chat');
 
   useEffect(() => {
     if (reviewingCount > prevCountRef.current) {

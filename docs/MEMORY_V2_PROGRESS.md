@@ -95,12 +95,13 @@ ChatLayout 挂载：
   - `lib/ai-generate.ts` → mode='generate'
   - `lib/ai-analyze.ts` / metrics insights → mode='analyze'
 
-### ⏸ Phase 7 — 清理 + push（未开始）
+### ✅ Phase 7 — 清理（已完成）
 
-- 删掉 `useMemorySync.ts`（旧）、`SparkProfile.tsx`（旧）
+- 删除 `src/hooks/useMemorySync.ts`（旧）
+- 删除 `src/components/SparkProfile.tsx`（旧）
+- `ChatLayout` 移除双写过渡：`getContextForChat` 直接走 `useMemoryStore.getFullContext('chat')`
 - 旧的 `brand_memories` / `learning_entries` 表保留 1 个迭代后再删
-- 写 CHANGELOG、bump 版本
-- `git push`
+- 注：`appStore` 里的 `brand` / `learnings` / `brandMemoryEnabled` 字段仍被 `MetricsCard` / `SparkChat` 引用，待 Phase 6（智能注入）一并迁移后再清理
 
 ---
 
