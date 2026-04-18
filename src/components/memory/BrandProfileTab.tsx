@@ -153,7 +153,7 @@ export function BrandProfileTab() {
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
-            placeholder="https://..."
+            placeholder="www.example.com 或 https://..."
             className={fieldClass}
           />
           <button
