@@ -233,7 +233,26 @@ Deno.serve(async (req) => {
     // Truncate to ~120k chars to stay within Gemini context window
     const truncated = combinedMarkdown.slice(0, 120_000);
 
-    const analysis = await analyseWithGemini(truncated, geminiKey);
+    const rawAnalysis = await analyseWithGemini(truncated, geminiKey);
+
+    // Normalize to camelCase AnalysisResult shape (defensive: Gemini may slip back to snake_case)
+    const a = rawAnalysis as Record<string, unknown>;
+    const asStr = (v: unknown) => (typeof v === "string" ? v : "");
+    const asArr = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+    const analysis = {
+      brandName: asStr(a.brandName ?? a.brand_name),
+      industry: asStr(a.industry),
+      mainBusiness: asStr(a.mainBusiness ?? a.main_business),
+      targetCustomer: asStr(a.targetCustomer ?? a.target_customer),
+      differentiation: asStr(a.differentiation),
+      toneOfVoice: asStr(a.toneOfVoice ?? a.tone_of_voice),
+      keywords: asArr(a.keywords),
+      tabooWords: asArr(a.tabooWords ?? a.taboo_words),
+      brandStory: asStr(a.brandStory ?? a.brand_story),
+      writingPatterns: asArr(a.writingPatterns ?? a.writing_patterns),
+    };
 
     return jsonResponse({
       user_id: userId,
