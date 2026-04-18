@@ -55,51 +55,59 @@ export const checkLoginLock = createServerFn({ method: 'POST' })
     const ip = getClientIP();
     if (!data.email) return { locked: false, remainSec: 0 };
 
-    // 取最大窗口内的所有失败记录，一次查完按时间戳分桶
-    const maxWindowMin = Math.max(...LOCK_TIERS.map(t => t.windowMin));
-    const since = new Date(Date.now() - maxWindowMin * 60 * 1000).toISOString();
+    try {
+      // 取最大窗口内的所有失败记录，一次查完按时间戳分桶
+      const maxWindowMin = Math.max(...LOCK_TIERS.map(t => t.windowMin));
+      const since = new Date(Date.now() - maxWindowMin * 60 * 1000).toISOString();
 
-    const [emailRes, ipRes] = await Promise.all([
-      supabaseAdmin
-        .from('login_attempts')
-        .select('attempted_at')
-        .eq('email', data.email)
-        .gte('attempted_at', since)
-        .order('attempted_at', { ascending: false }),
-      supabaseAdmin
-        .from('login_attempts')
-        .select('attempted_at')
-        .eq('ip_address', ip)
-        .gte('attempted_at', since)
-        .order('attempted_at', { ascending: false }),
-    ]);
+      const [emailRes, ipRes] = await Promise.all([
+        supabaseAdmin
+          .from('login_attempts')
+          .select('attempted_at')
+          .eq('email', data.email)
+          .gte('attempted_at', since)
+          .order('attempted_at', { ascending: false }),
+        supabaseAdmin
+          .from('login_attempts')
+          .select('attempted_at')
+          .eq('ip_address', ip)
+          .gte('attempted_at', since)
+          .order('attempted_at', { ascending: false }),
+      ]);
 
-    const evaluate = (rows: { attempted_at: string }[] | null, reason: 'email' | 'ip'): LockStatus | null => {
-      if (!rows || rows.length === 0) return null;
-      // tier 从严到松：先看是否触发 24h 锁
-      for (const tier of LOCK_TIERS) {
-        const cutoff = Date.now() - tier.windowMin * 60 * 1000;
-        const inWindow = rows.filter(r => new Date(r.attempted_at).getTime() >= cutoff);
-        if (inWindow.length >= tier.threshold) {
-          // 锁定截止 = 最近一次失败 + lockSec
-          const latest = new Date(inWindow[0]!.attempted_at).getTime();
-          const unlockAt = latest + tier.lockSec * 1000;
-          const remainSec = Math.max(0, Math.ceil((unlockAt - Date.now()) / 1000));
-          if (remainSec > 0) {
-            return { locked: true, remainSec, reason, tier: tier.threshold };
+      const evaluate = (rows: { attempted_at: string }[] | null, reason: 'email' | 'ip'): LockStatus | null => {
+        if (!rows || rows.length === 0) return null;
+        // tier 从严到松：先看是否触发 24h 锁
+        for (const tier of LOCK_TIERS) {
+          const cutoff = Date.now() - tier.windowMin * 60 * 1000;
+          const inWindow = rows.filter(r => new Date(r.attempted_at).getTime() >= cutoff);
+          if (inWindow.length >= tier.threshold) {
+            // 锁定截止 = 最近一次失败 + lockSec
+            const latest = new Date(inWindow[0]!.attempted_at).getTime();
+            const unlockAt = latest + tier.lockSec * 1000;
+            const remainSec = Math.max(0, Math.ceil((unlockAt - Date.now()) / 1000));
+            if (remainSec > 0) {
+              return { locked: true, remainSec, reason, tier: tier.threshold };
+            }
           }
         }
-      }
-      return null;
-    };
+        return null;
+      };
 
-    const emailLock = evaluate(emailRes.data, 'email');
-    const ipLock = evaluate(ipRes.data, 'ip');
-    // 取剩余时间更长的那个
-    if (emailLock && ipLock) {
-      return emailLock.remainSec >= ipLock.remainSec ? emailLock : ipLock;
+      const emailLock = evaluate(emailRes.data, 'email');
+      const ipLock = evaluate(ipRes.data, 'ip');
+      // 取剩余时间更长的那个
+      if (emailLock && ipLock) {
+        return emailLock.remainSec >= ipLock.remainSec ? emailLock : ipLock;
+      }
+      return emailLock || ipLock || { locked: false, remainSec: 0 };
+    } catch (err) {
+      if (isMissingAdminKeyError(err)) {
+        // 本地无密钥 → 静默放行，不影响登录流程
+        return { locked: false, remainSec: 0 };
+      }
+      throw err;
     }
-    return emailLock || ipLock || { locked: false, remainSec: 0 };
   });
 
 /** 记录一次登录失败 */
@@ -111,16 +119,23 @@ export const recordLoginFailure = createServerFn({ method: 'POST' })
     const ip = getClientIP();
     if (!data.email) return { locked: false, remainSec: 0 };
 
-    await supabaseAdmin.from('login_attempts').insert({
-      email: data.email,
-      ip_address: ip,
-    });
+    try {
+      await supabaseAdmin.from('login_attempts').insert({
+        email: data.email,
+        ip_address: ip,
+      });
 
-    // 顺手清理过期记录（异步，不阻塞响应）
-    supabaseAdmin.rpc('cleanup_old_login_attempts').then(() => {}, () => {});
+      // 顺手清理过期记录（异步，不阻塞响应）
+      supabaseAdmin.rpc('cleanup_old_login_attempts').then(() => {}, () => {});
 
-    // 写完立刻重新评估锁定状态
-    return await checkLoginLock({ data: { email: data.email } });
+      // 写完立刻重新评估锁定状态
+      return await checkLoginLock({ data: { email: data.email } });
+    } catch (err) {
+      if (isMissingAdminKeyError(err)) {
+        return { locked: false, remainSec: 0 };
+      }
+      throw err;
+    }
   });
 
 /** 登录成功后清空该邮箱的失败记录 */
