@@ -599,6 +599,8 @@ export function useMemoryV2() {
   return {
     analyzeUrls,
     saveAnalysisResult,
+    activateBrandProfile,
+    deleteBrandProfile,
     reloadMemories,
     persistEntry,
     persistAll,
