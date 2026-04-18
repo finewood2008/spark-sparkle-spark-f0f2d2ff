@@ -762,8 +762,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
               <Send size={16} />
             </button>
           </div>
-          {/* Prompt templates */}
-          <div className="flex flex-wrap gap-2 mt-2 px-1">
+          {/* Prompt templates - hide when input has content to avoid overwriting */}
+          <div className={`flex flex-wrap gap-2 mt-2 px-1 transition-opacity ${input.trim() ? 'hidden' : ''}`}>
             {[
               { label: '小红书种草', prompt: '帮我写一篇小红书种草笔记，主题是：' },
               { label: '公众号长文', prompt: '帮我写一篇公众号长文，主题是：' },
