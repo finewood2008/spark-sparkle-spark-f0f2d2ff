@@ -46,18 +46,35 @@ interface MemoryState {
 function buildIdentityContext(bp: BrandProfile | null, memories: MemoryEntry[]): string {
   if (!bp || !bp.initialized) return '';
 
-  const parts: string[] = ['【品牌档案】'];
-  if (bp.brandName) parts.push(`品牌名: ${bp.brandName}`);
-  if (bp.industry) parts.push(`行业: ${bp.industry}`);
-  if (bp.mainBusiness) parts.push(`主营: ${bp.mainBusiness}`);
-  if (bp.targetCustomer) parts.push(`目标客户: ${bp.targetCustomer}`);
-  if (bp.differentiation) parts.push(`差异化: ${bp.differentiation}`);
-  if (bp.toneOfVoice) parts.push(`语气风格: ${bp.toneOfVoice}`);
-  if (bp.keywords.length) parts.push(`关键词: ${bp.keywords.join('、')}`);
-  if (bp.tabooWords.length) parts.push(`禁用词: ${bp.tabooWords.join('、')}`);
-  if (bp.brandStory) parts.push(`品牌故事: ${bp.brandStory}`);
+  const parts: string[] = [];
 
-  // Append any extra identity-layer memories (e.g. visual_identity)
+  if (bp.brandDoc && bp.brandDoc.trim().length > 0) {
+    parts.push('【品牌档案】');
+    parts.push(bp.brandDoc.trim());
+  } else {
+    // Legacy fallback for old saved profiles
+    parts.push('【品牌档案】');
+    if (bp.brandName) parts.push(`品牌名: ${bp.brandName}`);
+    if (bp.industry) parts.push(`行业: ${bp.industry}`);
+    if (bp.mainBusiness) parts.push(`主营: ${bp.mainBusiness}`);
+    if (bp.targetCustomer) parts.push(`目标客户: ${bp.targetCustomer}`);
+    if (bp.differentiation) parts.push(`差异化: ${bp.differentiation}`);
+    if (bp.toneOfVoice) parts.push(`语气风格: ${bp.toneOfVoice}`);
+    if (bp.keywords?.length) parts.push(`关键词: ${bp.keywords.join('、')}`);
+    if (bp.tabooWords?.length) parts.push(`禁用词: ${bp.tabooWords.join('、')}`);
+    if (bp.brandStory) parts.push(`品牌故事: ${bp.brandStory}`);
+  }
+
+  // Append visual identity if present
+  const vi = bp.visualIdentity;
+  if (vi && (vi.colors || vi.fonts?.length)) {
+    const visParts: string[] = ['【视觉识别】'];
+    if (vi.colors?.primary) visParts.push(`主色: ${vi.colors.primary}`);
+    if (vi.fonts?.length) visParts.push(`字体: ${vi.fonts.join(', ')}`);
+    parts.push(visParts.join('\n'));
+  }
+
+  // Append any extra identity-layer memories
   const extras = memories.filter(
     (m) => m.layer === 'identity' && m.category !== 'brand_profile',
   );
