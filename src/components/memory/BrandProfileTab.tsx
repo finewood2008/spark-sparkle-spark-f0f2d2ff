@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save, ImageOff } from 'lucide-react';
+import { Plus, X, Loader2, Sparkles, Globe, CheckCircle2, AlertCircle, Save, ImageOff, Check, Trash2, FilePlus2 } from 'lucide-react';
 import { useMemoryStore } from '@/store/memoryStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import type { BrandProfile, AnalysisResult, VisualIdentity } from '@/types/memory';
@@ -133,20 +133,26 @@ function VisualAssetGrid({ visual }: { visual: VisualIdentity }) {
 
 export function BrandProfileTab() {
   const brandProfile = useMemoryStore((s) => s.brandProfile);
+  const brandProfiles = useMemoryStore((s) => s.brandProfiles);
   const sourceUrls = useMemoryStore((s) => s.sourceUrls);
   const isAnalyzing = useMemoryStore((s) => s.isAnalyzing);
   const addSourceUrl = useMemoryStore((s) => s.addSourceUrl);
   const removeSourceUrl = useMemoryStore((s) => s.removeSourceUrl);
-  const { analyzeUrls, saveAnalysisResult } = useMemoryV2();
+  const setSourceUrls = useMemoryStore((s) => s.setSourceUrls);
+  const { analyzeUrls, saveAnalysisResult, activateBrandProfile, deleteBrandProfile } = useMemoryV2();
 
   const [urlInput, setUrlInput] = useState('');
   const [form, setForm] = useState<BrandProfile>(brandProfile ?? emptyProfile);
   const [dirty, setDirty] = useState(false);
   const [analysisPreview, setAnalysisPreview] = useState<AnalysisResult | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (brandProfile) {
       setForm(brandProfile);
+      setDirty(false);
+    } else {
+      setForm(emptyProfile);
       setDirty(false);
     }
   }, [brandProfile]);
@@ -202,22 +208,44 @@ export function BrandProfileTab() {
     }
   };
 
+  // Saving an analysis ALWAYS creates a new brand profile (and auto-activates it).
   const handleSaveAnalysis = async () => {
     if (!analysisPreview) return;
-    await saveAnalysisResult(analysisPreview);
+    await saveAnalysisResult(analysisPreview, { mode: 'create' });
     setAnalysisPreview(null);
-    toast.success('品牌档案已保存');
+    toast.success('已新建品牌档案并设为激活');
   };
 
+  // Manual edit on Markdown body updates the CURRENTLY ACTIVE profile in place.
   const handleManualSave = async () => {
     const result: AnalysisResult = {
       brandDoc: form.brandDoc,
       visualIdentity: form.visualIdentity,
       writingPatterns: [],
     };
-    await saveAnalysisResult(result);
+    await saveAnalysisResult(result, { mode: 'update', profileId: form.id });
     setDirty(false);
-    toast.success('品牌档案已保存');
+    toast.success('已更新当前品牌档案');
+  };
+
+  const handleActivate = async (id: string) => {
+    if (!id) return;
+    await activateBrandProfile(id);
+    toast.success('已切换激活档案');
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteBrandProfile(id);
+    setConfirmDeleteId(null);
+    toast.success('档案已删除');
+  };
+
+  // Reset URL list and analysis preview to start a fresh capture.
+  const handleStartNew = () => {
+    setSourceUrls([]);
+    setAnalysisPreview(null);
+    setUrlInput('');
+    toast.info('请输入新品牌的 URL 开始分析');
   };
 
   const docValue = form.brandDoc || '';
