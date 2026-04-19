@@ -310,22 +310,36 @@ export default function LandingPage() {
             </button>
           </section>
 
-          {/* 3. Quick prompts */}
+          {/* 3. Quick prompts — 品牌化胶囊：彩色图标徽章 + hover 浮出箭头 */}
           <section
-            className="w-full mt-6 flex flex-wrap justify-center gap-2 opacity-0"
+            className="w-full mt-7 flex flex-wrap justify-center gap-2.5 opacity-0"
             style={{
               animation: 'spark-fade-in 0.6s ease-out forwards',
               animationDelay: '300ms',
             }}
           >
-            {QUICK_PROMPTS.map((prompt) => (
+            {QUICK_PROMPTS.map(({ icon: Icon, label, prompt, iconBg, iconColor }) => (
               <button
                 key={prompt}
                 type="button"
                 onClick={() => goAuth(prompt)}
-                className="px-4 py-2 rounded-full bg-white border border-[#EEEDEB] text-[13px] text-[#555] hover:border-[#FF6B1A] hover:text-[#FF6B1A] transition-colors"
+                className="group relative flex items-center gap-2 pl-2 pr-4 py-2 rounded-full bg-white border border-[#EEEDEB] text-[13px] text-[#3F3A35] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-[#FFCBA8] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
               >
-                {prompt}
+                {/* 彩色图标徽章 */}
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
+                  style={{ background: iconBg }}
+                >
+                  <Icon size={14} style={{ color: iconColor }} strokeWidth={2.2} />
+                </span>
+                <span className="transition-colors group-hover:text-[#FF6B1A]">{label}</span>
+                {/* hover 时浮出的 → 箭头：默认隐藏（宽度 0 + 透明），hover 时滑入 */}
+                <span
+                  className="overflow-hidden inline-flex items-center text-[#FF6B1A] opacity-0 max-w-0 -ml-1 group-hover:opacity-100 group-hover:max-w-[20px] group-hover:ml-0 transition-all duration-200"
+                  aria-hidden
+                >
+                  <ArrowRight size={14} strokeWidth={2.4} />
+                </span>
               </button>
             ))}
           </section>
