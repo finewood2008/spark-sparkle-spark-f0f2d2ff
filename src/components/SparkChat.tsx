@@ -250,6 +250,69 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             ),
           });
           setIsGenerating(false);
+
+          // Push another round of suggest-angles based on the REVISED article so
+          // the user can keep iterating. Each round refines the piece further.
+          const iteration = updatedItem.versions?.length || 1;
+          const suggestId = `${Date.now()}-angle-suggest-${iteration}`;
+          const initialChoices: ChoiceOption[] = [
+            { id: `submit-review-${updatedItem.id}-${iteration}`, label: '提交审核', emoji: '✅' },
+          ];
+          addMessage({
+            id: suggestId,
+            role: 'assistant',
+            content: `🔁 第 ${iteration} 轮迭代完成，我再想想还能怎么打磨…`,
+            timestamp: new Date().toISOString(),
+            choices: initialChoices,
+            loadingChoices: true,
+          });
+
+          suggestAngles({
+            title: updatedItem.title,
+            content: updatedItem.content,
+            cta: updatedItem.cta,
+            tags: updatedItem.tags || [],
+            platform: updatedItem.platform,
+          }).then((angles) => {
+            const articleTags = updatedItem.tags || [];
+            const fresh = filterDismissedAngles(angles, articleTags);
+            if (!fresh.length) {
+              const msgs2 = useAppStore.getState().messages;
+              useAppStore.setState({
+                messages: msgs2.map(m =>
+                  m.id === suggestId
+                    ? {
+                        ...m,
+                        content: '📋 这一版我暂时没有更多新方向了，可以提交审核或自己告诉我想怎么改：',
+                        loadingChoices: false,
+                      }
+                    : m
+                ),
+              });
+              return;
+            }
+            const angleChoices: ChoiceOption[] = fresh.map(a => ({
+              id: `${a.id}-iter${iteration}`,
+              label: a.label,
+              emoji: a.emoji,
+              anglePrompt: `${ANGLE_REVISE_PREFIX}${updatedItem.id}::${a.anglePrompt}`,
+              dismissable: true,
+              dismissTags: articleTags,
+            }));
+            const msgs2 = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: msgs2.map(m =>
+                m.id === suggestId
+                  ? {
+                      ...m,
+                      content: `💡 基于第 ${iteration} 版，还可以再这样打磨：`,
+                      choices: [...initialChoices, ...angleChoices].slice(0, 5),
+                      loadingChoices: false,
+                    }
+                  : m
+              ),
+            });
+          });
         },
         onError: (errMsg) => {
           const cur = useAppStore.getState().messages;
