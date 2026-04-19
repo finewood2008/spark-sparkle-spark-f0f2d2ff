@@ -66,6 +66,7 @@ export default function ConversationSidebar({
     newConversation,
     renameConversation,
     deleteConversation,
+    togglePinConversation,
   } = useConversations();
   const loading = useConversationStore((s) => s.loading);
   const { isAuthenticated, user } = useAuthStore();
