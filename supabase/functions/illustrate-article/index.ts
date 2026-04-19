@@ -220,9 +220,10 @@ serve(async (req) => {
               const imageUrl = await generateOneImage(p.imagePrompt, KEY);
               if (imageUrl) {
                 okCount += 1;
-                send("image", { index: i, alt: p.alt, imageUrl });
+                // imagePrompt 一并推给前端，用于"重新生成单张"
+                send("image", { index: i, alt: p.alt, imageUrl, imagePrompt: p.imagePrompt });
               } else {
-                send("image_failed", { index: i, alt: p.alt });
+                send("image_failed", { index: i, alt: p.alt, imagePrompt: p.imagePrompt });
               }
             }),
           );
