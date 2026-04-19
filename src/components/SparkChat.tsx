@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore';
 import {
   streamChat,
   creativeDialogue,
+  suggestAngles,
   type IntentBrief,
   type DialogueTurn,
 } from '../lib/ai-stream';
@@ -15,7 +16,7 @@ import { TypingIndicator } from './chat/ChatAtoms';
 import { WelcomeState } from './chat/WelcomeState';
 import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
-import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
+import { tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
 const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
