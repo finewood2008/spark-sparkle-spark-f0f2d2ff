@@ -44,6 +44,8 @@ export function useConversations() {
   const persistedIdsRef = useRef<Set<string>>(new Set());
   // Track whether we've attempted the initial bootstrap for this auth session
   const bootstrappedForUserRef = useRef<string | null>(null);
+  // Track conversations we've already AI-titled (or are titling) to avoid duplicates
+  const aiTitledRef = useRef<Set<string>>(new Set());
 
   /** Refresh the conversation list from the server. */
   const refresh = useCallback(async () => {
