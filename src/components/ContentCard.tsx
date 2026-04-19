@@ -905,16 +905,19 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       {/* Content */}
       {editing ? (
         <div className="relative">
-          <textarea
-            ref={textareaRef}
+          <EditableArticleBody
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
+            onChange={setEditContent}
+            textareaRef={textareaRef}
             onSelect={handleSelect}
-            onMouseUp={handleSelect}
-            className="w-full text-[14px] text-[#555] leading-[1.6] border border-[#E5E4E2] rounded-lg px-3 py-2 outline-none focus:border-spark-orange resize-none min-h-[160px]"
+            imageActions={{
+              onDelete: handleDeleteImage,
+              onRegenerate: handleRegenerateImage,
+              regeneratingUrls,
+            }}
           />
           {aiLoading && (
-            <div className="absolute inset-0 bg-white/60 rounded-lg flex items-center justify-center">
+            <div className="absolute inset-0 bg-white/60 rounded-lg flex items-center justify-center pointer-events-none">
               <div className="flex items-center gap-2 text-[13px] text-spark-orange">
                 <Loader2 size={16} className="animate-spin" />
                 AI 处理中...
