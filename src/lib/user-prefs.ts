@@ -28,6 +28,7 @@ export const defaultPrefs: UserPreferences = {
   autoCta: true,
   coverStyle: '简约清新',
   tonePreset: 'lively',
+  imageModel: 'standard',
 };
 
 const STORAGE_KEY = 'spark-user-prefs';
