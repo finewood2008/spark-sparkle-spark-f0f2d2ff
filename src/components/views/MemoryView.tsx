@@ -19,7 +19,7 @@ export default function MemoryView() {
   const setMemoryEnabled = useMemoryStore((s) => s.setMemoryEnabled);
   const brandProfile = useMemoryStore((s) => s.brandProfile);
   const preferences = useMemoryStore((s) => s.preferences);
-  const memories = useMemoryStore((s) => s.memoryEntry);
+  const memories = useMemoryStore((s) => s.memories);
   const contextCount = memories.filter((m) => m.layer === 'context').length;
 
   return (
