@@ -29,6 +29,10 @@ interface ClarifyOption {
   label: string;
   /** 用户选这个时，附加给生成 prompt 的 "角度提示" */
   anglePrompt: string;
+  /** 单个 emoji，用于卡片图标 */
+  emoji?: string;
+  /** 一句话补充说明，20 字内，告诉用户这个选项会带来什么 */
+  description?: string;
 }
 
 interface AnalysisOutput {
