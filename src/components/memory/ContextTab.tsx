@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 const categoryLabels: Record<ContextCategory, string> = {
   recent_content: '近期内容',
   active_schedule: '进行中计划',
-  session_summary: '会话摘要',
+  session_summary: '最近聊过的创作',
 };
 
 const categoryIcons: Record<ContextCategory, typeof Clock> = {
@@ -16,6 +16,12 @@ const categoryIcons: Record<ContextCategory, typeof Clock> = {
   active_schedule: Calendar,
   session_summary: MessageSquare,
 };
+
+/**
+ * Display order for categories — session_summary first so users immediately
+ * see "what spark remembers from our recent creative chats".
+ */
+const categoryOrder: ContextCategory[] = ['session_summary', 'recent_content', 'active_schedule'];
 
 function formatCountdown(expiresAt?: string): { text: string; urgent: boolean } {
   if (!expiresAt) return { text: '永久', urgent: false };
