@@ -109,10 +109,24 @@ function buildContextLayer(memories: MemoryEntry[]): string {
   const contextEntries = memories.filter((m) => m.layer === 'context');
   if (contextEntries.length === 0) return '';
 
-  const parts: string[] = ['【会话/上下文】'];
-  contextEntries.forEach((m) => {
-    const summary = (m.content as Record<string, unknown>).summary;
-    parts.push(`- [${m.category}] ${summary || JSON.stringify(m.content)}`);
+  const parts: string[] = ['【会话/上下文】（仅最近，可作为参考，避免重复角度）'];
+  // Sort newest first so the model sees the most relevant sessions
+  const sorted = [...contextEntries].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+  sorted.slice(0, 6).forEach((m) => {
+    const c = m.content as Record<string, unknown>;
+    if (m.category === 'session_summary') {
+      // Rich render: "主题 X → 角度 Y | 用到 a, b"
+      const topic = (c.topic as string) ?? '';
+      const angle = (c.chosenAngle as string) ?? '';
+      const assets = Array.isArray(c.matchedAssets) ? (c.matchedAssets as string[]).join('、') : '';
+      const assetsTail = assets ? ` | 用到 ${assets}` : '';
+      parts.push(`- 上次写过：${topic} → ${angle}${assetsTail}`);
+    } else {
+      const summary = c.summary;
+      parts.push(`- [${m.category}] ${summary || JSON.stringify(c)}`);
+    }
   });
   return parts.join('\n');
 }
