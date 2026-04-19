@@ -315,6 +315,19 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                   : m
               ),
             });
+          }).catch(() => {
+            const msgs2 = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: msgs2.map(m =>
+                m.id === suggestId
+                  ? {
+                      ...m,
+                      content: '📋 这一版我暂时没有更多新方向了，可以提交审核或自己告诉我想怎么改：',
+                      loadingChoices: false,
+                    }
+                  : m,
+              ),
+            });
           });
         },
         onError: (errMsg) => {
