@@ -598,6 +598,21 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                 : m
             );
             useAppStore.setState({ messages: next });
+          }).catch(() => {
+            // Safety net: even if the suggest pipeline throws, clear the
+            // skeleton so the user can still proceed (提交审核 button stays).
+            const cur = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: cur.map(m =>
+                m.id === suggestId
+                  ? {
+                      ...m,
+                      content: '📋 你可以直接提交审核，或继续告诉我想怎么改：',
+                      loadingChoices: false,
+                    }
+                  : m,
+              ),
+            });
           });
 
         },
