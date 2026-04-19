@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import {
   streamChat,
+  streamEdit,
   creativeDialogue,
   suggestAngles,
   type IntentBrief,
@@ -10,7 +11,7 @@ import {
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
+import type { ChatMessage, ContentItem, ContentVersion, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
 import type { MemoryEntry } from '../types/memory';
 
 // Extracted sub-components
@@ -22,6 +23,10 @@ import { tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
 const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
+
+/** Sentinel prefix for "apply this angle to an existing article" choice clicks.
+ *  Format: __angle_revise__::<itemId>::<angle prompt> */
+const ANGLE_REVISE_PREFIX = '__angle_revise__::';
 
 /** State of an in-flight pre-creation dialogue */
 interface DialogueState {
