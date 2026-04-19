@@ -301,6 +301,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const [illustrateLoading, setIllustrateLoading] = useState(false);
+  /** 全文配图进度：{done, total}，total=0 表示规划中（尚未拿到 plan） */
+  const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
@@ -617,6 +619,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
     setActionError('illustrate', null);
     setIllustrateLoading(true);
+    setIllustrateProgress({ done: 0, total: 0 });
     setUndoStack(prev => [...prev, startContent]);
     if (!editing) {
       setEditing(true);
@@ -677,6 +680,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         if (event === 'plan') {
           const items = (payload.items as Array<{ index: number; anchorSnippet: string; alt: string }>) || [];
           totalPlanned = (payload.total as number) || items.length;
+          setIllustrateProgress({ done: 0, total: totalPlanned });
           // 在每个锚点处插入占位（按 index 顺序，从后往前插以避免位置漂移）
           let next = working;
           // 先生成所有 token
@@ -710,6 +714,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             syncToStore(working);
           }
           succeeded += 1;
+          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
         } else if (event === 'image_failed') {
           const idx = payload.index as number;
           const token = tokens[idx];
@@ -718,6 +723,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             setEditContent(working);
             syncToStore(working);
           }
+          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
         } else if (event === 'done') {
           if (succeeded > 0) {
             toast.success(`已为正文配 ${succeeded} 张插图 ✨`);
@@ -767,6 +773,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       setActionError('illustrate', '网络异常，全文配图失败');
     }
     setIllustrateLoading(false);
+    setIllustrateProgress({ done: 0, total: 0 });
   };
 
   /** 删除单张已配图：把对应的 ![alt](url) 从正文里移除，同时同步到 store。 */
@@ -1324,7 +1331,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               title="AI 分析全文，在合适段落自动插图"
             >
               {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
-              {illustrateLoading ? '配图中...' : '全文配图'}
+              {illustrateLoading
+                ? illustrateProgress.total > 0
+                  ? `配图中 ${illustrateProgress.done}/${illustrateProgress.total} ✨`
+                  : '规划配图位置...'
+                : '全文配图'}
             </button>
 
             {/* 流程组：右靠 */}
@@ -1383,7 +1394,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               className="content-card-btn text-spark-orange"
             >
               {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
-              {illustrateLoading ? '配图中...' : '全文配图'}
+              {illustrateLoading
+                ? illustrateProgress.total > 0
+                  ? `配图中 ${illustrateProgress.done}/${illustrateProgress.total} ✨`
+                  : '规划配图位置...'
+                : '全文配图'}
             </button>
 
             <span className="ml-auto" aria-hidden />
