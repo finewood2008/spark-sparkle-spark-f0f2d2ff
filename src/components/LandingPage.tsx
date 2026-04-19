@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Brain, CalendarClock, TrendingUp, Send, ArrowRight } from 'lucide-react';
+import { Brain, CalendarClock, TrendingUp, Send, ArrowRight, Flame, BarChart3, Sparkles, CalendarRange } from 'lucide-react';
 import SparkLogo from './SparkLogo';
 
 const TYPING_PHRASES = [
