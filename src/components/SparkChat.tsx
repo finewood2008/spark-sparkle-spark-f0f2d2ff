@@ -727,6 +727,27 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     if (!text.trim() || isGenerating) return;
     setInput('');
 
+    // Special-case: angle-revise sentinel — modify the linked article instead
+    // of starting a new chat/generate cycle. Format:
+    //   __angle_revise__::<itemId>::<angle prompt>
+    if (text.startsWith(ANGLE_REVISE_PREFIX)) {
+      const rest = text.slice(ANGLE_REVISE_PREFIX.length);
+      const sepIdx = rest.indexOf('::');
+      if (sepIdx > 0) {
+        const itemId = rest.slice(0, sepIdx);
+        const anglePrompt = rest.slice(sepIdx + 2);
+        // Find a friendly label from the most recent message's choices
+        const msgs = useAppStore.getState().messages;
+        let label = anglePrompt.slice(0, 20);
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          const choice = msgs[i].choices?.find(c => c.anglePrompt === text);
+          if (choice) { label = choice.label; break; }
+        }
+        await applyAngleToArticle(itemId, anglePrompt, label);
+        return;
+      }
+    }
+
     // Special-case: "提交审核" choice — skip AI, submit current draft
     if (text.trim() === '提交审核') {
       addMessage({
