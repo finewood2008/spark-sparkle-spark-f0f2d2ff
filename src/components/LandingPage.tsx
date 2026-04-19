@@ -234,7 +234,7 @@ export default function LandingPage() {
                 <h1
                   className="font-extrabold leading-[0.9] tracking-[-0.04em] select-none"
                   style={{
-                    fontSize: 'clamp(64px, 11vw, 112px)',
+                    fontSize: 'clamp(48px, 8vw, 84px)',
                     background:
                       'linear-gradient(135deg, #FF8C42 0%, #FF6B1A 45%, #E04E00 100%)',
                     WebkitBackgroundClip: 'text',
