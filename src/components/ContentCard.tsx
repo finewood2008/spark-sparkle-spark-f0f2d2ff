@@ -252,7 +252,6 @@ function EditableArticleBody({
                 ta.style.height = 'auto';
                 ta.style.height = `${ta.scrollHeight}px`;
               }}
-              ref-callback={undefined}
               rows={Math.max(1, seg.text.split('\n').length)}
               className="w-full text-[14px] text-[#555] leading-[1.6] outline-none resize-none bg-transparent px-1 py-0.5"
               placeholder={isLast && segs.length === 1 ? '在这里写内容…' : ''}
