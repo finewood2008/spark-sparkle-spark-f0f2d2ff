@@ -197,6 +197,27 @@ export function useConversations() {
         patchConversation(convId, { lastMessageAt: new Date().toISOString() });
       }
       await touchConversation(convId);
+
+      // ----- AI-refined title (once per conversation, after first AI reply) -----
+      const firstAssistantMsg = messages.find(
+        (m) => m.role === 'assistant' && (m.content || '').trim().length > 0,
+      );
+      if (
+        firstUserMsg &&
+        firstAssistantMsg &&
+        !aiTitledRef.current.has(convId)
+      ) {
+        aiTitledRef.current.add(convId);
+        void (async () => {
+          const aiTitle = await generateAITitle(
+            firstUserMsg.content,
+            firstAssistantMsg.content,
+          );
+          if (!aiTitle) return;
+          patchConversation(convId!, { title: aiTitle });
+          await apiRename(convId!, aiTitle);
+        })();
+      }
     })();
   }, [
     messages,
