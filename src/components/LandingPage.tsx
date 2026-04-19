@@ -433,19 +433,35 @@ export default function LandingPage() {
       </main>
 
       <footer className="relative border-t border-[#EEEDEB] mt-16 bg-white/40 overflow-hidden">
-        {/* 超大背景描边水印 */}
-        <div
+        {/* 超大背景描边水印 — SVG 实现真正的渐变描边 */}
+        <svg
           aria-hidden
-          className="pointer-events-none select-none absolute -bottom-8 -right-4 md:-bottom-14 md:-right-8 leading-none font-black tracking-tighter"
-          style={{
-            fontSize: 'clamp(180px, 26vw, 360px)',
-            color: 'transparent',
-            WebkitTextStroke: '1.5px rgba(255, 107, 26, 0.18)',
-            opacity: 0.35,
-          }}
+          className="pointer-events-none select-none absolute -bottom-10 -right-6 md:-bottom-16 md:-right-10 w-[120%] md:w-[95%] h-auto"
+          viewBox="0 0 800 260"
+          preserveAspectRatio="xMaxYMax meet"
+          style={{ opacity: 0.55 }}
         >
-          SPARK
-        </div>
+          <defs>
+            <linearGradient id="spark-watermark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FF6B1A" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#FFB37A" stopOpacity="0.35" />
+            </linearGradient>
+          </defs>
+          <text
+            x="800"
+            y="240"
+            textAnchor="end"
+            fontSize="260"
+            fontWeight="900"
+            fontFamily="Inter, system-ui, sans-serif"
+            letterSpacing="-12"
+            fill="none"
+            stroke="url(#spark-watermark-grad)"
+            strokeWidth="1.5"
+          >
+            SPARK
+          </text>
+        </svg>
 
         <div className="relative max-w-[1080px] mx-auto px-6 pt-14 pb-10">
           {/* Top: logo + 3 link columns */}
