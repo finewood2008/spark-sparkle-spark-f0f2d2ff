@@ -773,6 +773,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       setActionError('illustrate', '网络异常，全文配图失败');
     }
     setIllustrateLoading(false);
+    setIllustrateProgress({ done: 0, total: 0 });
   };
 
   /** 删除单张已配图：把对应的 ![alt](url) 从正文里移除，同时同步到 store。 */
