@@ -80,7 +80,7 @@ serve(async (req) => {
     validatePayloadSize(req);
     checkRateLimit(req, { maxRequests: 20, windowSec: 60, keyPrefix: "chat" });
 
-    const { messages, mode, platform, brandContext, presetId } = await req.json();
+    const { messages, mode, platform, brandContext, presetId, intent } = await req.json();
 
     // Input validation: messages array max 50 items, each content max 10k chars
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -104,7 +104,7 @@ serve(async (req) => {
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const systemPrompt = mode === "generate"
-      ? buildGeneratePrompt(platform, brandContext, presetId)
+      ? buildGeneratePrompt(platform, brandContext, presetId, intent)
       : buildChatPrompt(brandContext, presetId);
 
     const body = toGemini(messages, systemPrompt);
