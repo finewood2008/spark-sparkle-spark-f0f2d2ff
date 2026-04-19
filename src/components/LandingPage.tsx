@@ -436,10 +436,9 @@ export default function LandingPage() {
         {/* 超大背景描边水印 — SVG 渐变描边，贴右下角 */}
         <svg
           aria-hidden
-          className="pointer-events-none select-none absolute -bottom-6 -right-4 md:-bottom-10 md:-right-6 w-[70%] md:w-[55%] h-auto"
+          className="pointer-events-none select-none absolute -bottom-6 -right-4 md:-bottom-10 md:-right-6 w-[70%] md:w-[55%] h-auto animate-spark-watermark-breathe"
           viewBox="0 0 800 220"
           preserveAspectRatio="xMaxYMax meet"
-          style={{ opacity: 0.32 }}
         >
           <defs>
             <linearGradient id="spark-watermark-grad" x1="0%" y1="0%" x2="100%" y2="100%">

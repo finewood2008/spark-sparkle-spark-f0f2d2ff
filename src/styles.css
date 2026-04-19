@@ -290,3 +290,12 @@
 .animate-spark-shimmer {
   animation: spark-shimmer 1.6s linear infinite;
 }
+
+@keyframes spark-watermark-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.animate-spark-watermark-breathe {
+  animation: spark-watermark-breathe 8s ease-in-out infinite;
+}
