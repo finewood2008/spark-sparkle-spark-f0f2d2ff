@@ -15,6 +15,8 @@ export interface UserPreferences {
   coverStyle: string;
   /** 火花的语气预设：专业 / 活泼 / 极简 */
   tonePreset: TonePresetId;
+  /** 图片生成模型：标准（更快）/ 高清（更好） */
+  imageModel: 'standard' | 'hd';
 }
 
 export const defaultPrefs: UserPreferences = {
