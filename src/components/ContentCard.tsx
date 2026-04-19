@@ -527,54 +527,162 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   };
 
   /**
-   * 全文智能配图：调 illustrate-article 让 AI 自己挑插图位置 + 生成图片，
-   * 把返回的 markdown 图片插回正文。
+   * 全文智能配图（SSE 流式）：
+   * 1) plan 事件：拿到所有插图位置，先在原文锚点处插入"🎨 正在配第 N/总 张..."占位
+   * 2) image 事件：每张图完成立即把对应占位换成真实 markdown 图片
+   * 3) image_failed：换成"⚠️ 第 N 张配图失败"提示
+   * 4) done：清理 + toast
    */
   const handleIllustrate = async () => {
-    const currentContent = editing ? editContent : item.content;
+    const startContent = editing ? editContent : item.content;
     const currentTitle = editing ? editTitle : item.title;
-    if (currentContent.length < 50) {
+    if (startContent.length < 50) {
       toast.error('正文太短（少于 50 字），无法智能配图');
       return;
     }
     setActionError('illustrate', null);
     setIllustrateLoading(true);
-    setUndoStack(prev => [...prev, currentContent]);
+    setUndoStack(prev => [...prev, startContent]);
     if (!editing) {
       setEditing(true);
       setExpanded(true);
-      setEditContent(currentContent);
+      setEditContent(startContent);
     }
+
+    // 占位 token：唯一、不会出现在正文里
+    const placeholderToken = (i: number) => `__SPARK_ILLUSTRATE_${Date.now()}_${i}__`;
+    const tokens: string[] = [];
+    // 当前流式拼装的正文（每次 image/failed 事件都基于这个改）
+    let working = startContent;
+
+    const syncToStore = (next: string) => {
+      const updated = contents.map(c =>
+        c.id === item.id
+          ? { ...c, content: next, updatedAt: new Date().toISOString() }
+          : c
+      );
+      setContents(updated);
+    };
+
+    const insertAtAnchor = (text: string, anchor: string, payload: string): string => {
+      const a = anchor.trim().substring(0, 30);
+      const idx = text.indexOf(a);
+      if (idx === -1) return text + payload; // 锚点丢失：追加到末尾
+      const lineEnd = text.indexOf('\n', idx + a.length);
+      const insertAt = lineEnd === -1 ? text.length : lineEnd;
+      return text.substring(0, insertAt) + payload + text.substring(insertAt);
+    };
+
     try {
       const authToken = await getAuthToken();
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({
-          title: currentTitle,
-          content: currentContent,
-          platform: item.platform,
-        }),
+        body: JSON.stringify({ title: currentTitle, content: startContent, platform: item.platform }),
       });
-      if (!resp.ok) {
+      if (!resp.ok || !resp.body) {
         const err = await resp.json().catch(() => ({ error: '配图失败' }));
         setActionError('illustrate', err.error || '全文配图失败，请重试');
         setIllustrateLoading(false);
         return;
       }
-      const data = await resp.json();
-      if (data.content) {
-        setEditContent(data.content);
-        const updated = contents.map(c =>
-          c.id === item.id
-            ? { ...c, content: data.content, updatedAt: new Date().toISOString() }
-            : c
-        );
-        setContents(updated);
-        toast.success(`已为正文配 ${data.count} 张插图 ✨`);
-      } else {
-        setActionError('illustrate', '未能生成插图，请重试');
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentEvent = '';
+      let totalPlanned = 0;
+      let succeeded = 0;
+      let streamDone = false;
+
+      const handleEvent = (event: string, data: string) => {
+        let payload: Record<string, unknown>;
+        try { payload = JSON.parse(data); } catch { return; }
+
+        if (event === 'plan') {
+          const items = (payload.items as Array<{ index: number; anchorSnippet: string; alt: string }>) || [];
+          totalPlanned = (payload.total as number) || items.length;
+          // 在每个锚点处插入占位（按 index 顺序，从后往前插以避免位置漂移）
+          let next = working;
+          // 先生成所有 token
+          for (let i = 0; i < items.length; i++) tokens[items[i].index] = placeholderToken(items[i].index);
+          // 按文中出现位置降序插入，保证插入不互相影响
+          const sorted = [...items].sort((a, b) => {
+            const ai = next.indexOf(a.anchorSnippet.trim().substring(0, 30));
+            const bi = next.indexOf(b.anchorSnippet.trim().substring(0, 30));
+            return bi - ai;
+          });
+          for (const it of sorted) {
+            const placeholder = `\n\n${tokens[it.index]}\n\n`;
+            next = insertAtAnchor(next, it.anchorSnippet, placeholder);
+          }
+          working = next;
+          setEditContent(next);
+          syncToStore(next);
+        } else if (event === 'image') {
+          const idx = payload.index as number;
+          const url = payload.imageUrl as string;
+          const alt = (payload.alt as string) || '';
+          const token = tokens[idx];
+          if (token && working.includes(token)) {
+            working = working.replace(token, `![${alt}](${url})`);
+            setEditContent(working);
+            syncToStore(working);
+          }
+          succeeded += 1;
+        } else if (event === 'image_failed') {
+          const idx = payload.index as number;
+          const token = tokens[idx];
+          if (token && working.includes(token)) {
+            working = working.replace(token, `> ⚠️ 第 ${idx + 1} 张配图失败`);
+            setEditContent(working);
+            syncToStore(working);
+          }
+        } else if (event === 'done') {
+          if (succeeded > 0) {
+            toast.success(`已为正文配 ${succeeded} 张插图 ✨`);
+          } else {
+            setActionError('illustrate', '所有插图都生成失败，请重试');
+          }
+        } else if (event === 'error') {
+          setActionError('illustrate', (payload.message as string) || '全文配图失败');
+        }
+      };
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          let line = buffer.slice(0, nl);
+          buffer = buffer.slice(nl + 1);
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line === '') {
+            // 事件分隔符 — 这里我们已经在 data: 时直接 dispatch 了
+            currentEvent = '';
+            continue;
+          }
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            handleEvent(currentEvent || 'message', line.slice(6));
+            if (currentEvent === 'done' || currentEvent === 'error') streamDone = true;
+          }
+        }
       }
+      // 兜底：清理任何残留占位
+      let cleaned = working;
+      for (const t of tokens) {
+        if (t && cleaned.includes(t)) {
+          cleaned = cleaned.replace(t, '');
+        }
+      }
+      if (cleaned !== working) {
+        setEditContent(cleaned);
+        syncToStore(cleaned);
+      }
+      void totalPlanned; // 仅用于调试
     } catch {
       setActionError('illustrate', '网络异常，全文配图失败');
     }
