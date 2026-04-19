@@ -634,9 +634,15 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   };
 
   /**
-   * Run one round of pre-creation dialogue. If `userReply` is provided, append
-   * it to the running history. If the backend replies ready=true, jump straight
-   * to runGenerate using the brief.
+   * Run one round of pre-creation dialogue (streaming).
+   *
+   * UX flow per round:
+   *   1. Push an empty assistant bubble immediately
+   *   2. As reply text streams in, append chars to bubble.content live
+   *   3. After ~40 chars of reply, fade in the choices skeleton
+   *      (loadingChoices=true) so user senses cards "coming up next"
+   *   4. When meta arrives, swap skeleton for real choice cards
+   *      (or jump straight to runGenerate if ready=true)
    */
   const runDialogueRound = async (userReply?: string, forceReady = false) => {
     const state = dialogueRef.current;
@@ -646,25 +652,58 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       ? [...state.history, { role: 'user' as const, content: userReply }]
       : state.history;
 
-    // Show typing indicator via shared isGenerating spinner
     setIsGenerating(true);
 
-    const turn: DialogueTurn | null = await creativeDialogue({
+    // Push placeholder bubble we'll mutate as text streams
+    const bubbleId = `${Date.now()}-dlg-${state.turn}`;
+    addMessage({
+      id: bubbleId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+    });
+
+    let accumulated = '';
+    let skeletonShown = false;
+    const SKELETON_AT = 40; // chars of reply before showing card skeleton
+
+    const updateBubble = (mutator: (m: ChatMessage) => ChatMessage) => {
+      const all = useAppStore.getState().messages;
+      const next = all.map(m => (m.id === bubbleId ? mutator(m) : m));
+      // Replace the messages array via direct setter pattern
+      useAppStore.setState({ messages: next });
+    };
+
+    let metaPayload: { suggestions: DialogueSuggestion[]; ready: boolean; brief?: { chosenAngle: string; matchedAssets: string[]; matchedRules: string[]; risks: string[] } } | null = null;
+    let streamErr: string | null = null;
+
+    await streamCreativeDialogue({
       originalPrompt: state.originalPrompt,
       history,
       forceReady,
+      onText: (delta) => {
+        accumulated += delta;
+        updateBubble((m) => ({ ...m, content: accumulated }));
+        // Halfway through the reply, fade in the card skeleton
+        if (!skeletonShown && accumulated.length >= SKELETON_AT) {
+          skeletonShown = true;
+          updateBubble((m) => ({ ...m, loadingChoices: true }));
+        }
+      },
+      onMeta: (meta) => { metaPayload = meta; },
+      onDone: () => { /* handled below */ },
+      onError: (msg) => { streamErr = msg; },
     });
 
     setIsGenerating(false);
 
-    if (!turn) {
-      // Hard failure → fall back to direct generation with what we have
-      addMessage({
-        id: `${Date.now()}-dlg-err`,
-        role: 'assistant',
+    if (streamErr && !accumulated) {
+      // Hard failure with no text → fall back to direct generation
+      updateBubble((m) => ({
+        ...m,
         content: '对话出了点问题，我直接开始为你创作。',
-        timestamp: new Date().toISOString(),
-      });
+        loadingChoices: false,
+      }));
       const fallbackBrief: IntentBrief = {
         intentType: 'other',
         matchedAssets: [],
@@ -680,47 +719,40 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
 
     // Append latest exchange into running history
+    const reply = accumulated || '我们继续聊聊？';
     const nextHistory = [
       ...history,
-      { role: 'assistant' as const, content: turn.reply },
+      { role: 'assistant' as const, content: reply },
     ];
     state.history = nextHistory;
     state.turn = state.turn + 1;
 
-    if (turn.ready && turn.brief) {
-      // Render closing reply (no escape button — we're already moving on)
-      addMessage({
-        id: `${Date.now()}-dlg-ready`,
-        role: 'assistant',
-        content: turn.reply,
-        timestamp: new Date().toISOString(),
-      });
+    if (metaPayload?.ready && metaPayload.brief) {
+      // Closing turn — clear skeleton, no choices needed
+      updateBubble((m) => ({ ...m, loadingChoices: false, choices: undefined }));
+
+      const brief = metaPayload.brief;
       const finalBrief: IntentBrief = {
         intentType: 'other',
-        matchedAssets: turn.brief.matchedAssets,
-        matchedRules: turn.brief.matchedRules,
-        risks: turn.brief.risks,
+        matchedAssets: brief.matchedAssets,
+        matchedRules: brief.matchedRules,
+        risks: brief.risks,
         clarifyQuestion: null,
         skipClarify: true,
       };
-      // Snapshot dialogue (excluding the very first user prompt — it's the
-      // article topic itself, already shown as the article title context)
       const transcript = nextHistory.slice(1);
       const turns = state.turn;
 
-      // 🧠 Memory: persist this session's brief into the context layer with
-      // a 7-day expiry, so next time we discuss a similar topic, spark can
-      // surface the angle/assets we already aligned on instead of starting
-      // from zero. Fire-and-forget — never block generation on this.
+      // 🧠 Memory: persist brief into context layer (7-day expiry)
       try {
         const nowIso = new Date().toISOString();
         const expIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const summaryParts: string[] = [
           `主题"${state.originalPrompt}"`,
-          `角度"${turn.brief.chosenAngle}"`,
+          `角度"${brief.chosenAngle}"`,
         ];
-        if (turn.brief.matchedAssets.length > 0) {
-          summaryParts.push(`用到 ${turn.brief.matchedAssets.join('、')}`);
+        if (brief.matchedAssets.length > 0) {
+          summaryParts.push(`用到 ${brief.matchedAssets.join('、')}`);
         }
         const sessionEntry: MemoryEntry = {
           id:
@@ -731,10 +763,10 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           category: 'session_summary',
           content: {
             topic: state.originalPrompt,
-            chosenAngle: turn.brief.chosenAngle,
-            matchedAssets: turn.brief.matchedAssets,
-            matchedRules: turn.brief.matchedRules,
-            risks: turn.brief.risks,
+            chosenAngle: brief.chosenAngle,
+            matchedAssets: brief.matchedAssets,
+            matchedRules: brief.matchedRules,
+            risks: brief.risks,
             turns,
             summary: summaryParts.join(' → '),
           },
@@ -744,7 +776,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           createdAt: nowIso,
           updatedAt: nowIso,
         };
-        // Don't await — generation must not wait on memory write
         void persistEntry(sessionEntry);
       } catch (err) {
         console.warn('[SparkChat] failed to persist session_summary:', err);
@@ -752,29 +783,26 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
 
       dialogueRef.current = null;
       setIsGenerating(true);
-      await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle, {
+      await runGenerate(state.originalPrompt, finalBrief, brief.chosenAngle, {
         history: transcript,
         turns,
       });
       return;
     }
 
-    // Still gathering — render reply + suggestion cards + escape button
-    const choices: ChoiceOption[] = turn.suggestions.map((s, i) => ({
+    // Still gathering — populate cards into the same bubble we've been streaming
+    const suggestions = metaPayload?.suggestions ?? [];
+    const choices: ChoiceOption[] = suggestions.map((s, i) => ({
       id: s.id || `dlg-${Date.now()}-${i}`,
       label: s.label,
       emoji: s.emoji,
       description: s.description,
       variant: 'card',
-      // Reuse anglePrompt to carry the click-value (sent verbatim on tap)
       anglePrompt: s.value,
     }));
-    // Always offer an escape route as a quick action
-    addMessage({
-      id: `${Date.now()}-dlg-${state.turn}`,
-      role: 'assistant',
-      content: turn.reply,
-      timestamp: new Date().toISOString(),
+    updateBubble((m) => ({
+      ...m,
+      loadingChoices: false,
       choices,
       actions: [
         {
@@ -784,7 +812,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           variant: 'outline',
         },
       ],
-    });
+    }));
   };
 
   /** Entry point when user asks to generate — kicks off the dialogue */
