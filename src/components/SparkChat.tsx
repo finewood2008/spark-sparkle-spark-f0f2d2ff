@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
-import { streamChat, analyzeIntent, type IntentBrief } from '../lib/ai-stream';
+import {
+  streamChat,
+  creativeDialogue,
+  type IntentBrief,
+  type DialogueTurn,
+} from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
 import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
@@ -12,6 +17,18 @@ import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
 import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
 
+/** Sentinel value sent when user clicks the "直接生成" escape button */
+const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
+
+/** State of an in-flight pre-creation dialogue */
+interface DialogueState {
+  originalPrompt: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  turn: number;
+  /** Latest brief, if backend has signaled ready */
+  brief?: IntentBrief;
+}
+
 export default function SparkChat({ getContext }: { getContext?: () => string }) {
   const {
     messages, addMessage, isGenerating, setIsGenerating,
@@ -20,9 +37,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Stash the in-flight intent brief between clarify-question render and user choice
-  const pendingBriefRef = useRef<IntentBrief | null>(null);
-  const pendingPromptRef = useRef<string>('');
+  // Multi-turn pre-creation dialogue state
+  const dialogueRef = useRef<DialogueState | null>(null);
 
   const hasMessages = messages.length > 0;
 
@@ -326,75 +342,118 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
   };
 
-  // Step 1+2: analyze intent → either ask clarifying question or skip to generation
-  const handleGenerate = async (text: string) => {
-    // Show "thinking" status while we analyze
-    const thinkingId = (Date.now() + 1).toString();
-    addMessage({
-      id: thinkingId,
-      role: 'assistant',
-      content: '🔍 让我先理解一下你的需求...',
-      timestamp: new Date().toISOString(),
+  /**
+   * Run one round of pre-creation dialogue. If `userReply` is provided, append
+   * it to the running history. If the backend replies ready=true, jump straight
+   * to runGenerate using the brief.
+   */
+  const runDialogueRound = async (userReply?: string, forceReady = false) => {
+    const state = dialogueRef.current;
+    if (!state) return;
+
+    const history = userReply
+      ? [...state.history, { role: 'user' as const, content: userReply }]
+      : state.history;
+
+    // Show typing indicator via shared isGenerating spinner
+    setIsGenerating(true);
+
+    const turn: DialogueTurn | null = await creativeDialogue({
+      originalPrompt: state.originalPrompt,
+      history,
+      forceReady,
     });
 
-    const brief = await analyzeIntent(text);
+    setIsGenerating(false);
 
-    // Remove the thinking message
-    const msgs = useAppStore.getState().messages.filter(m => m.id !== thinkingId);
-    useAppStore.setState({ messages: msgs });
-
-    // No brief or skip → generate directly (no brand context match either)
-    if (!brief || brief.skipClarify || !brief.clarifyQuestion) {
-      // Show a brief "I read your stuff" message if we found matches
-      if (brief && (brief.matchedAssets.length > 0 || brief.matchedRules.length > 0)) {
-        const matchedSummary: string[] = [];
-        if (brief.matchedAssets.length > 0) {
-          matchedSummary.push(`📌 我会用到你的：${brief.matchedAssets.slice(0, 2).join('、')}`);
-        }
-        if (brief.matchedRules.length > 0) {
-          matchedSummary.push(`✍️ 遵循偏好：${brief.matchedRules.slice(0, 2).join('、')}`);
-        }
-        addMessage({
-          id: `${Date.now()}-brief`,
-          role: 'assistant',
-          content: matchedSummary.join('\n'),
-          timestamp: new Date().toISOString(),
-        });
-      }
-      await runGenerate(text, brief ?? undefined);
+    if (!turn) {
+      // Hard failure → fall back to direct generation with what we have
+      addMessage({
+        id: `${Date.now()}-dlg-err`,
+        role: 'assistant',
+        content: '对话出了点问题，我直接开始为你创作。',
+        timestamp: new Date().toISOString(),
+      });
+      const fallbackBrief: IntentBrief = {
+        intentType: 'other',
+        matchedAssets: [],
+        matchedRules: [],
+        risks: [],
+        clarifyQuestion: null,
+        skipClarify: true,
+      };
+      dialogueRef.current = null;
+      setIsGenerating(true);
+      await runGenerate(state.originalPrompt, fallbackBrief, userReply);
       return;
     }
 
-    // Need clarification — render question + choice pills
-    const matchedLine: string[] = [];
-    if (brief.matchedAssets.length > 0) {
-      matchedLine.push(`📌 关于你的品牌，我看到了：${brief.matchedAssets.slice(0, 2).join('、')}`);
+    // Append latest exchange into running history
+    const nextHistory = [
+      ...history,
+      { role: 'assistant' as const, content: turn.reply },
+    ];
+    state.history = nextHistory;
+    state.turn = state.turn + 1;
+
+    if (turn.ready && turn.brief) {
+      // Render closing reply (no escape button — we're already moving on)
+      addMessage({
+        id: `${Date.now()}-dlg-ready`,
+        role: 'assistant',
+        content: turn.reply,
+        timestamp: new Date().toISOString(),
+      });
+      const finalBrief: IntentBrief = {
+        intentType: 'other',
+        matchedAssets: turn.brief.matchedAssets,
+        matchedRules: turn.brief.matchedRules,
+        risks: turn.brief.risks,
+        clarifyQuestion: null,
+        skipClarify: true,
+      };
+      dialogueRef.current = null;
+      setIsGenerating(true);
+      await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle);
+      return;
     }
-    const intro = matchedLine.length > 0 ? `${matchedLine.join('\n')}\n\n` : '';
 
-    const clarifyChoices: ChoiceOption[] = brief.clarifyQuestion.options.map((opt, i) => ({
-      id: `clarify-${Date.now()}-${i}`,
-      label: opt.label,
-      emoji: opt.emoji,
-      description: opt.description,
+    // Still gathering — render reply + suggestion cards + escape button
+    const choices: ChoiceOption[] = turn.suggestions.map((s, i) => ({
+      id: s.id || `dlg-${Date.now()}-${i}`,
+      label: s.label,
+      emoji: s.emoji,
+      description: s.description,
       variant: 'card',
-      anglePrompt: opt.anglePrompt,
-      clarifyForPrompt: text,
+      // Reuse anglePrompt to carry the click-value (sent verbatim on tap)
+      anglePrompt: s.value,
     }));
-    // Stash brief on the message so when user picks, we can pass matchedAssets to runGenerate
-    pendingBriefRef.current = brief;
-    pendingPromptRef.current = text;
-
+    // Always offer an escape route as a quick action
     addMessage({
-      id: `${Date.now()}-clarify`,
+      id: `${Date.now()}-dlg-${state.turn}`,
       role: 'assistant',
-      content: `${intro}${brief.clarifyQuestion.question}`,
+      content: turn.reply,
       timestamp: new Date().toISOString(),
-      choices: clarifyChoices,
+      choices,
+      actions: [
+        {
+          label: '直接生成',
+          value: FORCE_GENERATE_SENTINEL,
+          icon: '⚡',
+          variant: 'outline',
+        },
+      ],
     });
+  };
 
-    // Stop the spinner — we're waiting on user
-    setIsGenerating(false);
+  /** Entry point when user asks to generate — kicks off the dialogue */
+  const handleGenerate = async (text: string) => {
+    dialogueRef.current = {
+      originalPrompt: text,
+      history: [{ role: 'user', content: text }],
+      turn: 0,
+    };
+    await runDialogueRound();
   };
 
   const sendMessage = async (text: string) => {
@@ -413,30 +472,21 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       return;
     }
 
-    // Clarify-choice handling: if there's a pending brief and the text matches
-    // one of the offered options' labels, treat it as the user's angle pick and
-    // jump straight to generation with that angle injected.
-    const pendingBrief = pendingBriefRef.current;
-    const pendingPrompt = pendingPromptRef.current;
-    if (pendingBrief?.clarifyQuestion && pendingPrompt) {
-      const picked = pendingBrief.clarifyQuestion.options.find(
-        opt => opt.label === text.trim(),
-      );
-      if (picked) {
-        // Echo user's pick
-        addMessage({
-          id: Date.now().toString(),
-          role: 'user',
-          content: text.trim(),
-          timestamp: new Date().toISOString(),
-        });
-        // Clear pending state — single-use
-        pendingBriefRef.current = null;
-        pendingPromptRef.current = '';
-        setIsGenerating(true);
-        await runGenerate(pendingPrompt, pendingBrief, picked.anglePrompt);
-        return;
-      }
+    // Multi-turn dialogue handling: if we're in the middle of a pre-creation
+    // dialogue, route this user reply (whether typed or via card click) back
+    // into the dialogue loop instead of starting a new chat/generate cycle.
+    if (dialogueRef.current) {
+      const trimmed = text.trim();
+      const isForce = trimmed === FORCE_GENERATE_SENTINEL;
+      // Echo the user's reply (skip the sentinel — show a friendly label instead)
+      addMessage({
+        id: Date.now().toString(),
+        role: 'user',
+        content: isForce ? '直接生成' : trimmed,
+        timestamp: new Date().toISOString(),
+      });
+      await runDialogueRound(isForce ? undefined : trimmed, isForce);
+      return;
     }
 
     const userMsg: ChatMessage = {

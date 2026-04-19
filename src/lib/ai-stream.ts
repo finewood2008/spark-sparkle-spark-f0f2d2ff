@@ -70,6 +70,62 @@ export async function analyzeIntent(userPrompt: string): Promise<IntentBrief | n
   }
 }
 
+/** One turn of the multi-turn pre-creation dialogue */
+export interface DialogueSuggestion {
+  id: string;
+  emoji: string;
+  label: string;
+  description: string;
+  /** Text sent on click (first-person tone) */
+  value: string;
+}
+export interface DialogueTurn {
+  reply: string;
+  suggestions: DialogueSuggestion[];
+  ready: boolean;
+  brief?: {
+    chosenAngle: string;
+    matchedAssets: string[];
+    matchedRules: string[];
+    risks: string[];
+  };
+}
+
+/**
+ * Multi-turn pre-creation dialogue. Send original prompt + accumulated
+ * (user+assistant) history; backend decides whether to ask another round
+ * or signal ready=true with a brief to feed into generation.
+ *
+ * Pass forceReady=true when the user clicks the "直接生成" escape button.
+ */
+export async function creativeDialogue(args: {
+  originalPrompt: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  forceReady?: boolean;
+}): Promise<DialogueTurn | null> {
+  try {
+    const brandContext = resolveBrandContext('analyze') ?? '';
+    const token = await getAuthToken();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/creative-dialogue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        originalPrompt: args.originalPrompt,
+        history: args.history,
+        brandContext,
+        forceReady: !!args.forceReady,
+      }),
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as DialogueTurn;
+  } catch {
+    return null;
+  }
+}
+
 export async function streamChat({
   messages,
   mode = 'chat',
