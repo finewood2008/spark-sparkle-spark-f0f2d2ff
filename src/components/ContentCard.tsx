@@ -1331,7 +1331,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               title="AI 分析全文，在合适段落自动插图"
             >
               {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
-              {illustrateLoading ? '配图中...' : '全文配图'}
+              {illustrateLoading
+                ? illustrateProgress.total > 0
+                  ? `配图中 ${illustrateProgress.done}/${illustrateProgress.total} ✨`
+                  : '规划配图位置...'
+                : '全文配图'}
             </button>
 
             {/* 流程组：右靠 */}
