@@ -1346,7 +1346,9 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               }
               items={[
                 { id: 'polish', label: '润色（保留原意）', icon: <Sparkles size={12} />, onClick: handlePolish, loading: aiLoading === 'polish' },
-                { id: 'restyle', label: '换风格', icon: <Palette size={12} />, onClick: () => onAction?.('restyle', item) },
+                { id: 'restyle', label: '换风格', icon: <Palette size={12} />, onClick: () => handleFullEdit('restyle'), loading: aiLoading === 'restyle' },
+                { id: 'expand', label: '扩写全文', icon: <ChevronDown size={12} />, onClick: () => handleFullEdit('expand'), loading: aiLoading === 'expand' },
+                { id: 'simplify', label: '精简全文', icon: <ChevronUp size={12} />, onClick: () => handleFullEdit('simplify'), loading: aiLoading === 'simplify' },
               ]}
             />
 
