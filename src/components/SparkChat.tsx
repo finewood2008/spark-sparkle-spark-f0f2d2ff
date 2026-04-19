@@ -342,75 +342,118 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
   };
 
-  // Step 1+2: analyze intent → either ask clarifying question or skip to generation
-  const handleGenerate = async (text: string) => {
-    // Show "thinking" status while we analyze
-    const thinkingId = (Date.now() + 1).toString();
-    addMessage({
-      id: thinkingId,
-      role: 'assistant',
-      content: '🔍 让我先理解一下你的需求...',
-      timestamp: new Date().toISOString(),
+  /**
+   * Run one round of pre-creation dialogue. If `userReply` is provided, append
+   * it to the running history. If the backend replies ready=true, jump straight
+   * to runGenerate using the brief.
+   */
+  const runDialogueRound = async (userReply?: string, forceReady = false) => {
+    const state = dialogueRef.current;
+    if (!state) return;
+
+    const history = userReply
+      ? [...state.history, { role: 'user' as const, content: userReply }]
+      : state.history;
+
+    // Show typing indicator via shared isGenerating spinner
+    setIsGenerating(true);
+
+    const turn: DialogueTurn | null = await creativeDialogue({
+      originalPrompt: state.originalPrompt,
+      history,
+      forceReady,
     });
 
-    const brief = await analyzeIntent(text);
+    setIsGenerating(false);
 
-    // Remove the thinking message
-    const msgs = useAppStore.getState().messages.filter(m => m.id !== thinkingId);
-    useAppStore.setState({ messages: msgs });
-
-    // No brief or skip → generate directly (no brand context match either)
-    if (!brief || brief.skipClarify || !brief.clarifyQuestion) {
-      // Show a brief "I read your stuff" message if we found matches
-      if (brief && (brief.matchedAssets.length > 0 || brief.matchedRules.length > 0)) {
-        const matchedSummary: string[] = [];
-        if (brief.matchedAssets.length > 0) {
-          matchedSummary.push(`📌 我会用到你的：${brief.matchedAssets.slice(0, 2).join('、')}`);
-        }
-        if (brief.matchedRules.length > 0) {
-          matchedSummary.push(`✍️ 遵循偏好：${brief.matchedRules.slice(0, 2).join('、')}`);
-        }
-        addMessage({
-          id: `${Date.now()}-brief`,
-          role: 'assistant',
-          content: matchedSummary.join('\n'),
-          timestamp: new Date().toISOString(),
-        });
-      }
-      await runGenerate(text, brief ?? undefined);
+    if (!turn) {
+      // Hard failure → fall back to direct generation with what we have
+      addMessage({
+        id: `${Date.now()}-dlg-err`,
+        role: 'assistant',
+        content: '对话出了点问题，我直接开始为你创作。',
+        timestamp: new Date().toISOString(),
+      });
+      const fallbackBrief: IntentBrief = {
+        intentType: 'other',
+        matchedAssets: [],
+        matchedRules: [],
+        risks: [],
+        clarifyQuestion: null,
+        skipClarify: true,
+      };
+      dialogueRef.current = null;
+      setIsGenerating(true);
+      await runGenerate(state.originalPrompt, fallbackBrief, userReply);
       return;
     }
 
-    // Need clarification — render question + choice pills
-    const matchedLine: string[] = [];
-    if (brief.matchedAssets.length > 0) {
-      matchedLine.push(`📌 关于你的品牌，我看到了：${brief.matchedAssets.slice(0, 2).join('、')}`);
+    // Append latest exchange into running history
+    const nextHistory = [
+      ...history,
+      { role: 'assistant' as const, content: turn.reply },
+    ];
+    state.history = nextHistory;
+    state.turn = state.turn + 1;
+
+    if (turn.ready && turn.brief) {
+      // Render closing reply (no escape button — we're already moving on)
+      addMessage({
+        id: `${Date.now()}-dlg-ready`,
+        role: 'assistant',
+        content: turn.reply,
+        timestamp: new Date().toISOString(),
+      });
+      const finalBrief: IntentBrief = {
+        intentType: 'other',
+        matchedAssets: turn.brief.matchedAssets,
+        matchedRules: turn.brief.matchedRules,
+        risks: turn.brief.risks,
+        clarifyQuestion: null,
+        skipClarify: true,
+      };
+      dialogueRef.current = null;
+      setIsGenerating(true);
+      await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle);
+      return;
     }
-    const intro = matchedLine.length > 0 ? `${matchedLine.join('\n')}\n\n` : '';
 
-    const clarifyChoices: ChoiceOption[] = brief.clarifyQuestion.options.map((opt, i) => ({
-      id: `clarify-${Date.now()}-${i}`,
-      label: opt.label,
-      emoji: opt.emoji,
-      description: opt.description,
+    // Still gathering — render reply + suggestion cards + escape button
+    const choices: ChoiceOption[] = turn.suggestions.map((s, i) => ({
+      id: s.id || `dlg-${Date.now()}-${i}`,
+      label: s.label,
+      emoji: s.emoji,
+      description: s.description,
       variant: 'card',
-      anglePrompt: opt.anglePrompt,
-      clarifyForPrompt: text,
+      // Reuse anglePrompt to carry the click-value (sent verbatim on tap)
+      anglePrompt: s.value,
     }));
-    // Stash brief on the message so when user picks, we can pass matchedAssets to runGenerate
-    pendingBriefRef.current = brief;
-    pendingPromptRef.current = text;
-
+    // Always offer an escape route as a quick action
     addMessage({
-      id: `${Date.now()}-clarify`,
+      id: `${Date.now()}-dlg-${state.turn}`,
       role: 'assistant',
-      content: `${intro}${brief.clarifyQuestion.question}`,
+      content: turn.reply,
       timestamp: new Date().toISOString(),
-      choices: clarifyChoices,
+      choices,
+      actions: [
+        {
+          label: '直接生成',
+          value: FORCE_GENERATE_SENTINEL,
+          icon: '⚡',
+          variant: 'outline',
+        },
+      ],
     });
+  };
 
-    // Stop the spinner — we're waiting on user
-    setIsGenerating(false);
+  /** Entry point when user asks to generate — kicks off the dialogue */
+  const handleGenerate = async (text: string) => {
+    dialogueRef.current = {
+      originalPrompt: text,
+      history: [{ role: 'user', content: text }],
+      turn: 0,
+    };
+    await runDialogueRound();
   };
 
   const sendMessage = async (text: string) => {
