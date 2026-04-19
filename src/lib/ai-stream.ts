@@ -146,6 +146,10 @@ export async function suggestAngles(args: {
   cta?: string;
   tags?: string[];
   platform?: string;
+  /** 1 = first round after generation, 2+ = after each rewrite */
+  iteration?: number;
+  /** Labels of angles already applied in prior rounds (so the LLM won't repeat them) */
+  usedAngles?: string[];
 }): Promise<AngleSuggestion[]> {
   try {
     const token = await getAuthToken();
