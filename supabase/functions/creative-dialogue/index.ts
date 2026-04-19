@@ -1,11 +1,16 @@
-// creative-dialogue — 多轮自然语言创作前对话
-// ────────────────────────────────────────────
-// 输入：{ originalPrompt, history: [{role, content}], brandContext }
-// 输出（结构化）：{ reply, suggestions[], ready, brief? }
-//   - reply:      自然语言回复（一段话，带建议方向、思路、提问）
-//   - suggestions: 3-5 个推荐方向卡片（emoji + label + description + value）
-//   - ready:      true → 信息已足够生成；false → 还想再问一轮
-//   - brief:      ready=true 时附带，喂给 generate prompt
+// creative-dialogue — 多轮自然语言创作前对话（流式版）
+// ────────────────────────────────────────────────────
+// 协议升级：从一次性 JSON 改为 SSE 双段式：
+//   ① data: {"type":"text","delta":"..."}   ← 流式吐 reply 文字
+//   ② data: {"type":"text_done"}            ← reply 文字结束
+//   ③ data: {"type":"meta", suggestions, ready, brief?} ← 结构化卡片/状态
+//   ④ data: [DONE]
+//
+// 实现思路：Gemini tool-calling 模式下 streamGenerateContent 是把整个
+// functionCall args 一次性吐出，无法真流式 reply。所以分两步：
+//   1) 先用普通 streamGenerateContent（无 tool）流式生成 reply 文字
+//   2) 同一对话上下文 + 已生成的 reply，再用 tool-calling 拿
+//      {suggestions, ready, brief}（不再让模型重复生成 reply）
 //
 // 模型：gemini-2.5-flash-lite
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -19,6 +24,8 @@ import {
 } from "../_shared/auth.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const STREAM_URL = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${key}`;
 const GEN_URL = (key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
 
@@ -27,12 +34,11 @@ interface Suggestion {
   emoji: string;
   label: string;
   description: string;
-  /** 用户点击时实际发送的文本（可比 label 更具体） */
+  /** 用户点击时实际发送的文本 */
   value: string;
 }
 
-interface DialogueOutput {
-  reply: string;
+interface MetaPayload {
   suggestions: Suggestion[];
   ready: boolean;
   brief?: {
@@ -43,149 +49,167 @@ interface DialogueOutput {
   };
 }
 
-const SYSTEM_PROMPT = `你是火花，一个像真人创作伙伴一样的内容策略师。
-
-你的任务：在用户最终落笔前，跟 ta 进行 1-3 轮自然对话，把模糊的需求打磨成一个清晰、有差异化的创作方向。
-
-【对话风格】
-- 像微信里跟朋友聊一个写作灵感，不要生硬地"分析→提问→提问"
-- 每轮回复都要：(1) 先简短回应/复述用户上轮的意思，让 ta 知道你听懂了 (2) 给出你的判断和具体建议 (3) 抛一个真正影响成稿的问题
-- 字数 80-150 字，不要长段落，可以用 1-2 个换行分句
-- 不要客套话（"非常好的问题"、"我很开心"），直接进主题
-
-【建议来源】
-- 优先用品牌档案里的差异化点、过往爆款角度、写作偏好
-- 如果【已知的品牌资料】里出现【会话/上下文】"上次写过：…"条目，**主动复用或参考**：相似主题就提"我记得上次我们聊过 X 角度，这次要不要换个切口？"，避免和过往内容重复，让用户感觉到火花真的记得
-- 如果品牌档案空，用平台爆款套路（小红书：痛点切入/对比测评/亲测安利/姐妹种草；微信：观点输出/案例拆解/方法论；抖音：3秒钩子/反转/教程）
-- 把品牌资料和平台套路融合，给出 ta "想不到但又觉得很对" 的方向
-
-【判断 ready=true 的标准】（满足任一即可）
-- 用户已经明确说了：角度 + 目标读者 + 切入点 中至少 2 个
-- 用户主动说"直接生成"、"就这样"、"开始写"
-- 已经聊了 3 轮还没收敛，避免无限循环
-
-【建议卡片 suggestions】
-- 每轮都给 3-4 个，让用户能秒选
-- 每个 suggestion 是一个具体的"创作方向"，不是问题选项
-- emoji 要贴切（🎯 痛点 / 📊 数据 / 💎 案例 / 🔥 对比 / 📖 故事 / ✨ 新颖 / 🛠️ 教程 / 💡 观点 / 🌱 共鸣 / 👥 社群）
-- label 10 字内，description 20 字内说明会带来什么效果
-- value 是用户点击后发送的文本，写成第一人称口吻（如"从客户实际遇到的痛点切入"），让对话更自然
-- ready=true 时 suggestions 可以是空数组
-
-【ready=true 时】
-- reply 总结你和用户达成的共识（"好，那我就……"）
-- 必须附带 brief：把整轮对话浓缩成 chosenAngle（30字内的角度描述）+ 用到的品牌素材/规则/风险
-
-【ready=false 时】
-- 不要附 brief
-- reply 必须包含一个具体的问题（"你想……还是……？" 或 "你最想突出 ta 的哪一面？"）`;
-
 interface InboundMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-async function callGemini(
+// ─────────────────────────────────────────────────────────────
+// Prompts
+// ─────────────────────────────────────────────────────────────
+
+/** Step 1 prompt：让模型像真人一样流式吐一段分析/回应文字（60-120 字） */
+const REPLY_SYSTEM = `你是火花，一个像真人创作伙伴一样的内容策略师。
+
+用户在准备写一篇内容，你要在 ta 落笔前跟 ta 多轮自然对话，把模糊的需求打磨成清晰、有差异化的方向。
+
+【这一轮你要做的事】
+只输出"思考/分析"那一段自然语言文字，60-120 字、2-3 句话：
+- 先简短回应/复述用户上轮的意思（让 ta 知道你听懂了）
+- 给出你对这个主题的快速判断（受众/角度/平台调性）
+- 抛一个真正影响成稿的问题（"你想……还是……？"）
+
+【风格】
+- 像微信里聊一个写作灵感，不要生硬地"分析→提问"
+- 不要客套话（"非常好的问题"、"我很开心"）
+- 不要列表、不要 markdown 标题、不要 emoji 开头，纯口语化短段落
+- 不要在文字里列具体方向选项（那些会以卡片形式另外给）
+
+【已聊过 2 轮以上时】
+- 如果用户已经清楚说了角度+受众，直接说"好，那我就……开始写"，文字短一些（30-50 字）即可
+
+只输出这段对话文字，不要任何前缀后缀、不要 JSON、不要代码块。`;
+
+/** Step 2 prompt：基于已有 reply，输出结构化的 suggestions/ready/brief */
+const META_SYSTEM = `你是火花的结构化助手。
+
+我会给你：用户的原始需求 + 完整对话历史 + 火花刚刚说的新一轮回复。
+请基于这些信息，调用 next_meta 函数返回这一轮配套的卡片选项和 ready 状态。
+
+【suggestions 卡片】
+- 每个 suggestion 是一个"创作方向"，不是问题选项
+- 3-4 个，每个要能秒选
+- emoji 贴切（🎯 痛点 / 📊 数据 / 💎 案例 / 🔥 对比 / 📖 故事 / ✨ 新颖 / 🛠️ 教程 / 💡 观点 / 🌱 共鸣 / 👥 社群）
+- label ≤10 字，description ≤20 字说明效果
+- value 用第一人称，是用户点击后发送的文本（如"从客户实际遇到的痛点切入"）
+- 优先用品牌档案里的差异化点
+- 如果火花的 reply 已经在说"好那我就开始写"或类似收尾意图，suggestions 返回 []
+
+【ready 判断】（满足任一即可）
+- 用户已明确说了 角度 + 目标读者 + 切入点 中至少 2 个
+- 用户主动说"直接生成"、"就这样"、"开始写"
+- 已经聊了 3 轮还没收敛
+- 火花的 reply 本身已经在收尾（如"好，那我就……开始写"）
+
+【ready=true 时】
+- 必须附带 brief：chosenAngle (≤30 字最终角度) + 用到的品牌素材/规则/风险
+- suggestions 返回 []`;
+
+// ─────────────────────────────────────────────────────────────
+// Step 1: 流式吐 reply 文字
+// ─────────────────────────────────────────────────────────────
+function buildReplyUserParts(
+  originalPrompt: string,
+  history: InboundMessage[],
+  brandContext: string,
+): string {
+  const historyText = history
+    .map((m) => `${m.role === "user" ? "用户" : "火花"}：${m.content}`)
+    .join("\n");
+  return [
+    `【用户最初的创作需求】\n${originalPrompt}`,
+    brandContext
+      ? `【已知的品牌资料 / 写作偏好】\n${brandContext}`
+      : `【已知的品牌资料 / 写作偏好】\n（暂无，请用平台爆款套路给方向）`,
+    history.length > 0
+      ? `【目前的对话历史】\n${historyText}\n\n请输出火花这一轮的回复文字。`
+      : `【这是第一轮】\n请输出一段自然的开场（复述需求 + 给出方向判断 + 抛核心问题）。`,
+  ].join("\n\n");
+}
+
+async function startReplyStream(
   originalPrompt: string,
   history: InboundMessage[],
   brandContext: string,
   apiKey: string,
-): Promise<DialogueOutput> {
-  // 历史对话拼成纯文本，避免 Gemini 的 multi-turn 在 tool calling 下行为不稳
+): Promise<Response> {
+  const body = {
+    systemInstruction: { parts: [{ text: REPLY_SYSTEM }] },
+    contents: [{ role: "user", parts: [{ text: buildReplyUserParts(originalPrompt, history, brandContext) }] }],
+    generationConfig: { temperature: 0.85 },
+  };
+  return await fetch(STREAM_URL(apiKey), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Step 2: 拿 suggestions + ready + brief
+// ─────────────────────────────────────────────────────────────
+async function callMeta(
+  originalPrompt: string,
+  history: InboundMessage[],
+  reply: string,
+  brandContext: string,
+  apiKey: string,
+): Promise<MetaPayload> {
   const historyText = history
-    .map(
-      (m) =>
-        `${m.role === "user" ? "用户" : "火花"}：${m.content}`,
-    )
+    .map((m) => `${m.role === "user" ? "用户" : "火花"}：${m.content}`)
     .join("\n");
 
-  const userParts = [
-    `【用户最初的创作需求】\n${originalPrompt}`,
-    brandContext
-      ? `【已知的品牌资料 / 写作偏好】\n${brandContext}`
-      : `【已知的品牌资料 / 写作偏好】\n（暂无，请优先使用平台爆款套路给建议）`,
-    history.length > 0
-      ? `【目前的对话历史】\n${historyText}\n\n请基于以上对话，调用 next_turn 函数返回你这一轮的回复。`
-      : `【这是第一轮】\n请调用 next_turn 函数，给用户一段自然的开场（复述需求 + 给出方向判断 + 抛一个核心问题）。`,
-  ].join("\n\n");
+  const userText = [
+    `【用户最初的需求】\n${originalPrompt}`,
+    brandContext ? `【品牌资料】\n${brandContext}` : "",
+    historyText ? `【对话历史】\n${historyText}` : "",
+    `【火花刚刚说的新一轮回复】\n${reply}`,
+    `请调用 next_meta 函数。`,
+  ].filter(Boolean).join("\n\n");
 
   const body = {
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [{ role: "user", parts: [{ text: userParts }] }],
-    tools: [
-      {
-        functionDeclarations: [
-          {
-            name: "next_turn",
-            description: "返回火花在创作前对话中的下一轮回复",
-            parameters: {
-              type: "object",
-              properties: {
-                reply: {
-                  type: "string",
-                  description: "80-150字的自然语言回复，会显示在聊天气泡里",
+    systemInstruction: { parts: [{ text: META_SYSTEM }] },
+    contents: [{ role: "user", parts: [{ text: userText }] }],
+    tools: [{
+      functionDeclarations: [{
+        name: "next_meta",
+        description: "返回这一轮的卡片选项和 ready 状态",
+        parameters: {
+          type: "object",
+          properties: {
+            suggestions: {
+              type: "array",
+              description: "3-4 个建议方向卡片；ready=true 时为 []",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  emoji: { type: "string" },
+                  label: { type: "string" },
+                  description: { type: "string" },
+                  value: { type: "string" },
                 },
-                suggestions: {
-                  type: "array",
-                  description: "3-4 个建议方向卡片；ready=true 时可为 []",
-                  items: {
-                    type: "object",
-                    properties: {
-                      id: { type: "string" },
-                      emoji: { type: "string", description: "单个 emoji" },
-                      label: { type: "string", description: "10 字内的方向名" },
-                      description: { type: "string", description: "20 字内说明效果" },
-                      value: {
-                        type: "string",
-                        description: "用户点击后发送的第一人称文本",
-                      },
-                    },
-                    required: ["id", "emoji", "label", "description", "value"],
-                  },
-                },
-                ready: {
-                  type: "boolean",
-                  description: "true=信息已足够，可以开始生成；false=还想再问一轮",
-                },
-                brief: {
-                  type: "object",
-                  description: "ready=true 时必填；ready=false 时不要返回",
-                  properties: {
-                    chosenAngle: {
-                      type: "string",
-                      description: "30字内总结的最终创作角度",
-                    },
-                    matchedAssets: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "本次会用到的品牌资料 1-3 条",
-                    },
-                    matchedRules: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "适用的写作偏好规则 0-3 条",
-                    },
-                    risks: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "需要避开的风险 0-2 条",
-                    },
-                  },
-                  required: ["chosenAngle"],
-                },
+                required: ["id", "emoji", "label", "description", "value"],
               },
-              required: ["reply", "suggestions", "ready"],
+            },
+            ready: { type: "boolean" },
+            brief: {
+              type: "object",
+              description: "ready=true 时必填",
+              properties: {
+                chosenAngle: { type: "string" },
+                matchedAssets: { type: "array", items: { type: "string" } },
+                matchedRules: { type: "array", items: { type: "string" } },
+                risks: { type: "array", items: { type: "string" } },
+              },
+              required: ["chosenAngle"],
             },
           },
-        ],
-      },
-    ],
-    toolConfig: {
-      functionCallingConfig: {
-        mode: "ANY",
-        allowedFunctionNames: ["next_turn"],
-      },
-    },
+          required: ["suggestions", "ready"],
+        },
+      }],
+    }],
+    toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["next_meta"] } },
   };
 
   const res = await fetch(GEN_URL(apiKey), {
@@ -193,66 +217,47 @@ async function callGemini(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(`Gemini creative-dialogue error ${res.status}: ${t}`);
+    throw new Error(`Gemini meta call ${res.status}: ${t}`);
   }
-
   const json = await res.json();
-  const call = json.candidates?.[0]?.content?.parts?.find(
+  const args = json.candidates?.[0]?.content?.parts?.find(
     (p: { functionCall?: { args?: unknown } }) => p.functionCall,
-  )?.functionCall;
+  )?.functionCall?.args as Partial<MetaPayload> | undefined;
 
-  if (!call?.args) {
-    // 回退：直接放行让用户进入生成
-    return {
-      reply: "好的，我马上开始为你创作。",
-      suggestions: [],
-      ready: true,
-      brief: {
-        chosenAngle: originalPrompt,
-        matchedAssets: [],
-        matchedRules: [],
-        risks: [],
-      },
-    };
-  }
-
-  const args = call.args as Partial<DialogueOutput>;
-  const ready = !!args.ready;
-  const suggestions = Array.isArray(args.suggestions)
-    ? args.suggestions.slice(0, 4).map((s, i) => ({
-        id: typeof s.id === "string" && s.id ? s.id : `s-${Date.now()}-${i}`,
-        emoji: typeof s.emoji === "string" ? s.emoji : "💡",
-        label: typeof s.label === "string" ? s.label : "继续",
-        description: typeof s.description === "string" ? s.description : "",
-        value: typeof s.value === "string" ? s.value : (s.label ?? ""),
-      }))
+  const ready = !!args?.ready;
+  const suggestions = Array.isArray(args?.suggestions)
+    ? args!.suggestions!.slice(0, 4).map((s, i) => ({
+      id: typeof s.id === "string" && s.id ? s.id : `s-${Date.now()}-${i}`,
+      emoji: typeof s.emoji === "string" ? s.emoji : "💡",
+      label: typeof s.label === "string" ? s.label : "继续",
+      description: typeof s.description === "string" ? s.description : "",
+      value: typeof s.value === "string" ? s.value : (s.label ?? ""),
+    }))
     : [];
 
   return {
-    reply: typeof args.reply === "string" ? args.reply : "我们继续聊聊？",
     suggestions,
     ready,
     brief: ready
       ? {
-          chosenAngle:
-            args.brief?.chosenAngle && typeof args.brief.chosenAngle === "string"
-              ? args.brief.chosenAngle
-              : originalPrompt,
-          matchedAssets: Array.isArray(args.brief?.matchedAssets)
-            ? args.brief.matchedAssets.slice(0, 3)
-            : [],
-          matchedRules: Array.isArray(args.brief?.matchedRules)
-            ? args.brief.matchedRules.slice(0, 3)
-            : [],
-          risks: Array.isArray(args.brief?.risks)
-            ? args.brief.risks.slice(0, 2)
-            : [],
-        }
+        chosenAngle: typeof args?.brief?.chosenAngle === "string" && args.brief.chosenAngle
+          ? args.brief.chosenAngle
+          : originalPrompt,
+        matchedAssets: Array.isArray(args?.brief?.matchedAssets) ? args!.brief!.matchedAssets!.slice(0, 3) : [],
+        matchedRules: Array.isArray(args?.brief?.matchedRules) ? args!.brief!.matchedRules!.slice(0, 3) : [],
+        risks: Array.isArray(args?.brief?.risks) ? args!.brief!.risks!.slice(0, 2) : [],
+      }
       : undefined,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// SSE encoder helper
+// ─────────────────────────────────────────────────────────────
+function sseLine(obj: unknown): string {
+  return `data: ${JSON.stringify(obj)}\n\n`;
 }
 
 serve(async (req) => {
@@ -262,97 +267,151 @@ serve(async (req) => {
   try {
     await requireUser(req);
     validatePayloadSize(req);
-    checkRateLimit(req, {
-      maxRequests: 30,
-      windowSec: 60,
-      keyPrefix: "creative-dialogue",
-    });
+    checkRateLimit(req, { maxRequests: 30, windowSec: 60, keyPrefix: "creative-dialogue" });
 
     const { originalPrompt, history, brandContext, forceReady } = await req.json();
     if (typeof originalPrompt !== "string" || originalPrompt.trim().length === 0) {
       return new Response(JSON.stringify({ error: "originalPrompt required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (originalPrompt.length > 2000) {
       return new Response(JSON.stringify({ error: "originalPrompt too long" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // forceReady = 用户点了"直接生成"快捷退出，跳过模型直接返回 ready
+    const safeHistory: InboundMessage[] = Array.isArray(history)
+      ? history.filter((m: unknown): m is InboundMessage =>
+        !!m && typeof m === "object"
+        && (("role" in m && (m as InboundMessage).role === "user")
+          || (m as InboundMessage).role === "assistant")
+        && typeof (m as InboundMessage).content === "string"
+      ).slice(-10)
+      : [];
+    const safeBrand = typeof brandContext === "string" ? brandContext.slice(0, 8000) : "";
+
+    // forceReady 快捷退出 — 直接返回一条 SSE 流，无需调用模型
     if (forceReady === true) {
-      const lastUser = Array.isArray(history)
-        ? [...history].reverse().find(
-            (m: InboundMessage) => m.role === "user",
-          )?.content
-        : undefined;
-      return new Response(
-        JSON.stringify({
-          reply: "好，那我就直接开始写了。",
-          suggestions: [],
-          ready: true,
-          brief: {
-            chosenAngle: lastUser || originalPrompt,
-            matchedAssets: [],
-            matchedRules: [],
-            risks: [],
-          },
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      const lastUser = [...safeHistory].reverse().find((m) => m.role === "user")?.content;
+      const stream = new ReadableStream({
+        start(controller) {
+          const enc = new TextEncoder();
+          controller.enqueue(enc.encode(sseLine({ type: "text", delta: "好，那我就直接开始写了。" })));
+          controller.enqueue(enc.encode(sseLine({ type: "text_done" })));
+          controller.enqueue(enc.encode(sseLine({
+            type: "meta",
+            suggestions: [],
+            ready: true,
+            brief: {
+              chosenAngle: lastUser || originalPrompt,
+              matchedAssets: [],
+              matchedRules: [],
+              risks: [],
+            },
+          })));
+          controller.enqueue(enc.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+      return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
     }
 
-    const KEY = Deno.env.get("LOVABLE_API_KEY")
-      ? null
-      : Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    // Prefer GOOGLE_GEMINI_API_KEY (matches analyze-intent for consistency)
     const apiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
-    void KEY;
 
-    const safeHistory: InboundMessage[] = Array.isArray(history)
-      ? history
-          .filter(
-            (m: unknown): m is InboundMessage =>
-              !!m &&
-              typeof m === "object" &&
-              (("role" in m && (m as InboundMessage).role === "user") ||
-                (m as InboundMessage).role === "assistant") &&
-              typeof (m as InboundMessage).content === "string",
-          )
-          .slice(-10)
-      : [];
+    // ── Step 1: 流式吐 reply 文字 ──
+    const upstream = await startReplyStream(originalPrompt, safeHistory, safeBrand, apiKey);
+    if (!upstream.ok || !upstream.body) {
+      const t = await upstream.text();
+      console.error("Gemini reply stream error:", upstream.status, t);
+      return new Response(JSON.stringify({ error: "AI 服务暂时不可用" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const result = await callGemini(
-      originalPrompt,
-      safeHistory,
-      typeof brandContext === "string" ? brandContext.slice(0, 8000) : "",
-      apiKey,
-    );
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const enc = new TextEncoder();
+        const dec = new TextDecoder();
+        const reader = upstream.body!.getReader();
+        let buf = "";
+        let fullReply = "";
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+        try {
+          // ── 解析 Gemini SSE，把每个 text part 转发为 {type:"text",delta} ──
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+
+            let idx: number;
+            while ((idx = buf.indexOf("\n")) !== -1) {
+              const line = buf.slice(0, idx).trim();
+              buf = buf.slice(idx + 1);
+              if (!line.startsWith("data: ")) continue;
+              const payload = line.slice(6);
+              if (payload === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(payload);
+                const text = parsed.candidates?.[0]?.content?.parts
+                  ?.map((p: { text?: string }) => p.text || "").join("") || "";
+                if (text) {
+                  fullReply += text;
+                  controller.enqueue(enc.encode(sseLine({ type: "text", delta: text })));
+                }
+              } catch { /* partial json — ignore */ }
+            }
+          }
+
+          controller.enqueue(enc.encode(sseLine({ type: "text_done" })));
+
+          // ── Step 2: 拿 meta（卡片 + ready） ──
+          let meta: MetaPayload;
+          try {
+            meta = await callMeta(originalPrompt, safeHistory, fullReply, safeBrand, apiKey);
+          } catch (e) {
+            console.error("meta call failed, falling back:", e);
+            // Fallback：第 3+ 轮直接 ready，否则给空卡片让用户自己输入
+            const isLate = safeHistory.length >= 4;
+            meta = {
+              suggestions: [],
+              ready: isLate,
+              brief: isLate
+                ? { chosenAngle: originalPrompt, matchedAssets: [], matchedRules: [], risks: [] }
+                : undefined,
+            };
+          }
+
+          controller.enqueue(enc.encode(sseLine({ type: "meta", ...meta })));
+          controller.enqueue(enc.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch (err) {
+          console.error("stream pipeline error:", err);
+          try {
+            controller.enqueue(enc.encode(sseLine({ type: "error", message: "对话流中断" })));
+            controller.enqueue(enc.encode("data: [DONE]\n\n"));
+          } catch { /* already closed */ }
+          controller.close();
+        }
+      },
     });
+
+    return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (e) {
     console.error("creative-dialogue error:", e);
     if (e instanceof AuthError) {
       return new Response(JSON.stringify({ error: e.message }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (e instanceof Error && e.message.includes("Rate limit")) {
       return new Response(JSON.stringify({ error: e.message }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

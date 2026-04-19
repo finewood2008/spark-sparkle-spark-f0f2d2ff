@@ -126,6 +126,106 @@ export async function creativeDialogue(args: {
   }
 }
 
+/** Streamed creative-dialogue events emitted by the SSE backend */
+export type DialogueStreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'text_done' }
+  | { type: 'meta'; suggestions: DialogueSuggestion[]; ready: boolean; brief?: DialogueTurn['brief'] }
+  | { type: 'error'; message: string };
+
+/**
+ * Streaming version of creativeDialogue.
+ *
+ * Backend emits SSE events in this order:
+ *   1) one or more {type:"text", delta} as the reply paragraph streams
+ *   2) one {type:"text_done"} marking end of reply
+ *   3) one {type:"meta", suggestions, ready, brief?} with structured cards
+ *   4) [DONE]
+ *
+ * Use onText to render reply chars as they arrive, and onMeta to swap in
+ * suggestion cards once the structural payload lands.
+ */
+export async function streamCreativeDialogue(args: {
+  originalPrompt: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  forceReady?: boolean;
+  onText: (delta: string) => void;
+  onTextDone?: () => void;
+  onMeta: (meta: { suggestions: DialogueSuggestion[]; ready: boolean; brief?: DialogueTurn['brief'] }) => void;
+  onDone: () => void;
+  onError?: (message: string) => void;
+}): Promise<void> {
+  try {
+    const brandContext = resolveBrandContext('analyze') ?? '';
+    const token = await getAuthToken();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/creative-dialogue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        originalPrompt: args.originalPrompt,
+        history: args.history,
+        brandContext,
+        forceReady: !!args.forceReady,
+      }),
+    });
+
+    if (!resp.ok || !resp.body) {
+      let msg = '对话服务暂时不可用';
+      try { const j = await resp.json(); if (j?.error) msg = j.error; } catch { /* ignore */ }
+      args.onError?.(msg);
+      args.onDone();
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let textDoneFired = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        let line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        if (payload === '[DONE]') { args.onDone(); return; }
+        try {
+          const evt = JSON.parse(payload) as DialogueStreamEvent;
+          if (evt.type === 'text') {
+            args.onText(evt.delta);
+          } else if (evt.type === 'text_done') {
+            textDoneFired = true;
+            args.onTextDone?.();
+          } else if (evt.type === 'meta') {
+            if (!textDoneFired) { args.onTextDone?.(); textDoneFired = true; }
+            args.onMeta({ suggestions: evt.suggestions, ready: evt.ready, brief: evt.brief });
+          } else if (evt.type === 'error') {
+            args.onError?.(evt.message);
+          }
+        } catch {
+          // partial — re-buffer
+          buf = line + '\n' + buf;
+          break;
+        }
+      }
+    }
+    args.onDone();
+  } catch (e) {
+    args.onError?.(e instanceof Error ? e.message : '对话流出错');
+    args.onDone();
+  }
+}
+
 /** Suggestion for "what to try next" after an article is generated */
 export interface AngleSuggestion {
   id: string;
