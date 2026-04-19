@@ -131,7 +131,49 @@ serve(async (req) => {
     validatePayloadSize(req, 200_000);
     checkRateLimit(req, { maxRequests: 5, windowSec: 60, keyPrefix: "illustrate" });
 
-    const { title, content, platform } = await req.json();
+    const body = await req.json();
+    const { title, content, platform, mode, imagePrompt, alt, platformVibeKey } = body as {
+      title?: string;
+      content?: string;
+      platform?: string;
+      mode?: "single" | "full";
+      imagePrompt?: string;
+      alt?: string;
+      platformVibeKey?: string;
+    };
+
+    const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+
+    // ---- Single-image regeneration mode ----
+    // 用于单图重新生成：直接用前端传来的 imagePrompt 生成 1 张图，避免重新规划。
+    if (mode === "single") {
+      if (!imagePrompt || typeof imagePrompt !== "string") {
+        return new Response(
+          JSON.stringify({ error: "缺少 imagePrompt" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // 给一个统一风格 vibe（与全文配图保持一致），如果前端传了 key 用 key，否则用 platform
+      const vibe =
+        platformVibe[platformVibeKey || platform || "xiaohongshu"] || platformVibe.xiaohongshu;
+      const prompt = imagePrompt.includes("CRITICAL: NO text")
+        ? imagePrompt
+        : `${imagePrompt}. Style: ${vibe}. CRITICAL: NO text, NO letters, NO words, NO watermarks, NO logos. Pure visual imagery only.`;
+      const imageUrl = await generateOneImage(prompt, KEY);
+      if (!imageUrl) {
+        return new Response(
+          JSON.stringify({ error: "图片生成失败，请重试" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ imageUrl, alt: alt || "", imagePrompt: prompt }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ---- Full-article mode (default, SSE streaming) ----
     if (!content || typeof content !== "string" || content.length < 50) {
       return new Response(
         JSON.stringify({ error: "正文太短，无法智能配图（至少 50 字）" }),
@@ -144,9 +186,6 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -181,9 +220,10 @@ serve(async (req) => {
               const imageUrl = await generateOneImage(p.imagePrompt, KEY);
               if (imageUrl) {
                 okCount += 1;
-                send("image", { index: i, alt: p.alt, imageUrl });
+                // imagePrompt 一并推给前端，用于"重新生成单张"
+                send("image", { index: i, alt: p.alt, imageUrl, imagePrompt: p.imagePrompt });
               } else {
-                send("image_failed", { index: i, alt: p.alt });
+                send("image_failed", { index: i, alt: p.alt, imagePrompt: p.imagePrompt });
               }
             }),
           );

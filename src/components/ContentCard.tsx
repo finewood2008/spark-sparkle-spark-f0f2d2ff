@@ -24,8 +24,17 @@ interface ToolbarPos {
  * 把含 ![alt](url) markdown + 流式占位符的正文渲染成 React 节点。
  * 占位符格式：[[SPARK_ILLUSTRATING:第 N/总 张]]  → 渲染成加载卡
  * 失败提示行：> ⚠️ 第 N 张配图失败 → 渲染成警告条
+ *
+ * imageActions: 当传入时，每张图右上角显示 ✕（删除）和 🔄（重新生成）按钮。
  */
-function renderContentWithImages(text: string): React.ReactNode[] {
+function renderContentWithImages(
+  text: string,
+  imageActions?: {
+    onDelete: (url: string, alt: string) => void;
+    onRegenerate: (url: string, alt: string) => void;
+    regeneratingUrls: Set<string>;
+  },
+): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   // 同时匹配图片、加载占位、失败提示
   const re = /(!\[([^\]]*)\]\(([^)]+)\))|(\[\[SPARK_ILLUSTRATING:([^\]]+)\]\])|(^> ⚠️ [^\n]+$)/gm;
@@ -44,9 +53,41 @@ function renderContentWithImages(text: string): React.ReactNode[] {
       // markdown 图片
       const alt = match[2];
       const url = match[3];
+      const isRegenerating = imageActions?.regeneratingUrls.has(url) ?? false;
       nodes.push(
-        <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
+        <figure
+          key={`i-${key++}`}
+          className="my-3 rounded-lg overflow-hidden border border-[#EDECE8] relative group/img"
+        >
           <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
+          {isRegenerating && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+              <div className="flex items-center gap-2 text-[12px] text-spark-orange">
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-spark-orange/30 border-t-spark-orange animate-spin" />
+                重新生成中...
+              </div>
+            </div>
+          )}
+          {imageActions && !isRegenerating && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => { e.stopPropagation(); imageActions.onRegenerate(url, alt); }}
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-spark-orange text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                title="重新生成这张图"
+                aria-label="重新生成这张图"
+              >
+                <RefreshCw size={13} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); imageActions.onDelete(url, alt); }}
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                title="删除这张图"
+                aria-label="删除这张图"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
           {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
         </figure>,
       );
@@ -273,6 +314,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 每张已生成插图对应的英文 prompt（key=imageUrl）。会话级，刷新后丢失则用 alt 兜底。 */
+  const imagePromptsRef = useRef<Map<string, { prompt: string; alt: string }>>(new Map());
+  /** 正在重新生成的图片 URL 集合，用于在 figure 上盖一层 spinner */
+  const [regeneratingUrls, setRegeneratingUrls] = useState<Set<string>>(new Set());
 
   const enterEditMode = () => {
     setEditTitle(item.title);
@@ -653,7 +698,12 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           const idx = payload.index as number;
           const url = payload.imageUrl as string;
           const alt = (payload.alt as string) || '';
+          const prompt = (payload.imagePrompt as string) || '';
           const token = tokens[idx];
+          // 记录每张图的 prompt，用于"重新生成单张"
+          if (url && prompt) {
+            imagePromptsRef.current.set(url, { prompt, alt });
+          }
           if (token && working.includes(token)) {
             working = working.replace(token, `![${alt}](${url})`);
             setEditContent(working);
@@ -718,6 +768,88 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
     setIllustrateLoading(false);
   };
+
+  /** 删除单张已配图：把对应的 ![alt](url) 从正文里移除，同时同步到 store。 */
+  const handleDeleteImage = useCallback((url: string, alt: string) => {
+    const current = editing ? editContent : item.content;
+    // 转义 URL 中的正则元字符
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 匹配 ![alt](url)，前后多余空行也一并清理
+    const pattern = new RegExp(`\\n*!\\[${esc(alt)}\\]\\(${esc(url)}\\)\\n*`, 'g');
+    const next = current.replace(pattern, '\n\n');
+    if (next === current) return;
+    if (editing) setEditContent(next);
+    setUndoStack(prev => [...prev, current]);
+    const updated = contents.map(c =>
+      c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
+    );
+    setContents(updated);
+    imagePromptsRef.current.delete(url);
+    toast.success('已删除这张图');
+  }, [editing, editContent, item.content, item.id, contents, setContents]);
+
+  /** 重新生成单张图：用记录的 prompt（或 alt 兜底）调 illustrate-article 的 single 模式，
+   *  完成后把正文里的 url 替换成新的 url。 */
+  const handleRegenerateImage = useCallback(async (url: string, alt: string) => {
+    const meta = imagePromptsRef.current.get(url);
+    const prompt = meta?.prompt || alt; // 刷新后丢失则用 alt 兜底
+    if (!prompt) {
+      toast.error('找不到这张图的生成提示，无法重新生成');
+      return;
+    }
+    setRegeneratingUrls(prev => {
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+    try {
+      const authToken = await getAuthToken();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          mode: 'single',
+          imagePrompt: prompt,
+          alt,
+          platform: item.platform,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '重新生成失败' }));
+        toast.error(err.error || '重新生成失败');
+        return;
+      }
+      const data = await resp.json() as { imageUrl: string; alt: string; imagePrompt: string };
+      const newUrl = data.imageUrl;
+      if (!newUrl) {
+        toast.error('图片为空，请重试');
+        return;
+      }
+      // 把正文里这张图的 url 换成新的 url（alt 保持不变）
+      const current = editing ? editContent : item.content;
+      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`!\\[${esc(alt)}\\]\\(${esc(url)}\\)`, 'g');
+      const next = current.replace(pattern, `![${alt}](${newUrl})`);
+      setUndoStack(prev => [...prev, current]);
+      if (editing) setEditContent(next);
+      const updated = contents.map(c =>
+        c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
+      );
+      setContents(updated);
+      // 转移 prompt 记录到新 url
+      imagePromptsRef.current.delete(url);
+      imagePromptsRef.current.set(newUrl, { prompt: data.imagePrompt || prompt, alt });
+      toast.success('已重新生成 ✨');
+    } catch {
+      toast.error('网络异常，重新生成失败');
+    } finally {
+      setRegeneratingUrls(prev => {
+        const next = new Set(prev);
+        next.delete(url);
+        return next;
+      });
+    }
+  }, [editing, editContent, item.content, item.id, item.platform, contents, setContents]);
 
   const handleSave = () => {
     const updated = contents.map(c =>
@@ -1020,7 +1152,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       ) : (
         <div className="text-[14px] text-[#555] leading-[1.6]">
-          {renderContentWithImages(expanded ? item.content : previewText)}
+          {renderContentWithImages(expanded ? item.content : previewText, expanded ? {
+            onDelete: handleDeleteImage,
+            onRegenerate: handleRegenerateImage,
+            regeneratingUrls,
+          } : undefined)}
           {!expanded && item.content.split('\n').length > 3 && (
             <span className="text-[#999]">...</span>
           )}
