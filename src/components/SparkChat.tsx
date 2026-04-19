@@ -697,7 +697,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
 
     setIsGenerating(false);
 
-    if (streamErr && !accumulated) {
+    if (errRef.current && !accumulated) {
       // Hard failure with no text → fall back to direct generation
       updateBubble((m) => ({
         ...m,
@@ -727,11 +727,12 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     state.history = nextHistory;
     state.turn = state.turn + 1;
 
-    if (metaPayload?.ready && metaPayload.brief) {
+    const meta = metaRef.current;
+    if (meta?.ready && meta.brief) {
       // Closing turn — clear skeleton, no choices needed
       updateBubble((m) => ({ ...m, loadingChoices: false, choices: undefined }));
 
-      const brief = metaPayload.brief;
+      const brief = meta.brief;
       const finalBrief: IntentBrief = {
         intentType: 'other',
         matchedAssets: brief.matchedAssets,
@@ -791,7 +792,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     }
 
     // Still gathering — populate cards into the same bubble we've been streaming
-    const suggestions = metaPayload?.suggestions ?? [];
+    const suggestions: DialogueSuggestion[] = meta?.suggestions ?? [];
     const choices: ChoiceOption[] = suggestions.map((s, i) => ({
       id: s.id || `dlg-${Date.now()}-${i}`,
       label: s.label,
