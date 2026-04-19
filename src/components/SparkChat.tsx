@@ -472,30 +472,21 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       return;
     }
 
-    // Clarify-choice handling: if there's a pending brief and the text matches
-    // one of the offered options' labels, treat it as the user's angle pick and
-    // jump straight to generation with that angle injected.
-    const pendingBrief = pendingBriefRef.current;
-    const pendingPrompt = pendingPromptRef.current;
-    if (pendingBrief?.clarifyQuestion && pendingPrompt) {
-      const picked = pendingBrief.clarifyQuestion.options.find(
-        opt => opt.label === text.trim(),
-      );
-      if (picked) {
-        // Echo user's pick
-        addMessage({
-          id: Date.now().toString(),
-          role: 'user',
-          content: text.trim(),
-          timestamp: new Date().toISOString(),
-        });
-        // Clear pending state — single-use
-        pendingBriefRef.current = null;
-        pendingPromptRef.current = '';
-        setIsGenerating(true);
-        await runGenerate(pendingPrompt, pendingBrief, picked.anglePrompt);
-        return;
-      }
+    // Multi-turn dialogue handling: if we're in the middle of a pre-creation
+    // dialogue, route this user reply (whether typed or via card click) back
+    // into the dialogue loop instead of starting a new chat/generate cycle.
+    if (dialogueRef.current) {
+      const trimmed = text.trim();
+      const isForce = trimmed === FORCE_GENERATE_SENTINEL;
+      // Echo the user's reply (skip the sentinel — show a friendly label instead)
+      addMessage({
+        id: Date.now().toString(),
+        role: 'user',
+        content: isForce ? '直接生成' : trimmed,
+        timestamp: new Date().toISOString(),
+      });
+      await runDialogueRound(isForce ? undefined : trimmed, isForce);
+      return;
     }
 
     const userMsg: ChatMessage = {
