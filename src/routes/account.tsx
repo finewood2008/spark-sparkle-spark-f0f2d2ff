@@ -1,13 +1,10 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { Flame, ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Palette, PenLine, Save, CheckCircle2, Ruler, Megaphone, Image, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, KeyRound } from 'lucide-react';
+import { ArrowLeft, User, Camera, MessageSquare, Github, Building2, Globe, Link2, Unlink, Loader2, Check, LogOut, Save, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, KeyRound, Settings2, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { getBindingStatus, bindThirdPartyAccount, unbindThirdPartyAccount, type BindingStatus, type SocialProvider } from '@/services/authService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { type UserPreferences, defaultPrefs, loadUserPrefs, saveUserPrefs, syncPrefsFromCloud } from '@/lib/user-prefs';
-import DeviceTokenManager from '@/components/DeviceTokenManager';
-import TonePresetCard from '@/components/settings/TonePresetCard';
 import { requireSession } from '@/lib/auth-helpers';
 
 export const Route = createFileRoute('/account')({
