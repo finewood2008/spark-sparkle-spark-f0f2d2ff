@@ -148,6 +148,11 @@ export interface ContentItem {
   /** AI's explanation of creative choices (why this title / structure / CTA).
    *  Populated when generated via the new analyze-intent → generate flow. */
   reasoning?: string[];
+  /** Pre-creation dialogue transcript that led to this article (creative-dialogue flow).
+   *  Rendered as a collapsible "我们一起聊了 N 轮" section under the card. */
+  dialogueHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** Number of dialogue rounds (assistant turns) that produced this article. */
+  dialogueTurns?: number;
 }
 
 export interface ContentMetrics {

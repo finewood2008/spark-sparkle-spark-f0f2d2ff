@@ -117,6 +117,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
@@ -545,6 +546,59 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Pre-creation dialogue transcript — collapsible "我们一起聊了 N 轮" */}
+      {!editing && item.dialogueHistory && item.dialogueHistory.length > 0 && (
+        <div className="mb-3 rounded-lg border border-[#E5E4E2] bg-[#FAFAF8] overflow-hidden">
+          <button
+            onClick={() => setDialogueOpen(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#F2F1ED] transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px]">💬</span>
+              <span className="text-[12px] font-medium text-[#666]">
+                我们一起聊了 {item.dialogueTurns ?? Math.ceil(item.dialogueHistory.length / 2)} 轮
+              </span>
+              <span className="text-[11px] text-[#BBB]">· 创作前的对齐过程</span>
+            </div>
+            {dialogueOpen ? (
+              <ChevronUp size={14} className="text-[#999]" />
+            ) : (
+              <ChevronDown size={14} className="text-[#999]" />
+            )}
+          </button>
+          {dialogueOpen && (
+            <div className="px-3 pb-3 pt-1 space-y-2 border-t border-[#EDECE8]">
+              {item.dialogueHistory.map((m, i) => (
+                <div
+                  key={i}
+                  className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {m.role === 'assistant' && (
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-spark-orange/15 flex items-center justify-center text-[10px]">
+                      ✨
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[85%] text-[12px] leading-[1.55] rounded-lg px-2.5 py-1.5 whitespace-pre-wrap ${
+                      m.role === 'user'
+                        ? 'bg-spark-orange/10 text-[#555]'
+                        : 'bg-white border border-[#EDECE8] text-[#666]'
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                  {m.role === 'user' && (
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-[#E5E4E2] flex items-center justify-center text-[10px] text-[#999]">
+                      你
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
