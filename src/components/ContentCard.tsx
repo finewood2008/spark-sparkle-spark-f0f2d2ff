@@ -641,7 +641,52 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     });
   };
 
-  const handleUndo = () => {
+  /**
+   * 全文级 AI 改写：换风格 / 扩写 / 精简
+   * 直接修改卡片正文，不走对话生成；与 handlePolish 行为一致：
+   * - 进入编辑态 + 展开
+   * - 流式覆盖 editContent
+   * - 失败显示行内 InlineActionError 可重试
+   */
+  const handleFullEdit = async (kind: 'restyle' | 'expand' | 'simplify') => {
+    const source = editing ? editContent : item.content;
+    if (!source.trim()) return;
+
+    const labelMap = { restyle: '换风格', expand: '扩写全文', simplify: '精简全文' } as const;
+    const actionMap = { restyle: 'restyle', expand: 'expand_full', simplify: 'simplify_full' } as const;
+
+    setActionError(kind, null);
+    setUndoStack(prev => [...prev, source]);
+    setAiLoading(kind);
+    if (!editing) {
+      setEditing(true);
+      setExpanded(true);
+      setEditContent(source);
+    }
+
+    let result = '';
+    await streamEdit({
+      action: actionMap[kind],
+      text: source,
+      fullContent: source,
+      platform: item.platform,
+      onDelta: (chunk) => { result += chunk; },
+      onDone: () => {
+        if (!result.trim()) {
+          setActionError(kind, 'AI 没有返回内容，请重试');
+          setAiLoading(null);
+          return;
+        }
+        setEditContent(result);
+        setAiLoading(null);
+        toast.success(`AI ${labelMap[kind]}完成`);
+      },
+      onError: (err) => {
+        setActionError(kind, err || `${labelMap[kind]}失败`);
+        setAiLoading(null);
+      },
+    });
+  };
     if (undoStack.length === 0) return;
     const prev = undoStack[undoStack.length - 1];
     setUndoStack(s => s.slice(0, -1));
