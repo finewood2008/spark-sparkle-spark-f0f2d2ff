@@ -14,60 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      brand_memories: {
-        Row: {
-          created_at: string
-          device_id: string
-          differentiation: string
-          id: string
-          industry: string
-          init_step: number
-          initialized: boolean
-          keywords: string[]
-          main_business: string
-          name: string
-          taboo_words: string[]
-          target_customer: string
-          tone_of_voice: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          device_id?: string
-          differentiation?: string
-          id?: string
-          industry?: string
-          init_step?: number
-          initialized?: boolean
-          keywords?: string[]
-          main_business?: string
-          name?: string
-          taboo_words?: string[]
-          target_customer?: string
-          tone_of_voice?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          device_id?: string
-          differentiation?: string
-          id?: string
-          industry?: string
-          init_step?: number
-          initialized?: boolean
-          keywords?: string[]
-          main_business?: string
-          name?: string
-          taboo_words?: string[]
-          target_customer?: string
-          tone_of_voice?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       content_metrics: {
         Row: {
           ai_insight: string | null
@@ -149,42 +95,6 @@ export type Database = {
           token_hash?: string
           token_prefix?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      learning_entries: {
-        Row: {
-          category: string
-          confidence: number
-          created_at: string
-          device_id: string
-          evidence: string
-          id: string
-          insight: string
-          type: string
-          user_id: string | null
-        }
-        Insert: {
-          category?: string
-          confidence?: number
-          created_at?: string
-          device_id?: string
-          evidence?: string
-          id?: string
-          insight: string
-          type?: string
-          user_id?: string | null
-        }
-        Update: {
-          category?: string
-          confidence?: number
-          created_at?: string
-          device_id?: string
-          evidence?: string
-          id?: string
-          insight?: string
-          type?: string
-          user_id?: string | null
         }
         Relationships: []
       }
