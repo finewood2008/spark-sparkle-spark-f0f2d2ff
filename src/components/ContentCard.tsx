@@ -300,9 +300,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
-  const [illustrateLoading, setIllustrateLoading] = useState(false);
-  /** 全文配图进度：{done, total}，total=0 表示规划中（尚未拿到 plan） */
-  const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  // 全文配图相关状态由 useIllustrate hook 管理（在下方初始化，避免引用循环）
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
