@@ -161,6 +161,9 @@ export interface ContentItem {
   dialogueHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   /** Number of dialogue rounds (assistant turns) that produced this article. */
   dialogueTurns?: number;
+  /** Labels of angle suggestions applied via "重写" iterations.
+   *  Passed to suggest-angles so each new round avoids repeating prior directions. */
+  appliedAngles?: string[];
 }
 
 export interface ContentMetrics {
