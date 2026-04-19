@@ -17,6 +17,10 @@ export interface ChoiceOption {
   id: string;
   label: string;
   emoji?: string;
+  /** Short one-line description shown under the label in card-style choices. */
+  description?: string;
+  /** Visual style hint — 'card' renders an icon+title+desc card, undefined falls back to pill. */
+  variant?: 'pill' | 'card';
   /** When set, clicking this choice triggers the clarify flow with this angle prompt
    *  appended to the original user prompt for generation. */
   anglePrompt?: string;
@@ -32,7 +36,7 @@ export interface IntentAnalysis {
   risks: string[];
   clarifyQuestion: {
     question: string;
-    options: Array<{ id: string; label: string; anglePrompt: string }>;
+    options: Array<{ id: string; label: string; anglePrompt: string; emoji?: string; description?: string }>;
   } | null;
   skipClarify: boolean;
 }

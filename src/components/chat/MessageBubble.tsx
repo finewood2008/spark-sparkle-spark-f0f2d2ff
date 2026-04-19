@@ -193,20 +193,55 @@ export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
           <p className="text-[14px] leading-[1.6] text-[#333] whitespace-pre-wrap">{msg.content}</p>
         </div>
 
-        {/* Choice pills */}
+        {/* Choices: card variant for clarify questions, pill fallback otherwise */}
         {msg.choices && msg.choices.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {msg.choices.map(c => (
-              <button
-                key={c.id}
-                onClick={() => onSend(c.label)}
-                className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
-              >
-                {c.emoji && <span className="mr-1">{c.emoji}</span>}
-                {c.label}
-              </button>
-            ))}
-          </div>
+          (() => {
+            const isCardMode = msg.choices.some(c => c.variant === 'card');
+            if (isCardMode) {
+              return (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {msg.choices.map((c, idx) => (
+                    <button
+                      key={c.id}
+                      onClick={() => onSend(c.label)}
+                      className="group relative text-left rounded-2xl border border-[#EAE7E0] bg-white hover:border-spark-orange hover:shadow-[0_4px_20px_-8px_rgba(255,140,66,0.4)] transition-all px-4 py-3.5 flex gap-3 items-start"
+                    >
+                      <div className="shrink-0 w-9 h-9 rounded-xl bg-spark-orange/8 group-hover:bg-spark-orange/15 transition-colors flex items-center justify-center text-[18px] leading-none">
+                        {c.emoji || ['🎯', '🌱', '💎'][idx % 3]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[14px] font-medium text-[#2A2A28] leading-tight">
+                          {c.label}
+                        </div>
+                        {c.description && (
+                          <div className="mt-1 text-[12px] text-[#8a8a86] leading-[1.5] line-clamp-2">
+                            {c.description}
+                          </div>
+                        )}
+                      </div>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-spark-orange opacity-0 group-hover:opacity-100 transition-opacity text-[14px]">
+                        →
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {msg.choices.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => onSend(c.label)}
+                    className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+                  >
+                    {c.emoji && <span className="mr-1">{c.emoji}</span>}
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })()
         )}
 
         {/* Quick action buttons */}
