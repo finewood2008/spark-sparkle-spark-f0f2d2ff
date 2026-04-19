@@ -635,7 +635,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           // 在每个锚点处插入占位（按 index 顺序，从后往前插以避免位置漂移）
           let next = working;
           // 先生成所有 token
-          for (let i = 0; i < items.length; i++) tokens[items[i].index] = placeholderToken(items[i].index);
+          for (let i = 0; i < items.length; i++) tokens[items[i].index] = placeholderFor(items[i].index, totalPlanned);
           // 按文中出现位置降序插入，保证插入不互相影响
           const sorted = [...items].sort((a, b) => {
             const ai = next.indexOf(a.anchorSnippet.trim().substring(0, 30));
