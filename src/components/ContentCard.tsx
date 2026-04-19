@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw, Lightbulb } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw, Lightbulb, Copy, Check } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
@@ -117,29 +117,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
-  // Dialogue review expand state — persisted per article id in localStorage so
-  // returning to a content card preserves the user's last expand/collapse choice.
-  const dialogueStorageKey = `spark.dialogueOpen.${item.id}`;
-  const [dialogueOpen, setDialogueOpenState] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(dialogueStorageKey) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const setDialogueOpen = (next: boolean | ((prev: boolean) => boolean)) => {
-    setDialogueOpenState((prev) => {
-      const value = typeof next === 'function' ? next(prev) : next;
-      try {
-        if (value) window.localStorage.setItem(dialogueStorageKey, '1');
-        else window.localStorage.removeItem(dialogueStorageKey);
-      } catch {
-        /* storage unavailable — keep in-memory state only */
-      }
-      return value;
-    });
-  };
+  const [copied, setCopied] = useState(false);
+  const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
@@ -476,6 +455,45 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setOriginalContent(editContent);
   };
 
+  /**
+   * Copy the full article (title + body + CTA + tags) to clipboard in a
+   * shareable plain-text format. Uses navigator.clipboard with a textarea
+   * fallback for older browsers / non-secure contexts.
+   */
+  const handleCopyAll = async () => {
+    const title = editing ? editTitle : item.title;
+    const body = editing ? editContent : item.content;
+    const cta = editing ? editCta : (item.cta || '');
+    const tags = editing ? editTags : (item.tags || []);
+
+    const parts: string[] = [];
+    if (title) parts.push(title);
+    if (body) parts.push(body);
+    if (cta) parts.push(cta);
+    if (tags.length > 0) parts.push(tags.map(t => `#${t}`).join(' '));
+    const text = parts.join('\n\n');
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      toast.success('已复制全文到剪贴板');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('复制失败，请手动选择文字复制');
+    }
+  };
+
   const handleSubmitReview = async () => {
     setSubmitLoading(true);
     // 如果在编辑态，先把编辑内容合并进来
@@ -640,6 +658,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           >
             {titleLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           </button>
+          <button
+            onClick={handleCopyAll}
+            className="shrink-0 p-1.5 rounded-lg text-[#999] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors"
+            title="复制全文（标题 + 正文 + CTA + 标签）"
+            aria-label="复制全文"
+          >
+            {copied ? <Check size={14} className="text-spark-orange" /> : <Copy size={14} />}
+          </button>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 mb-2 group">
@@ -651,6 +677,16 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             title="重新生成标题"
           >
             {titleLoading ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <RefreshCw size={13} />}
+          </button>
+          <button
+            onClick={handleCopyAll}
+            className={`shrink-0 p-1 rounded-md hover:text-spark-orange hover:bg-spark-orange/10 transition-colors ${
+              copied ? 'opacity-100 text-spark-orange' : 'opacity-0 group-hover:opacity-100 text-[#CCC]'
+            }`}
+            title="复制全文（标题 + 正文 + CTA + 标签）"
+            aria-label="复制全文"
+          >
+            {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </div>
       )}

@@ -17,7 +17,6 @@ import { TypingIndicator } from './chat/ChatAtoms';
 import { WelcomeState } from './chat/WelcomeState';
 import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
-import { DialogueProgressBanner } from './chat/DialogueProgressBanner';
 import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
@@ -41,12 +40,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Multi-turn pre-creation dialogue state. The ref holds canonical state used
-  // by async handlers; `dialogueTurn` mirrors it to drive the progress banner
-  // (null = no dialogue in flight, number = current round, 1-based after first
-  // assistant reply).
+  // Multi-turn pre-creation dialogue state
   const dialogueRef = useRef<DialogueState | null>(null);
-  const [dialogueTurn, setDialogueTurn] = useState<number | null>(null);
 
   const hasMessages = messages.length > 0;
 
@@ -398,7 +393,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         skipClarify: true,
       };
       dialogueRef.current = null;
-      setDialogueTurn(null);
       setIsGenerating(true);
       await runGenerate(state.originalPrompt, fallbackBrief, userReply);
       return;
@@ -411,7 +405,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     ];
     state.history = nextHistory;
     state.turn = state.turn + 1;
-    setDialogueTurn(state.turn);
 
     if (turn.ready && turn.brief) {
       // Render closing reply (no escape button — we're already moving on)
@@ -477,7 +470,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       }
 
       dialogueRef.current = null;
-      setDialogueTurn(null);
       setIsGenerating(true);
       await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle, {
         history: transcript,
@@ -521,9 +513,6 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       history: [{ role: 'user', content: text }],
       turn: 0,
     };
-    // Show banner immediately on round 1 so user sees "alignment in progress"
-    // before the first AI reply lands.
-    setDialogueTurn(1);
     await runDialogueRound();
   };
 
@@ -643,8 +632,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       {!hasMessages ? (
         <WelcomeState onSuggestion={(text) => sendMessage(text)} />
       ) : (
-        <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
-          {dialogueTurn !== null && <DialogueProgressBanner turn={dialogueTurn} />}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
             {messages.map(msg => (
               <MessageBubble
