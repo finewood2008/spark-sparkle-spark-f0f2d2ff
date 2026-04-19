@@ -9,6 +9,7 @@ import { getAuthToken } from '@/lib/auth-helpers';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import { useMemoryStore } from '@/store/memoryStore';
 import { SUPABASE_URL } from '@/lib/env';
+import { useIllustrate } from '@/hooks/useIllustrate';
 
 interface ContentCardProps {
   item: ContentItem;
