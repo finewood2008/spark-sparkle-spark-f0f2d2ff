@@ -117,6 +117,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
