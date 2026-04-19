@@ -6,10 +6,16 @@ import { useAppStore } from '../store/appStore';
 import { supabase } from '@/integrations/supabase/client';
 import SparkChat from './SparkChat';
 
-const DraftDrawer = lazy(() => import('./DraftDrawer'));
-const MemoryPanel = lazy(() => import('./MemoryPanel'));
-const SchedulePage = lazy(() => import('../pages/SchedulePage'));
-const ReviewPage = lazy(() => import('../pages/ReviewPage'));
+// Lazy chunk loaders — exposed so we can warm them on hover/focus
+const loadDraftDrawer = () => import('./DraftDrawer');
+const loadMemoryPanel = () => import('./MemoryPanel');
+const loadSchedulePage = () => import('../pages/SchedulePage');
+const loadReviewPage = () => import('../pages/ReviewPage');
+
+const DraftDrawer = lazy(loadDraftDrawer);
+const MemoryPanel = lazy(loadMemoryPanel);
+const SchedulePage = lazy(loadSchedulePage);
+const ReviewPage = lazy(loadReviewPage);
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -62,6 +68,12 @@ export default function ChatLayout() {
     router.preloadRoute({ to: '/account' }).catch(() => { /* ignore */ });
     router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
   };
+
+  // Lazy-panel chunk warmers — trigger dynamic import on hover/focus
+  const preloadDraft = () => { loadDraftDrawer().catch(() => {}); };
+  const preloadMemory = () => { loadMemoryPanel().catch(() => {}); };
+  const preloadSchedule = () => { loadSchedulePage().catch(() => {}); };
+  const preloadReview = () => { loadReviewPage().catch(() => {}); };
 
   // v2 unified memory system — panel + chat context both read from memoryStore.
   useMemoryV2();
@@ -180,6 +192,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setDrawerOpen(true)}
+                onMouseEnter={preloadDraft}
+                onFocus={preloadDraft}
+                onTouchStart={preloadDraft}
                 aria-label="草稿箱"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
@@ -192,6 +207,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setReviewOpen(true)}
+                onMouseEnter={preloadReview}
+                onFocus={preloadReview}
+                onTouchStart={preloadReview}
                 aria-label="审核中心"
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
@@ -220,6 +238,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setScheduleOpen(true)}
+                onMouseEnter={preloadSchedule}
+                onFocus={preloadSchedule}
+                onTouchStart={preloadSchedule}
                 aria-label="自动任务"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
@@ -232,6 +253,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setProfileOpen(true)}
+                onMouseEnter={preloadMemory}
+                onFocus={preloadMemory}
+                onTouchStart={preloadMemory}
                 aria-label="火花记忆"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
