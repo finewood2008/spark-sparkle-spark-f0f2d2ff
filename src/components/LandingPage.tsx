@@ -10,11 +10,42 @@ const TYPING_PHRASES = [
   '用我的品牌调性写一篇推文',
 ];
 
-const QUICK_PROMPTS = [
-  '🔥 帮我制定本周小红书发布计划',
-  '📊 看看我上一篇内容的数据表现',
-  '✨ 根据我的品牌调性写一篇推文',
-  '📅 每天自动帮我生成一篇种草笔记',
+const QUICK_PROMPTS: Array<{
+  icon: typeof Flame;
+  label: string;
+  prompt: string;
+  /** 图标背景色（淡橘 / 淡蓝 / 淡紫 / 淡绿）让 4 个胶囊有视觉区分 */
+  iconBg: string;
+  iconColor: string;
+}> = [
+  {
+    icon: Flame,
+    label: '帮我制定本周小红书发布计划',
+    prompt: '帮我制定本周小红书发布计划',
+    iconBg: 'rgba(255, 107, 26, 0.12)',
+    iconColor: '#FF6B1A',
+  },
+  {
+    icon: BarChart3,
+    label: '看看我上一篇内容的数据表现',
+    prompt: '看看我上一篇内容的数据表现',
+    iconBg: 'rgba(59, 130, 246, 0.12)',
+    iconColor: '#3B82F6',
+  },
+  {
+    icon: Sparkles,
+    label: '根据我的品牌调性写一篇推文',
+    prompt: '根据我的品牌调性写一篇推文',
+    iconBg: 'rgba(168, 85, 247, 0.12)',
+    iconColor: '#A855F7',
+  },
+  {
+    icon: CalendarRange,
+    label: '每天自动帮我生成一篇种草笔记',
+    prompt: '每天自动帮我生成一篇种草笔记',
+    iconBg: 'rgba(16, 185, 129, 0.12)',
+    iconColor: '#10B981',
+  },
 ];
 
 const CAPABILITIES = [
