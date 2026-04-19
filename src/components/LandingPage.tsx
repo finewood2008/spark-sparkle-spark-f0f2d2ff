@@ -262,6 +262,10 @@ export default function LandingPage() {
                     const h = 0.18 + ((wave + 1) / 2) * 0.82;
                     // 每 6 段一个橘色高亮，营造刻度节奏
                     const isAccent = i % 6 === 0;
+                    // 从中心向两边扩散：距中心越远 delay 越大
+                    const center = 13.5;
+                    const distFromCenter = Math.abs(i - center);
+                    const delay = distFromCenter * 110;
                     return (
                       <span
                         key={i}
@@ -272,7 +276,7 @@ export default function LandingPage() {
                             ? 'linear-gradient(to top, #FF6B1A, #FF8C42)'
                             : 'rgba(255,107,26,0.28)',
                           opacity: isAccent ? 0.95 : 0.7,
-                          animationDelay: `${(i * 80).toFixed(0)}ms`,
+                          animationDelay: `${delay.toFixed(0)}ms`,
                         }}
                       />
                     );
