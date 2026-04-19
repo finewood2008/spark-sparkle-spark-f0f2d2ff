@@ -40,6 +40,11 @@ const SYSTEM_PROMPT = `你是一位资深内容编辑，擅长帮创作者从「
 5. label ≤ 14 个汉字，要像用户自己会说出口的话
 6. anglePrompt 是用户点击后会发送给 AI 的完整指令，要明确告诉 AI 怎么改
 
+【迭代意识】
+- 如果这是第 N (N>1) 轮迭代，说明用户已经在打磨这篇了，**绝对不要重复推荐前几轮已经用过的方向**（会附在用户消息里）
+- 每多一轮，建议就要**更聚焦、更细节、更精炼**：第 1 轮可以是大方向（换受众），第 3 轮就该是局部打磨（把第二段的"很多人都"改成具体数字）
+- 第 3 轮以后，优先推荐"显微镜级"的修改：某个词、某个过渡句、某个收尾的具体改法
+
 【输出 JSON 严格格式】
 {
   "suggestions": [
@@ -54,6 +59,10 @@ interface SuggestRequest {
   cta?: string;
   tags?: string[];
   platform?: string;
+  /** Iteration round, 1 = first round after generation, 2+ = after a rewrite */
+  iteration?: number;
+  /** Labels of angle suggestions the user has ALREADY applied in earlier rounds */
+  usedAngles?: string[];
 }
 
 serve(async (req) => {
@@ -70,7 +79,7 @@ serve(async (req) => {
     });
 
     const body = (await req.json()) as SuggestRequest;
-    const { title, content, cta, tags, platform } = body;
+    const { title, content, cta, tags, platform, iteration, usedAngles } = body;
 
     if (!title || !content) {
       return new Response(
@@ -89,12 +98,26 @@ serve(async (req) => {
     const safeContent = content.slice(0, 2000);
     const tagStr = (tags ?? []).join("、");
 
+    const round = Math.max(1, Number(iteration) || 1);
+    const usedList = (usedAngles ?? [])
+      .map((s) => String(s).trim())
+      .filter(Boolean)
+      .slice(0, 12);
+
+    const iterationBlock = round > 1
+      ? `\n\n【迭代上下文】
+- 这是第 ${round} 轮迭代（用户已经基于前几轮的建议改写过了）
+- 前几轮用过的方向（**绝对不要再推荐方向相近的**）：
+${usedList.length > 0 ? usedList.map((l, i) => `  ${i + 1}. ${l}`).join("\n") : "  （未提供）"}
+- 请给出比上一轮**更聚焦、更具体、更显微镜**的建议，针对这篇文章的具体段落、具体句子、具体收尾去打磨。`
+      : "";
+
     const userPrompt = `文章信息：
 - 平台：${platform ?? "未指定"}
 - 标题：${title}
 - 正文：${safeContent}
 - CTA：${cta ?? "（无）"}
-- 标签：${tagStr || "（无）"}
+- 标签：${tagStr || "（无）"}${iterationBlock}
 
 请基于这篇文章的**具体内容**，给我 3-4 条方向性的二次创作建议。`;
 
