@@ -426,6 +426,49 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       // article topic itself, already shown as the article title context)
       const transcript = nextHistory.slice(1);
       const turns = state.turn;
+
+      // 🧠 Memory: persist this session's brief into the context layer with
+      // a 7-day expiry, so next time we discuss a similar topic, spark can
+      // surface the angle/assets we already aligned on instead of starting
+      // from zero. Fire-and-forget — never block generation on this.
+      try {
+        const nowIso = new Date().toISOString();
+        const expIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const summaryParts: string[] = [
+          `主题"${state.originalPrompt}"`,
+          `角度"${turn.brief.chosenAngle}"`,
+        ];
+        if (turn.brief.matchedAssets.length > 0) {
+          summaryParts.push(`用到 ${turn.brief.matchedAssets.join('、')}`);
+        }
+        const sessionEntry: MemoryEntry = {
+          id:
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          layer: 'context',
+          category: 'session_summary',
+          content: {
+            topic: state.originalPrompt,
+            chosenAngle: turn.brief.chosenAngle,
+            matchedAssets: turn.brief.matchedAssets,
+            matchedRules: turn.brief.matchedRules,
+            risks: turn.brief.risks,
+            turns,
+            summary: summaryParts.join(' → '),
+          },
+          source: 'chat_extract',
+          confidence: 0.9,
+          expiresAt: expIso,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        // Don't await — generation must not wait on memory write
+        void persistEntry(sessionEntry);
+      } catch (err) {
+        console.warn('[SparkChat] failed to persist session_summary:', err);
+      }
+
       dialogueRef.current = null;
       setIsGenerating(true);
       await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle, {
