@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight, Flame, BarChart3, Sparkles, CalendarRange } from 'lucide-react';
 import SparkLogo from './SparkLogo';
 
@@ -109,11 +109,26 @@ function useTypewriter(phrases: string[]) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const router = useRouter();
   const placeholder = useTypewriter(TYPING_PHRASES);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const blob1Ref = useRef<HTMLDivElement>(null);
   const blob2Ref = useRef<HTMLDivElement>(null);
   const blob3Ref = useRef<HTMLDivElement>(null);
+
+  // Preload /auth chunk on idle so first navigation feels instant
+  useEffect(() => {
+    const preload = () => {
+      router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
+    };
+    if ('requestIdleCallback' in window) {
+      const id = (window as Window & typeof globalThis).requestIdleCallback(preload, { timeout: 1500 });
+      return () => (window as Window & typeof globalThis).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(preload, 600);
+    return () => clearTimeout(t);
+  }, [router]);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -161,7 +176,13 @@ export default function LandingPage() {
         /* ignore storage errors */
       }
     }
+    setIsNavigating(true);
     navigate({ to: '/auth' });
+  };
+
+  // Trigger preload on hover/focus — gives users near-instant nav after first interaction
+  const preloadAuth = () => {
+    router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
   };
 
   return (
