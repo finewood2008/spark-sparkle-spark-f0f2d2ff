@@ -530,6 +530,24 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         className="hidden"
       />
 
+      {/* Reasoning — AI's creative choices, shown by default for that "smart" feel */}
+      {!editing && item.reasoning && item.reasoning.length > 0 && (
+        <div className="mb-3 rounded-lg border border-spark-orange/20 bg-spark-orange/5 px-3 py-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Lightbulb size={13} className="text-spark-orange" />
+            <span className="text-[12px] font-medium text-spark-orange">我的创作思路</span>
+          </div>
+          <ul className="space-y-1">
+            {item.reasoning.map((r, i) => (
+              <li key={i} className="text-[12px] leading-[1.55] text-[#666] pl-3 relative">
+                <span className="absolute left-0 top-0 text-spark-orange/60">·</span>
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Title */}
       {editing ? (
         <div className="flex items-center gap-1.5 mb-2">
