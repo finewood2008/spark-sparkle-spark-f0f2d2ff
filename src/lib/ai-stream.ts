@@ -251,6 +251,10 @@ export async function suggestAngles(args: {
   /** Labels of angles already applied in prior rounds (so the LLM won't repeat them) */
   usedAngles?: string[];
 }): Promise<AngleSuggestion[]> {
+  // Hard 20s timeout — the suggestion loader shows a skeleton; if the edge
+  // function hangs or stalls, the UI must still recover gracefully.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const token = await getAuthToken();
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/suggest-angles`, {
@@ -260,12 +264,15 @@ export async function suggestAngles(args: {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(args),
+      signal: controller.signal,
     });
     if (!resp.ok) return [];
     const data = (await resp.json()) as { suggestions?: AngleSuggestion[] };
     return Array.isArray(data.suggestions) ? data.suggestions : [];
   } catch {
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 

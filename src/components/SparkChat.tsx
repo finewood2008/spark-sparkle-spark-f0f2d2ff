@@ -315,6 +315,19 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                   : m
               ),
             });
+          }).catch(() => {
+            const msgs2 = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: msgs2.map(m =>
+                m.id === suggestId
+                  ? {
+                      ...m,
+                      content: '📋 这一版我暂时没有更多新方向了，可以提交审核或自己告诉我想怎么改：',
+                      loadingChoices: false,
+                    }
+                  : m,
+              ),
+            });
           });
         },
         onError: (errMsg) => {
@@ -598,6 +611,21 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                 : m
             );
             useAppStore.setState({ messages: next });
+          }).catch(() => {
+            // Safety net: even if the suggest pipeline throws, clear the
+            // skeleton so the user can still proceed (提交审核 button stays).
+            const cur = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: cur.map(m =>
+                m.id === suggestId
+                  ? {
+                      ...m,
+                      content: '📋 你可以直接提交审核，或继续告诉我想怎么改：',
+                      loadingChoices: false,
+                    }
+                  : m,
+              ),
+            });
           });
 
         },
