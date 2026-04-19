@@ -674,7 +674,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       useAppStore.setState({ messages: next });
     };
 
-    let metaPayload: { suggestions: DialogueSuggestion[]; ready: boolean; brief?: { chosenAngle: string; matchedAssets: string[]; matchedRules: string[]; risks: string[] } } | null = null;
+    type MetaPayload = { suggestions: DialogueSuggestion[]; ready: boolean; brief?: { chosenAngle: string; matchedAssets: string[]; matchedRules: string[]; risks: string[] } };
+    let metaPayload: MetaPayload | null = null;
     let streamErr: string | null = null;
 
     await streamCreativeDialogue({
