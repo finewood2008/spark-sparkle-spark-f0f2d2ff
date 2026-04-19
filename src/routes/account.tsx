@@ -31,8 +31,6 @@ function AccountPage() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const [bindings, setBindings] = useState<BindingStatus[]>([]);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
-  const [prefs, setPrefs] = useState<UserPreferences>(defaultPrefs);
-  const [prefsSaved, setPrefsSaved] = useState(false);
 
   // 密码设置
   const [hasPassword, setHasPassword] = useState<boolean>(false);
