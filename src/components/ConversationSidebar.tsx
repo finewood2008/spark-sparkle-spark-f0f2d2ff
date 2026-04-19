@@ -442,7 +442,15 @@ export default function ConversationSidebar({
         </div>
 
         {/* User footer */}
-        <div className="border-t border-[#E5E4E2] px-2 py-2">
+        <div className="border-t border-[#E5E4E2] px-2 py-2 space-y-0.5">
+          <button
+            onClick={() => navigate({ to: isAuthenticated ? '/settings' : '/auth' })}
+            onMouseEnter={preloadAccount}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-[#666] hover:bg-[#EEEDEB] hover:text-[#333] transition-colors"
+          >
+            <Settings size={15} />
+            <span className="flex-1 text-left">系统设置</span>
+          </button>
           <button
             onClick={() => navigate({ to: isAuthenticated ? '/account' : '/auth' })}
             onMouseEnter={preloadAccount}
