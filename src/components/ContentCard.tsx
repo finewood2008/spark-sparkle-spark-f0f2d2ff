@@ -455,7 +455,44 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setOriginalContent(editContent);
   };
 
-  const handleSubmitReview = async () => {
+  /**
+   * Copy the full article (title + body + CTA + tags) to clipboard in a
+   * shareable plain-text format. Uses navigator.clipboard with a textarea
+   * fallback for older browsers / non-secure contexts.
+   */
+  const handleCopyAll = async () => {
+    const title = editing ? editTitle : item.title;
+    const body = editing ? editContent : item.content;
+    const cta = editing ? editCta : (item.cta || '');
+    const tags = editing ? editTags : (item.tags || []);
+
+    const parts: string[] = [];
+    if (title) parts.push(title);
+    if (body) parts.push(body);
+    if (cta) parts.push(cta);
+    if (tags.length > 0) parts.push(tags.map(t => `#${t}`).join(' '));
+    const text = parts.join('\n\n');
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      toast.success('已复制全文到剪贴板');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('复制失败，请手动选择文字复制');
+    }
+  };
     setSubmitLoading(true);
     // 如果在编辑态，先把编辑内容合并进来
     const finalItem: ContentItem = {
