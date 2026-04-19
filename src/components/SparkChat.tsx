@@ -351,11 +351,13 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
               useAppStore.setState({ messages: next });
               return;
             }
+            // Encode the target article id into anglePrompt so sendMessage can
+            // route the click to "revise existing article" instead of generate.
             const angleChoices: ChoiceOption[] = angles.map(a => ({
               id: a.id,
               label: a.label,
               emoji: a.emoji,
-              anglePrompt: a.anglePrompt,
+              anglePrompt: `${ANGLE_REVISE_PREFIX}${newItem.id}::${a.anglePrompt}`,
             }));
             const cur = useAppStore.getState().messages;
             const next = cur.map(m =>
