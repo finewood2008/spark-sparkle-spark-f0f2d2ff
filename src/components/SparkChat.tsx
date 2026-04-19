@@ -10,6 +10,7 @@ import {
 } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
+import { dismissAngle, filterDismissedAngles } from '../lib/dismissed-angles';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import type { ChatMessage, ContentItem, ContentVersion, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
 import type { MemoryEntry } from '../types/memory';
@@ -490,7 +491,10 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             tags: Array.isArray(parsed.tags) ? parsed.tags : [],
             platform,
           }).then((angles) => {
-            if (!angles.length) {
+            const articleTags = Array.isArray(parsed.tags) ? parsed.tags : [];
+            // Drop any angle the user already dismissed for a similar topic
+            const fresh = filterDismissedAngles(angles, articleTags);
+            if (!fresh.length) {
               const cur = useAppStore.getState().messages;
               const next = cur.map(m =>
                 m.id === suggestId
@@ -506,11 +510,13 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             }
             // Encode the target article id into anglePrompt so sendMessage can
             // route the click to "revise existing article" instead of generate.
-            const angleChoices: ChoiceOption[] = angles.map(a => ({
+            const angleChoices: ChoiceOption[] = fresh.map(a => ({
               id: a.id,
               label: a.label,
               emoji: a.emoji,
               anglePrompt: `${ANGLE_REVISE_PREFIX}${newItem.id}::${a.anglePrompt}`,
+              dismissable: true,
+              dismissTags: articleTags,
             }));
             const cur = useAppStore.getState().messages;
             const next = cur.map(m =>
@@ -854,6 +860,23 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     if (text) sendMessage(text);
   }, [pushDistributionCard]);
 
+  /** Remove a suggestion pill from a message and remember the dismissal so
+   *  similar topics won't surface it again. */
+  const handleDismissChoice = useCallback((messageId: string, choiceId: string) => {
+    const msgs = useAppStore.getState().messages;
+    const msg = msgs.find(m => m.id === messageId);
+    const choice = msg?.choices?.find(c => c.id === choiceId);
+    if (choice) {
+      dismissAngle(choice.label, choice.dismissTags);
+    }
+    const next = msgs.map(m =>
+      m.id === messageId
+        ? { ...m, choices: (m.choices || []).filter(c => c.id !== choiceId) }
+        : m
+    );
+    useAppStore.setState({ messages: next });
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Messages */}
@@ -869,6 +892,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                 onSend={sendMessage}
                 onCardAction={handleCardAction}
                 onRetry={handleRetry}
+                onDismissChoice={handleDismissChoice}
               />
             ))}
             {isGenerating && <TypingIndicator />}

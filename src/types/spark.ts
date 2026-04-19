@@ -26,6 +26,11 @@ export interface ChoiceOption {
   anglePrompt?: string;
   /** Original user prompt this choice is clarifying for (used by clarify flow). */
   clarifyForPrompt?: string;
+  /** When true, render a small × button to dismiss this suggestion (and persist
+   *  the dismissal so similar topics won't surface it again). */
+  dismissable?: boolean;
+  /** Tag fingerprint used for the dismissal bucket (what counts as "similar topic"). */
+  dismissTags?: string[];
 }
 
 /** Result of analyze-intent edge function — drives the "smart pre-generation" flow */
