@@ -313,167 +313,22 @@ function AccountPage() {
           </div>
         </div>
 
-        {/* Preferences card */}
-        <div className="rounded-2xl bg-card shadow-lg border border-border overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-              <Palette size={16} className="text-primary" />
-              个人偏好
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">设置你的默认写作偏好，生成内容时自动应用</p>
+        {/* Link to system settings */}
+        <Link
+          to="/settings"
+          className="block rounded-2xl bg-card shadow-lg border border-border px-6 py-4 hover:bg-muted/30 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+              <Settings2 size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-foreground text-sm">系统设置</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">写作偏好、火花语气、图片生成、桌面端 Token</p>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
-          <div className="px-6 py-4 space-y-4">
-            {/* Default platform */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">默认发布平台</label>
-              <div className="flex gap-2">
-                {([
-                  { value: 'xiaohongshu', label: '小红书' },
-                  { value: 'wechat', label: '公众号' },
-                  { value: 'douyin', label: '抖音' },
-                ] as const).map(p => (
-                  <button
-                    key={p.value}
-                    onClick={() => setPrefs(prev => ({ ...prev, defaultPlatform: p.value }))}
-                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
-                      prefs.defaultPlatform === p.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Writing style */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">写作风格</label>
-              <select
-                value={prefs.writingStyle}
-                onChange={e => setPrefs(prev => ({ ...prev, writingStyle: e.target.value }))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-              >
-                <option value="专业严谨">专业严谨</option>
-                <option value="轻松活泼">轻松活泼</option>
-                <option value="种草安利">种草安利</option>
-                <option value="知识科普">知识科普</option>
-                <option value="故事叙述">故事叙述</option>
-              </select>
-            </div>
-
-            {/* Writing tone */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">语气偏好</label>
-              <select
-                value={prefs.writingTone}
-                onChange={e => setPrefs(prev => ({ ...prev, writingTone: e.target.value }))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-              >
-                <option value="友好亲切">友好亲切</option>
-                <option value="权威专业">权威专业</option>
-                <option value="幽默风趣">幽默风趣</option>
-                <option value="温暖感性">温暖感性</option>
-                <option value="简洁直接">简洁直接</option>
-              </select>
-            </div>
-
-            {/* Default length */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
-                <Ruler size={12} />
-                默认文章长度
-              </label>
-              <div className="flex gap-2">
-                {([
-                  { value: 'short', label: '短篇 ~300字' },
-                  { value: 'medium', label: '中篇 ~600字' },
-                  { value: 'long', label: '长篇 1000+' },
-                ] as const).map(l => (
-                  <button
-                    key={l.value}
-                    onClick={() => setPrefs(prev => ({ ...prev, defaultLength: l.value }))}
-                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
-                      prefs.defaultLength === l.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Auto CTA */}
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Megaphone size={12} />
-                自动添加行动号召（CTA）
-              </label>
-              <button
-                onClick={() => setPrefs(prev => ({ ...prev, autoCta: !prev.autoCta }))}
-                className={`w-11 h-6 rounded-full transition-colors relative ${prefs.autoCta ? 'bg-primary' : 'bg-muted'}`}
-              >
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${prefs.autoCta ? 'left-[22px]' : 'left-0.5'}`} />
-              </button>
-            </div>
-
-            {/* Cover style */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
-                <Image size={12} />
-                封面图风格
-              </label>
-              <select
-                value={prefs.coverStyle}
-                onChange={e => setPrefs(prev => ({ ...prev, coverStyle: e.target.value }))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-              >
-                <option value="简约清新">简约清新</option>
-                <option value="商务专业">商务专业</option>
-                <option value="活泼可爱">活泼可爱</option>
-                <option value="高端大气">高端大气</option>
-                <option value="文艺复古">文艺复古</option>
-              </select>
-            </div>
-
-            {/* Signature */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1">
-                <PenLine size={12} />
-                个性签名
-              </label>
-              <input
-                value={prefs.signature}
-                onChange={e => setPrefs(prev => ({ ...prev, signature: e.target.value }))}
-                placeholder="一句话介绍自己..."
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-              />
-            </div>
-
-            {/* Save */}
-            <button
-              onClick={async () => {
-                await saveUserPrefs(prefs);
-                setPrefsSaved(true);
-                toast.success('偏好已保存并同步到云端');
-                setTimeout(() => setPrefsSaved(false), 2000);
-              }}
-              className="spark-btn-primary w-full text-sm gap-1.5"
-            >
-              {prefsSaved ? <CheckCircle2 size={14} /> : <Save size={14} />}
-              {prefsSaved ? '已保存' : '保存偏好'}
-            </button>
-          </div>
-        </div>
-
-        {/* Tone preset (原系统设置) */}
-        <TonePresetCard />
-
-        {/* Desktop client tokens */}
-        <DeviceTokenManager />
+        </Link>
       </div>
     </div>
   );
