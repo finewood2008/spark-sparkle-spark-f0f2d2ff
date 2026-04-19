@@ -278,11 +278,15 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     // analyze mode: no preferences
 
     // --- context layer ---
-    if (mode === 'chat') {
+    // chat mode: full session context
+    // analyze mode: also include context (so creative-dialogue can recall
+    //   past creation sessions — chosen angles, used assets — and reuse them
+    //   on similar topics, making spark feel like it remembers)
+    if (mode === 'chat' || mode === 'analyze') {
       const ctx = buildContextLayer(memories);
       if (ctx) sections.push(ctx);
     }
-    // generate & analyze: no context layer
+    // generate: no context layer (the brief carries everything needed)
 
     return sections.join('\n\n');
   },
