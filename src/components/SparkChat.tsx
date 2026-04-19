@@ -375,6 +375,9 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     const clarifyChoices: ChoiceOption[] = brief.clarifyQuestion.options.map((opt, i) => ({
       id: `clarify-${Date.now()}-${i}`,
       label: opt.label,
+      emoji: opt.emoji,
+      description: opt.description,
+      variant: 'card',
       anglePrompt: opt.anglePrompt,
       clarifyForPrompt: text,
     }));
