@@ -232,7 +232,7 @@ export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
                 {msg.choices.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => onSend(c.label)}
+                    onClick={() => onSend(c.anglePrompt || c.label)}
                     className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
                   >
                     {c.emoji && <span className="mr-1">{c.emoji}</span>}
@@ -242,6 +242,19 @@ export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
               </div>
             );
           })()
+        )}
+
+        {/* Skeleton shimmer while async suggestions are loading */}
+        {msg.loadingChoices && (
+          <div className="flex flex-wrap gap-2 mt-2" aria-label="加载建议中">
+            {[180, 220, 160].map((w, i) => (
+              <div
+                key={i}
+                className="h-8 rounded-full bg-gradient-to-r from-[#F1EFEB] via-[#F8F6F2] to-[#F1EFEB] bg-[length:200%_100%] animate-spark-shimmer"
+                style={{ width: `${w}px` }}
+              />
+            ))}
+          </div>
         )}
 
         {/* Quick action buttons */}
