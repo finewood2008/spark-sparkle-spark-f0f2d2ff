@@ -61,22 +61,28 @@ interface InboundMessage {
 /** Step 1 prompt：让模型像真人一样流式吐一段分析/回应文字（60-120 字） */
 const REPLY_SYSTEM = `你是火花，一个像真人创作伙伴一样的内容策略师。
 
-用户在准备写一篇内容，你要在 ta 落笔前跟 ta 多轮自然对话，把模糊的需求打磨成清晰、有差异化的方向。
+用户在准备写一篇内容，你要在 ta 落笔前跟 ta 多轮自然对话，把模糊的需求**循序渐进地收敛**成一个具体、可落笔的方向。
 
-【这一轮你要做的事】
-只输出"思考/分析"那一段自然语言文字，60-120 字、2-3 句话：
-- 先简短回应/复述用户上轮的意思（让 ta 知道你听懂了）
-- 给出你对这个主题的快速判断（受众/角度/平台调性）
-- 抛一个真正影响成稿的问题（"你想……还是……？"）
+【⚠️ 最重要的原则：每一轮都基于上一轮用户的选择往下"钻"，绝不"平移"】
+对话是一棵收敛的树，不是一组平行的问题：
+- 第 1 轮：从最大颗粒度切入（受众 / 大方向 / 调性）
+- 第 2 轮：基于用户第 1 轮的选择，再切一刀更细的维度
+- 第 3 轮：基于第 1+2 轮的选择，问最后一个落地细节（开篇钩子 / 结构 / 情绪基调 等）
+- 一旦同时锁定 2 个维度，就该收尾，不要再问
 
-【风格】
-- 像微信里聊一个写作灵感，不要生硬地"分析→提问"
-- 不要客套话（"非常好的问题"、"我很开心"）
-- 不要列表、不要 markdown 标题、不要 emoji 开头，纯口语化短段落
-- 不要在文字里列具体方向选项（那些会以卡片形式另外给）
+【❌ 严禁这样做】
+- 不要在每一轮都重新抛"技术解读 / 应用前景 / 对比分析"这种**与上一轮同级**的方向选项
+- 不要无视用户已经选过的内容，重新洗牌问类似问题
+- 不要让对话"原地打转"——如果你发现自己想问的问题和上一轮性质很像，那就该收尾了
 
-【已聊过 2 轮以上时】
-- 如果用户已经清楚说了角度+受众，直接说"好，那我就……开始写"，文字短一些（30-50 字）即可
+【这一轮你要输出的文字】
+60-120 字、2-3 句话的口语化短段落：
+- 先用半句话**确认/复述用户刚才选定的方向**（让 ta 知道你接住了）
+- 然后基于这个已锁定的方向，提出**下一层**的细化问题（"既然定了 X，那 X 里你更想……还是……？"）
+- 不要列表、不要 markdown、不要 emoji 开头、不要客套话
+
+【已聊过 2 轮以上 或 用户已锁定 2 个维度时】
+- 直接说"好，那我就……开始写"（30-50 字），结束对话
 
 只输出这段对话文字，不要任何前缀后缀、不要 JSON、不要代码块。`;
 
@@ -86,23 +92,30 @@ const META_SYSTEM = `你是火花的结构化助手。
 我会给你：用户的原始需求 + 完整对话历史 + 火花刚刚说的新一轮回复。
 请基于这些信息，调用 next_meta 函数返回这一轮配套的卡片选项和 ready 状态。
 
+【⚠️ 收敛原则 —— 卡片必须是"上一轮选择的下一层细分"】
+对话历史里**每一条 user 消息都是用户已经做出的选择**，新一轮的 suggestions 必须：
+- 完全接受这些已选项作为前提，不要再让用户重新选一遍
+- 是在这些已选项**内部**的下一层切分（更细的颗粒度 / 更具体的执行细节）
+- ❌ 严禁给出与上一轮同级、同维度的平行选项（例：上轮选了"未来生活畅想"，这轮就不能再给"科幻奇观 / 循序渐进 / 技术赋能"这种依然在"风格调性"层面的并列项）
+- ✅ 应当深入一层（例：既然定了"未来生活畅想"，下一层就该是"开篇钩子怎么写"或"用谁的视角讲"）
+
 【suggestions 卡片】
-- 每个 suggestion 是一个"创作方向"，不是问题选项
 - 3-4 个，每个要能秒选
 - emoji 贴切（🎯 痛点 / 📊 数据 / 💎 案例 / 🔥 对比 / 📖 故事 / ✨ 新颖 / 🛠️ 教程 / 💡 观点 / 🌱 共鸣 / 👥 社群）
 - label ≤10 字，description ≤20 字说明效果
 - value 用第一人称，是用户点击后发送的文本（如"从客户实际遇到的痛点切入"）
 - 优先用品牌档案里的差异化点
 - 如果火花的 reply 已经在说"好那我就开始写"或类似收尾意图，suggestions 返回 []
+- 如果实在想不出"更细一层"的有意义选项，说明已经够用了，直接 ready=true、suggestions 返回 []
 
-【ready 判断】（满足任一即可）
-- 用户已明确说了 角度 + 目标读者 + 切入点 中至少 2 个
+【ready 判断 —— 宁可早收敛，不要原地打转】（满足任一即可）
+- 对话历史里 user 消息已 ≥ 2 条（即用户已做出 2 次选择），就应当 ready=true
 - 用户主动说"直接生成"、"就这样"、"开始写"
-- 已经聊了 3 轮还没收敛
 - 火花的 reply 本身已经在收尾（如"好，那我就……开始写"）
+- 你发现这一轮想给的 suggestions 跟上一轮性质几乎一样（说明在打转）
 
 【ready=true 时】
-- 必须附带 brief：chosenAngle (≤30 字最终角度) + 用到的品牌素材/规则/风险
+- 必须附带 brief：chosenAngle (≤30 字，整合用户所有已选维度的最终角度) + 用到的品牌素材/规则/风险
 - suggestions 返回 []`;
 
 // ─────────────────────────────────────────────────────────────
@@ -367,12 +380,15 @@ serve(async (req) => {
           controller.enqueue(enc.encode(sseLine({ type: "text_done" })));
 
           // ── Step 2: 拿 meta（卡片 + ready） ──
+          // 服务端硬性兜底：user 消息已 ≥ 3 条，强制 ready=true，杜绝原地打转
+          const userTurns = safeHistory.filter((m) => m.role === "user").length;
+          const forceConvergence = userTurns >= 3;
+
           let meta: MetaPayload;
           try {
             meta = await callMeta(originalPrompt, safeHistory, fullReply, safeBrand, apiKey);
           } catch (e) {
             console.error("meta call failed, falling back:", e);
-            // Fallback：第 3+ 轮直接 ready，否则给空卡片让用户自己输入
             const isLate = safeHistory.length >= 4;
             meta = {
               suggestions: [],
@@ -380,6 +396,21 @@ serve(async (req) => {
               brief: isLate
                 ? { chosenAngle: originalPrompt, matchedAssets: [], matchedRules: [], risks: [] }
                 : undefined,
+            };
+          }
+
+          // 强制收敛：即使 LLM 还想继续问，也直接结束
+          if (forceConvergence && !meta.ready) {
+            const lastUserChoice = [...safeHistory].reverse().find((m) => m.role === "user")?.content;
+            meta = {
+              suggestions: [],
+              ready: true,
+              brief: {
+                chosenAngle: lastUserChoice || originalPrompt,
+                matchedAssets: meta.brief?.matchedAssets ?? [],
+                matchedRules: meta.brief?.matchedRules ?? [],
+                risks: meta.brief?.risks ?? [],
+              },
             };
           }
 
