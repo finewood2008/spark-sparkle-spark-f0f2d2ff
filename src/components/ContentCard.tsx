@@ -1,13 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ContentItem, LearningEntry } from '../types/spark';
+import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
 import { getAuthToken } from '@/lib/auth-helpers';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/store/authStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import { useMemoryStore } from '@/store/memoryStore';
 import { SUPABASE_URL } from '@/lib/env';
