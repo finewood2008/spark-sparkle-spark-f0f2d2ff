@@ -489,6 +489,61 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setTitleLoading(false);
   };
 
+  /**
+   * 全文智能配图：调 illustrate-article 让 AI 自己挑插图位置 + 生成图片，
+   * 把返回的 markdown 图片插回正文。
+   */
+  const handleIllustrate = async () => {
+    const currentContent = editing ? editContent : item.content;
+    const currentTitle = editing ? editTitle : item.title;
+    if (currentContent.length < 50) {
+      toast.error('正文太短（少于 50 字），无法智能配图');
+      return;
+    }
+    setActionError('illustrate', null);
+    setIllustrateLoading(true);
+    setUndoStack(prev => [...prev, currentContent]);
+    if (!editing) {
+      setEditing(true);
+      setExpanded(true);
+      setEditContent(currentContent);
+    }
+    try {
+      const authToken = await getAuthToken();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          title: currentTitle,
+          content: currentContent,
+          platform: item.platform,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '配图失败' }));
+        setActionError('illustrate', err.error || '全文配图失败，请重试');
+        setIllustrateLoading(false);
+        return;
+      }
+      const data = await resp.json();
+      if (data.content) {
+        setEditContent(data.content);
+        const updated = contents.map(c =>
+          c.id === item.id
+            ? { ...c, content: data.content, updatedAt: new Date().toISOString() }
+            : c
+        );
+        setContents(updated);
+        toast.success(`已为正文配 ${data.count} 张插图 ✨`);
+      } else {
+        setActionError('illustrate', '未能生成插图，请重试');
+      }
+    } catch {
+      setActionError('illustrate', '网络异常，全文配图失败');
+    }
+    setIllustrateLoading(false);
+  };
+
   const handleSave = () => {
     const updated = contents.map(c =>
       c.id === item.id
