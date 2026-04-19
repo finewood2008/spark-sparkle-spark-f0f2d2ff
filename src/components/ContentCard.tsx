@@ -21,17 +21,18 @@ interface ToolbarPos {
 }
 
 /**
- * 把含 ![alt](url) markdown 的正文渲染成 React 节点（图片用 <img> 标签）。
- * 不引入 markdown 库，只识别图片语法，其它部分按 whitespace-pre-wrap 文本渲染。
+ * 把含 ![alt](url) markdown + 流式占位符的正文渲染成 React 节点。
+ * 占位符格式：[[SPARK_ILLUSTRATING:第 N/总 张]]  → 渲染成加载卡
+ * 失败提示行：> ⚠️ 第 N 张配图失败 → 渲染成警告条
  */
 function renderContentWithImages(text: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
-  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  // 同时匹配图片、加载占位、失败提示
+  const re = /(!\[([^\]]*)\]\(([^)]+)\))|(\[\[SPARK_ILLUSTRATING:([^\]]+)\]\])|(^> ⚠️ [^\n]+$)/gm;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
   while ((match = re.exec(text)) !== null) {
-    const [full, alt, url] = match;
     if (match.index > lastIndex) {
       nodes.push(
         <span key={`t-${key++}`} className="whitespace-pre-wrap">
@@ -39,13 +40,42 @@ function renderContentWithImages(text: string): React.ReactNode[] {
         </span>,
       );
     }
-    nodes.push(
-      <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
-        <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
-        {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
-      </figure>,
-    );
-    lastIndex = match.index + full.length;
+    if (match[1]) {
+      // markdown 图片
+      const alt = match[2];
+      const url = match[3];
+      nodes.push(
+        <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
+          <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
+          {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
+        </figure>,
+      );
+    } else if (match[4]) {
+      // 加载占位
+      const label = match[5];
+      nodes.push(
+        <div
+          key={`p-${key++}`}
+          className="my-3 rounded-lg border border-spark-orange/30 bg-spark-orange/5 px-3 py-3 flex items-center gap-2"
+        >
+          <span className="inline-block animate-pulse text-base">🎨</span>
+          <span className="text-[12px] text-spark-orange font-medium">正在配{label}插图...</span>
+          <span className="ml-auto inline-block w-3 h-3 rounded-full border-2 border-spark-orange/30 border-t-spark-orange animate-spin" />
+        </div>,
+      );
+    } else if (match[6]) {
+      // 失败提示行
+      const msg = match[6].replace(/^> /, '');
+      nodes.push(
+        <div
+          key={`f-${key++}`}
+          className="my-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600"
+        >
+          {msg}
+        </div>,
+      );
+    }
+    lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) {
     nodes.push(
