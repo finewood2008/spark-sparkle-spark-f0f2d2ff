@@ -205,17 +205,36 @@ export default function LandingPage() {
                   火花
                 </h1>
                 {/* 标题下的小工业刻度线，呼应"Studio" tagging */}
-                <div className="absolute -bottom-2 left-0 right-0 flex items-center gap-[3px] opacity-60">
-                  {Array.from({ length: 16 }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="h-[3px] flex-1 rounded-full"
-                      style={{
-                        background:
-                          i % 4 === 0 ? '#FF6B1A' : 'rgba(255,107,26,0.18)',
-                      }}
-                    />
-                  ))}
+                {/* Sin 波形数据条：模拟音波/增长曲线，从中线向上下生长 */}
+                <div
+                  className="absolute -bottom-4 left-0 right-0 flex items-end justify-between gap-[3px]"
+                  style={{ height: '22px' }}
+                  aria-hidden
+                >
+                  {Array.from({ length: 28 }).map((_, i) => {
+                    // 双正弦叠加：主波 + 高频副波，做出有节奏的"数据感"
+                    const t = i / 27;
+                    const wave =
+                      Math.sin(t * Math.PI * 2.4) * 0.7 +
+                      Math.sin(t * Math.PI * 5.1 + 0.6) * 0.3;
+                    // 归一化到 0.18 ~ 1.0，避免完全压扁
+                    const h = 0.18 + ((wave + 1) / 2) * 0.82;
+                    // 每 6 段一个橘色高亮，营造刻度节奏
+                    const isAccent = i % 6 === 0;
+                    return (
+                      <span
+                        key={i}
+                        className="flex-1 rounded-full transition-all"
+                        style={{
+                          height: `${(h * 100).toFixed(1)}%`,
+                          background: isAccent
+                            ? 'linear-gradient(to top, #FF6B1A, #FF8C42)'
+                            : 'rgba(255,107,26,0.28)',
+                          opacity: isAccent ? 0.95 : 0.7,
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
