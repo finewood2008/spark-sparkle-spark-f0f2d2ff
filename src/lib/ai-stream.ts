@@ -126,6 +126,45 @@ export async function creativeDialogue(args: {
   }
 }
 
+/** Suggestion for "what to try next" after an article is generated */
+export interface AngleSuggestion {
+  id: string;
+  emoji: string;
+  label: string;
+  /** Full prompt sent back to chat when user clicks this suggestion */
+  anglePrompt: string;
+}
+
+/**
+ * Generate 3-4 directional, content-aware suggestions for an article.
+ * Returns [] on failure — caller should fall back gracefully (e.g. show
+ * nothing, or only the "提交审核" button).
+ */
+export async function suggestAngles(args: {
+  title: string;
+  content: string;
+  cta?: string;
+  tags?: string[];
+  platform?: string;
+}): Promise<AngleSuggestion[]> {
+  try {
+    const token = await getAuthToken();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/suggest-angles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(args),
+    });
+    if (!resp.ok) return [];
+    const data = (await resp.json()) as { suggestions?: AngleSuggestion[] };
+    return Array.isArray(data.suggestions) ? data.suggestions : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function streamChat({
   messages,
   mode = 'chat',
