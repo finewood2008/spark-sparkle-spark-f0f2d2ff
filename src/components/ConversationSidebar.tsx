@@ -11,6 +11,7 @@ import {
   Zap,
   Brain,
   User,
+  Settings,
   MoreHorizontal,
   Pin,
   PinOff,
