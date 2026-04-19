@@ -9,13 +9,12 @@ import {
 } from "../_shared/auth.ts";
 
 /**
- * illustrate-article
+ * illustrate-article (SSE 流式版)
  * --------------------------------
- * 智能全文配图：
- * 1) 用 gemini-2.5-flash 分析正文，挑出 2-4 个最适合插图的段落，
- *    给每张图生成一个独立的视觉 prompt（由 LLM 决定主题/风格连贯性）。
- * 2) 并行调用 gemini-2.5-flash-image 把每张 prompt 转成 base64 图片。
- * 3) 把图片以 markdown 形式插回原文（在指定段落后面），返回新正文。
+ * 1) 用 gemini-2.5-flash 规划 2-4 个插图位置，立即推 `event: plan` 给前端，
+ *    前端先在每个锚点处插入 `🎨 正在配第 N/总 张...` 占位。
+ * 2) 并行生成图片，每张图完成立即推 `event: image`，前端把对应占位换成图。
+ * 3) 全部完成后推 `event: done`。
  */
 
 const TEXT_MODEL = "gemini-2.5-flash";
@@ -26,11 +25,8 @@ const IMG_URL = (key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${key}`;
 
 interface PlanItem {
-  /** 原文中作为锚点的段落片段（前 30 字），用于定位插入位置 */
   anchorSnippet: string;
-  /** 该位置的图片 prompt（英文，详细描述画面） */
   imagePrompt: string;
-  /** 简短中文 alt 描述，markdown 用 */
   alt: string;
 }
 
@@ -87,7 +83,6 @@ async function planIllustrations(
   try {
     parsed = JSON.parse(text);
   } catch {
-    // 容错：去掉 ```json 包裹
     const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
     parsed = JSON.parse(cleaned);
   }
@@ -127,32 +122,6 @@ async function generateOneImage(prompt: string, apiKey: string): Promise<string 
   }
 }
 
-/**
- * 把 imageUrl 按 plan.anchorSnippet 插入到原文段落之后。
- * 找不到锚点时退化：把图追加到文末。
- */
-function insertIllustrations(
-  content: string,
-  illustrations: Array<{ plan: PlanItem; imageUrl: string }>,
-): string {
-  let result = content;
-  for (const { plan, imageUrl } of illustrations) {
-    const md = `\n\n![${plan.alt}](${imageUrl})\n\n`;
-    const anchor = plan.anchorSnippet.trim().substring(0, 30);
-    const idx = result.indexOf(anchor);
-    if (idx === -1) {
-      // 锚点丢失（被截断/有特殊字符），追加到文末
-      result = result + md;
-      continue;
-    }
-    // 找到该段落的结尾（下一个换行或文末）
-    const lineEnd = result.indexOf("\n", idx + anchor.length);
-    const insertAt = lineEnd === -1 ? result.length : lineEnd;
-    result = result.substring(0, insertAt) + md + result.substring(insertAt);
-  }
-  return result;
-}
-
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return optionsCors(req);
@@ -179,34 +148,67 @@ serve(async (req) => {
     const KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
-    // 1) 规划插图位置 + prompt
-    const plans = await planIllustrations(title || "", content, platform || "xiaohongshu", KEY);
-    console.log(`[illustrate] planned ${plans.length} illustrations`);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: unknown) => {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+          );
+        };
+        try {
+          // 1) 规划阶段
+          const plans = await planIllustrations(
+            title || "",
+            content,
+            platform || "xiaohongshu",
+            KEY,
+          );
+          console.log(`[illustrate] planned ${plans.length} illustrations (streaming)`);
+          send("plan", {
+            total: plans.length,
+            items: plans.map((p, i) => ({
+              index: i,
+              anchorSnippet: p.anchorSnippet,
+              alt: p.alt,
+            })),
+          });
 
-    // 2) 并行生成所有图片
-    const results = await Promise.all(
-      plans.map(async (p) => ({ plan: p, imageUrl: await generateOneImage(p.imagePrompt, KEY) })),
-    );
-    const ok = results.filter((r): r is { plan: PlanItem; imageUrl: string } => !!r.imageUrl);
-    if (ok.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "AI 没能生成任何插图，请稍后重试", code: "NO_IMAGES" }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+          // 2) 并行生成图片，每张完成立即推送
+          let okCount = 0;
+          await Promise.all(
+            plans.map(async (p, i) => {
+              const imageUrl = await generateOneImage(p.imagePrompt, KEY);
+              if (imageUrl) {
+                okCount += 1;
+                send("image", { index: i, alt: p.alt, imageUrl });
+              } else {
+                send("image_failed", { index: i, alt: p.alt });
+              }
+            }),
+          );
 
-    // 3) 插回原文
-    const newContent = insertIllustrations(content, ok);
+          // 3) 完成
+          send("done", { total: plans.length, succeeded: okCount });
+          controller.close();
+        } catch (e) {
+          console.error("[illustrate] stream error", e);
+          send("error", {
+            message: e instanceof Error ? e.message : "全文配图失败",
+          });
+          controller.close();
+        }
+      },
+    });
 
-    return new Response(
-      JSON.stringify({
-        content: newContent,
-        count: ok.length,
-        planned: plans.length,
-        illustrations: ok.map(({ plan, imageUrl }) => ({ alt: plan.alt, imageUrl })),
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (e) {
     console.error("[illustrate] error", e);
     if (e instanceof AuthError) {
