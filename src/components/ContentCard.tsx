@@ -687,6 +687,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       },
     });
   };
+
+  const handleUndo = () => {
     if (undoStack.length === 0) return;
     const prev = undoStack[undoStack.length - 1];
     setUndoStack(s => s.slice(0, -1));
