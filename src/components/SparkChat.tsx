@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
-import { streamChat, analyzeIntent, type IntentBrief } from '../lib/ai-stream';
+import {
+  streamChat,
+  creativeDialogue,
+  type IntentBrief,
+  type DialogueTurn,
+} from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
 import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
@@ -12,6 +17,18 @@ import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
 import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
 
+/** Sentinel value sent when user clicks the "直接生成" escape button */
+const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
+
+/** State of an in-flight pre-creation dialogue */
+interface DialogueState {
+  originalPrompt: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  turn: number;
+  /** Latest brief, if backend has signaled ready */
+  brief?: IntentBrief;
+}
+
 export default function SparkChat({ getContext }: { getContext?: () => string }) {
   const {
     messages, addMessage, isGenerating, setIsGenerating,
@@ -20,9 +37,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Stash the in-flight intent brief between clarify-question render and user choice
-  const pendingBriefRef = useRef<IntentBrief | null>(null);
-  const pendingPromptRef = useRef<string>('');
+  // Multi-turn pre-creation dialogue state
+  const dialogueRef = useRef<DialogueState | null>(null);
 
   const hasMessages = messages.length > 0;
 
