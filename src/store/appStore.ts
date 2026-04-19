@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChatMessage, ContentItem, ScheduleConfig, BrandMemory, LearningEntry, Suggestion, TabId } from '../types/spark';
+import type { ChatMessage, ContentItem, ScheduleConfig, Suggestion, TabId } from '../types/spark';
 
 interface AppState {
   activeTab: TabId;
@@ -20,13 +20,6 @@ interface AppState {
 
   schedule: ScheduleConfig | null;
   setSchedule: (s: ScheduleConfig) => void;
-
-  brand: BrandMemory | null;
-  setBrand: (b: BrandMemory) => void;
-  brandMemoryEnabled: boolean;
-  setBrandMemoryEnabled: (v: boolean) => void;
-  learnings: LearningEntry[];
-  setLearnings: (l: LearningEntry[]) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -48,11 +41,4 @@ export const useAppStore = create<AppState>((set) => ({
 
   schedule: null,
   setSchedule: (schedule) => set({ schedule }),
-
-  brand: null,
-  setBrand: (brand) => set({ brand }),
-  brandMemoryEnabled: false,
-  setBrandMemoryEnabled: (v) => set({ brandMemoryEnabled: v }),
-  learnings: [],
-  setLearnings: (learnings) => set({ learnings }),
 }));

@@ -53,18 +53,15 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   }, [messages, isGenerating]);
 
   const getBrandContext = useCallback(() => {
+    // Memory v2: brand identity + preferences come from useMemoryStore via
+    // ChatLayout's getContext (chat mode). For generate mode, ai-stream's
+    // resolveBrandContext pulls v2 directly when no explicit context is passed.
+    // We still always append user prefs (platform/tone/length defaults).
     const parts: string[] = [];
     if (getContext) {
       const ctx = getContext();
       if (ctx) parts.push(ctx);
-    } else {
-      const store = useAppStore.getState();
-      if (store.brandMemoryEnabled && store.brand?.initialized) {
-        const b = store.brand;
-        parts.push(`\n品牌名: ${b.name}\n行业: ${b.industry}\n主营: ${b.mainBusiness}\n目标客户: ${b.targetCustomer}\n语气: ${b.toneOfVoice}\n关键词: ${b.keywords.join(', ')}\n差异化: ${b.differentiation}\n禁用词: ${b.tabooWords.join(', ')}`);
-      }
     }
-    // Always append user preferences
     parts.push(getUserPrefsContext());
     return parts.join('\n');
   }, [getContext]);
