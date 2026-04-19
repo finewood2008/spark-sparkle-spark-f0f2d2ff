@@ -521,6 +521,9 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       history: [{ role: 'user', content: text }],
       turn: 0,
     };
+    // Show banner immediately on round 1 so user sees "alignment in progress"
+    // before the first AI reply lands.
+    setDialogueTurn(1);
     await runDialogueRound();
   };
 
