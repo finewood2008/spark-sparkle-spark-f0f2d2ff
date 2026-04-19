@@ -850,6 +850,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       });
     }
   }, [editing, editContent, item.content, item.id, item.platform, contents, setContents]);
+
+  const handleSave = () => {
     const updated = contents.map(c =>
       c.id === item.id
         ? {
