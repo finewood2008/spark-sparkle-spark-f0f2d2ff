@@ -3,10 +3,10 @@ import { useAppStore } from '../store/appStore';
 import {
   streamChat,
   streamEdit,
-  creativeDialogue,
+  streamCreativeDialogue,
   suggestAngles,
   type IntentBrief,
-  type DialogueTurn,
+  type DialogueSuggestion,
 } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
