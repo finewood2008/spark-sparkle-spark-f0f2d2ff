@@ -327,6 +327,9 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={() => goAuth()}
+              onMouseEnter={preloadAuth}
+              onFocus={preloadAuth}
+              onTouchStart={preloadAuth}
               aria-label="开始对话"
               className="group w-full bg-white border border-[#EEEDEB] rounded-3xl flex items-center pl-5 pr-2 py-2 hover:border-[#FFCBA8] hover:shadow-md transition-all"
             >
@@ -359,6 +362,9 @@ export default function LandingPage() {
                 key={prompt}
                 type="button"
                 onClick={() => goAuth(prompt)}
+                onMouseEnter={preloadAuth}
+                onFocus={preloadAuth}
+                onTouchStart={preloadAuth}
                 className="group relative flex items-center gap-2 pl-2 pr-4 py-2 rounded-full bg-white border border-[#EEEDEB] text-[13px] text-[#3F3A35] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-[#FFCBA8] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
               >
                 {/* 彩色图标徽章 */}
@@ -448,6 +454,9 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={() => goAuth()}
+              onMouseEnter={preloadAuth}
+              onFocus={preloadAuth}
+              onTouchStart={preloadAuth}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-full text-white font-medium spark-shadow hover:opacity-95 hover:scale-[1.02] transition-all"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
             >
