@@ -20,6 +20,43 @@ interface ToolbarPos {
   left: number;
 }
 
+/**
+ * 把含 ![alt](url) markdown 的正文渲染成 React 节点（图片用 <img> 标签）。
+ * 不引入 markdown 库，只识别图片语法，其它部分按 whitespace-pre-wrap 文本渲染。
+ */
+function renderContentWithImages(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = re.exec(text)) !== null) {
+    const [full, alt, url] = match;
+    if (match.index > lastIndex) {
+      nodes.push(
+        <span key={`t-${key++}`} className="whitespace-pre-wrap">
+          {text.substring(lastIndex, match.index)}
+        </span>,
+      );
+    }
+    nodes.push(
+      <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
+        <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
+        {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
+      </figure>,
+    );
+    lastIndex = match.index + full.length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(
+      <span key={`t-${key++}`} className="whitespace-pre-wrap">
+        {text.substring(lastIndex)}
+      </span>,
+    );
+  }
+  return nodes;
+}
+
 function AIFloatingToolbar({
   pos,
   onAction,
