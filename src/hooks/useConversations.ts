@@ -253,5 +253,6 @@ export function useConversations() {
     newConversation,
     renameConversation,
     deleteConversation,
+    togglePinConversation,
   };
 }
