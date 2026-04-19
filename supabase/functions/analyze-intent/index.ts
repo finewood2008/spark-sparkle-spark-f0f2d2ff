@@ -122,12 +122,17 @@ async function analyzeWithGemini(
                         properties: {
                           id: { type: "string" },
                           label: { type: "string", description: "选项展示文字，10 字内" },
+                          emoji: { type: "string", description: "单个 emoji 作为卡片图标，必填" },
+                          description: {
+                            type: "string",
+                            description: "20 字内的补充说明，告诉用户选这个会带来什么效果，不要重复 label",
+                          },
                           anglePrompt: {
                             type: "string",
                             description: "用户选这个后，给生成 prompt 追加的角度指令，如「从客户案例切入，强调实际效果」",
                           },
                         },
-                        required: ["id", "label", "anglePrompt"],
+                        required: ["id", "label", "anglePrompt", "emoji", "description"],
                       },
                       minItems: 2,
                       maxItems: 3,
