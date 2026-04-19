@@ -643,7 +643,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       {!hasMessages ? (
         <WelcomeState onSuggestion={(text) => sendMessage(text)} />
       ) : (
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
+          {dialogueTurn !== null && <DialogueProgressBanner turn={dialogueTurn} />}
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
             {messages.map(msg => (
               <MessageBubble
