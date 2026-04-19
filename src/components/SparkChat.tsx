@@ -411,6 +411,32 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       return;
     }
 
+    // Clarify-choice handling: if there's a pending brief and the text matches
+    // one of the offered options' labels, treat it as the user's angle pick and
+    // jump straight to generation with that angle injected.
+    const pendingBrief = pendingBriefRef.current;
+    const pendingPrompt = pendingPromptRef.current;
+    if (pendingBrief?.clarifyQuestion && pendingPrompt) {
+      const picked = pendingBrief.clarifyQuestion.options.find(
+        opt => opt.label === text.trim(),
+      );
+      if (picked) {
+        // Echo user's pick
+        addMessage({
+          id: Date.now().toString(),
+          role: 'user',
+          content: text.trim(),
+          timestamp: new Date().toISOString(),
+        });
+        // Clear pending state — single-use
+        pendingBriefRef.current = null;
+        pendingPromptRef.current = '';
+        setIsGenerating(true);
+        await runGenerate(pendingPrompt, pendingBrief, picked.anglePrompt);
+        return;
+      }
+    }
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
