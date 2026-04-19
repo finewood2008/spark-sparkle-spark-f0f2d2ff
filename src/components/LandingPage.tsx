@@ -354,30 +354,60 @@ export default function LandingPage() {
             ))}
           </section>
 
-          {/* 4. Capabilities */}
+          {/* 4. Capabilities — 作品集 case study 风格三卡 */}
           <section
-            className="w-full mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 opacity-0"
+            className="w-full mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 opacity-0"
             style={{
               animation: 'spark-fade-in 0.6s ease-out forwards',
               animationDelay: '450ms',
             }}
           >
-            {CAPABILITIES.map(({ icon: Icon, title, desc }) => (
-              <div
+            {CAPABILITIES.map(({ icon: Icon, eyebrow, title, desc, metric, metricLabel }, idx) => (
+              <article
                 key={title}
-                className="bg-white border border-[#EEEDEB] rounded-xl p-5 hover:border-[#FFCBA8] hover:shadow-sm transition-all"
+                className="group relative bg-white border border-[#EEEDEB] rounded-2xl pl-6 pr-5 py-6 hover:border-[#FFCBA8] hover:shadow-[0_12px_32px_-12px_rgba(255,107,26,0.25)] hover:-translate-y-1 transition-all duration-300 overflow-hidden"
               >
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
-                  style={{ background: 'rgba(255, 107, 26, 0.1)' }}
-                >
-                  <Icon size={18} className="text-[#FF6B1A]" />
-                </div>
-                <h3 className="text-[15px] font-semibold text-[#1F1F1F] mb-1.5">
+                {/* 左侧竖向橘色色块 — 默认细线，hover 时变粗加深 */}
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-5 bottom-5 w-[3px] rounded-r-full transition-all duration-300 group-hover:w-[5px] group-hover:top-3 group-hover:bottom-3"
+                  style={{
+                    background: 'linear-gradient(to bottom, #FF8C42, #FF6B1A 60%, #E04E00)',
+                  }}
+                />
+
+                {/* 顶部行：编号 + eyebrow + 图标 */}
+                <header className="flex items-start justify-between mb-5">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[26px] leading-none font-bold text-[#FF6B1A] tracking-tight tabular-nums">
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-[10px] tracking-[0.28em] text-[#B8755A] font-medium">
+                      {eyebrow}
+                    </span>
+                  </div>
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-4deg]"
+                    style={{ background: 'rgba(255, 107, 26, 0.08)' }}
+                  >
+                    <Icon size={17} className="text-[#FF6B1A]" strokeWidth={2.1} />
+                  </div>
+                </header>
+
+                {/* 标题：大号、紧凑字距 */}
+                <h3 className="text-[22px] font-bold text-[#1F1F1F] tracking-tight leading-tight mb-2">
                   {title}
                 </h3>
-                <p className="text-[13px] text-[#888] leading-relaxed">{desc}</p>
-              </div>
+                <p className="text-[13px] text-[#8A8580] leading-relaxed mb-5">{desc}</p>
+
+                {/* 底部分隔线 + key metric — 像 case study 的成绩单 */}
+                <div className="pt-4 border-t border-dashed border-[#F0EFED] flex items-baseline justify-between">
+                  <span className="text-[11px] text-[#B8B5B0] tracking-wide">{metricLabel}</span>
+                  <span className="text-[18px] font-bold text-[#1F1F1F] tabular-nums tracking-tight">
+                    {metric}
+                  </span>
+                </div>
+              </article>
             ))}
           </section>
 
