@@ -24,8 +24,17 @@ interface ToolbarPos {
  * 把含 ![alt](url) markdown + 流式占位符的正文渲染成 React 节点。
  * 占位符格式：[[SPARK_ILLUSTRATING:第 N/总 张]]  → 渲染成加载卡
  * 失败提示行：> ⚠️ 第 N 张配图失败 → 渲染成警告条
+ *
+ * imageActions: 当传入时，每张图右上角显示 ✕（删除）和 🔄（重新生成）按钮。
  */
-function renderContentWithImages(text: string): React.ReactNode[] {
+function renderContentWithImages(
+  text: string,
+  imageActions?: {
+    onDelete: (url: string, alt: string) => void;
+    onRegenerate: (url: string, alt: string) => void;
+    regeneratingUrls: Set<string>;
+  },
+): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   // 同时匹配图片、加载占位、失败提示
   const re = /(!\[([^\]]*)\]\(([^)]+)\))|(\[\[SPARK_ILLUSTRATING:([^\]]+)\]\])|(^> ⚠️ [^\n]+$)/gm;
@@ -44,9 +53,41 @@ function renderContentWithImages(text: string): React.ReactNode[] {
       // markdown 图片
       const alt = match[2];
       const url = match[3];
+      const isRegenerating = imageActions?.regeneratingUrls.has(url) ?? false;
       nodes.push(
-        <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
+        <figure
+          key={`i-${key++}`}
+          className="my-3 rounded-lg overflow-hidden border border-[#EDECE8] relative group/img"
+        >
           <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
+          {isRegenerating && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+              <div className="flex items-center gap-2 text-[12px] text-spark-orange">
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-spark-orange/30 border-t-spark-orange animate-spin" />
+                重新生成中...
+              </div>
+            </div>
+          )}
+          {imageActions && !isRegenerating && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => { e.stopPropagation(); imageActions.onRegenerate(url, alt); }}
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-spark-orange text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                title="重新生成这张图"
+                aria-label="重新生成这张图"
+              >
+                <RefreshCw size={13} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); imageActions.onDelete(url, alt); }}
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                title="删除这张图"
+                aria-label="删除这张图"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
           {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
         </figure>,
       );
