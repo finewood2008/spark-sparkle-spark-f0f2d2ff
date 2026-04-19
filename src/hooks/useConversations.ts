@@ -135,7 +135,6 @@ export function useConversations() {
     })();
   }, [
     isAuthenticated,
-    isInitializing,
     user?.id,
     openConversation,
     setActiveId,
