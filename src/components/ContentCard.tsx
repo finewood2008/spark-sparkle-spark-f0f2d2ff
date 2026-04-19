@@ -1216,7 +1216,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       )}
 
       {/* Inline action errors with retry */}
-      {(actionErrors.cover || actionErrors.polish || actionErrors.title || actionErrors.illustrate) && (
+      {(actionErrors.cover || actionErrors.polish || actionErrors.title || actionErrors.illustrate || actionErrors.restyle || actionErrors.expand || actionErrors.simplify) && (
         <div className="mt-3 space-y-1.5">
           {actionErrors.cover && (
             <InlineActionError
@@ -1234,6 +1234,33 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               loading={aiLoading === 'polish'}
               onRetry={handlePolish}
               onDismiss={() => setActionError('polish', null)}
+            />
+          )}
+          {actionErrors.restyle && (
+            <InlineActionError
+              label="换风格"
+              message={actionErrors.restyle}
+              loading={aiLoading === 'restyle'}
+              onRetry={() => handleFullEdit('restyle')}
+              onDismiss={() => setActionError('restyle', null)}
+            />
+          )}
+          {actionErrors.expand && (
+            <InlineActionError
+              label="扩写全文"
+              message={actionErrors.expand}
+              loading={aiLoading === 'expand'}
+              onRetry={() => handleFullEdit('expand')}
+              onDismiss={() => setActionError('expand', null)}
+            />
+          )}
+          {actionErrors.simplify && (
+            <InlineActionError
+              label="精简全文"
+              message={actionErrors.simplify}
+              loading={aiLoading === 'simplify'}
+              onRetry={() => handleFullEdit('simplify')}
+              onDismiss={() => setActionError('simplify', null)}
             />
           )}
           {actionErrors.title && (
