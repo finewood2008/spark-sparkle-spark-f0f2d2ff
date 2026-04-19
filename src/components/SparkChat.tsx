@@ -17,6 +17,7 @@ import { TypingIndicator } from './chat/ChatAtoms';
 import { WelcomeState } from './chat/WelcomeState';
 import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
+import { DialogueProgressBanner } from './chat/DialogueProgressBanner';
 import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
