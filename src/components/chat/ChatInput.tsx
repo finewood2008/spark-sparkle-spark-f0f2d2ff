@@ -1,4 +1,5 @@
 import { Send, Paperclip } from 'lucide-react';
+import { prewarmChat } from '@/lib/ai-stream';
 
 export function ChatInput({ input, setInput, onSend, isGenerating, inputRef }: {
   input: string;
@@ -55,6 +56,9 @@ export function ChatInput({ input, setInput, onSend, isGenerating, inputRef }: {
             <button
               key={t.label}
               type="button"
+              onMouseEnter={() => { void prewarmChat('generate'); }}
+              onFocus={() => { void prewarmChat('generate'); }}
+              onTouchStart={() => { void prewarmChat('generate'); }}
               onClick={() => {
                 setInput(t.prompt);
                 requestAnimationFrame(() => {
