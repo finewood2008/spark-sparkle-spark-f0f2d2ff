@@ -207,6 +207,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setReviewOpen(true)}
+                onMouseEnter={preloadReview}
+                onFocus={preloadReview}
+                onTouchStart={preloadReview}
                 aria-label="审核中心"
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
@@ -235,6 +238,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setScheduleOpen(true)}
+                onMouseEnter={preloadSchedule}
+                onFocus={preloadSchedule}
+                onTouchStart={preloadSchedule}
                 aria-label="自动任务"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
@@ -247,6 +253,9 @@ export default function ChatLayout() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setProfileOpen(true)}
+                onMouseEnter={preloadMemory}
+                onFocus={preloadMemory}
+                onTouchStart={preloadMemory}
                 aria-label="火花记忆"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
