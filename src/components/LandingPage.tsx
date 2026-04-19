@@ -356,16 +356,16 @@ export default function LandingPage() {
 
           {/* 4. Capabilities — 作品集 case study 风格三卡 */}
           <section
-            className="w-full mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 opacity-0"
-            style={{
-              animation: 'spark-fade-in 0.6s ease-out forwards',
-              animationDelay: '450ms',
-            }}
+            className="w-full mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5"
           >
             {CAPABILITIES.map(({ icon: Icon, eyebrow, title, desc, metric, metricLabel }, idx) => (
               <article
                 key={title}
-                className="group relative bg-white border border-[#EEEDEB] rounded-2xl pl-6 pr-5 py-6 hover:border-[#FFCBA8] hover:shadow-[0_12px_32px_-12px_rgba(255,107,26,0.25)] hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                className="group relative bg-white border border-[#EEEDEB] rounded-2xl pl-6 pr-5 py-6 hover:border-[#FFCBA8] hover:shadow-[0_12px_32px_-12px_rgba(255,107,26,0.25)] hover:-translate-y-1 transition-[border-color,box-shadow,transform] duration-300 overflow-hidden opacity-0"
+                style={{
+                  animation: 'spark-slide-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                  animationDelay: `${450 + idx * 100}ms`,
+                }}
               >
                 {/* 左侧竖向橘色色块 — 默认细线，hover 时变粗加深 */}
                 <span
