@@ -673,10 +673,9 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       // Replace the messages array via direct setter pattern
       useAppStore.setState({ messages: next });
     };
-
     type MetaPayload = { suggestions: DialogueSuggestion[]; ready: boolean; brief?: { chosenAngle: string; matchedAssets: string[]; matchedRules: string[]; risks: string[] } };
-    let metaPayload: MetaPayload | null = null;
-    let streamErr: string | null = null;
+    const metaRef: { current: MetaPayload | null } = { current: null };
+    const errRef: { current: string | null } = { current: null };
 
     await streamCreativeDialogue({
       originalPrompt: state.originalPrompt,
@@ -691,9 +690,9 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           updateBubble((m) => ({ ...m, loadingChoices: true }));
         }
       },
-      onMeta: (meta) => { metaPayload = meta; },
+      onMeta: (meta) => { metaRef.current = meta as MetaPayload; },
       onDone: () => { /* handled below */ },
-      onError: (msg) => { streamErr = msg; },
+      onError: (msg) => { errRef.current = msg; },
     });
 
     setIsGenerating(false);
