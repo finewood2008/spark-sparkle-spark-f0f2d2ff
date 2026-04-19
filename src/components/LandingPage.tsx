@@ -234,7 +234,7 @@ export default function LandingPage() {
                 <h1
                   className="font-extrabold leading-[0.9] tracking-[-0.04em] select-none"
                   style={{
-                    fontSize: 'clamp(64px, 11vw, 112px)',
+                    fontSize: 'clamp(48px, 8vw, 84px)',
                     background:
                       'linear-gradient(135deg, #FF8C42 0%, #FF6B1A 45%, #E04E00 100%)',
                     WebkitBackgroundClip: 'text',
@@ -265,13 +265,14 @@ export default function LandingPage() {
                     return (
                       <span
                         key={i}
-                        className="flex-1 rounded-full transition-all"
+                        className="flex-1 rounded-full transition-all animate-spark-watermark-breathe"
                         style={{
                           height: `${(h * 100).toFixed(1)}%`,
                           background: isAccent
                             ? 'linear-gradient(to top, #FF6B1A, #FF8C42)'
                             : 'rgba(255,107,26,0.28)',
                           opacity: isAccent ? 0.95 : 0.7,
+                          animationDelay: `${(i * 80).toFixed(0)}ms`,
                         }}
                       />
                     );
