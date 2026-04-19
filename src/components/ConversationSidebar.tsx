@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -12,6 +12,8 @@ import {
   Brain,
   User,
   MoreHorizontal,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { useConversationStore } from '@/store/conversationStore';
@@ -64,6 +66,7 @@ export default function ConversationSidebar({
     newConversation,
     renameConversation,
     deleteConversation,
+    togglePinConversation,
   } = useConversations();
   const loading = useConversationStore((s) => s.loading);
   const { isAuthenticated, user } = useAuthStore();
@@ -74,6 +77,15 @@ export default function ConversationSidebar({
   const [renameValue, setRenameValue] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  const pinnedConversations = useMemo(
+    () => conversations.filter((c) => c.pinned),
+    [conversations],
+  );
+  const regularConversations = useMemo(
+    () => conversations.filter((c) => !c.pinned),
+    [conversations],
+  );
 
   const handleNew = async () => {
     onChangeView('chat');
@@ -244,8 +256,8 @@ export default function ConversationSidebar({
               还没有对话，点上面「新建对话」开始吧～
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {conversations.map((c) => {
+            (() => {
+              const renderItem = (c: typeof conversations[number]) => {
                 const active = activeView === 'chat' && c.id === activeId;
                 const isRenaming = renamingId === c.id;
                 return (
@@ -258,10 +270,21 @@ export default function ConversationSidebar({
                     }`}
                     onClick={() => !isRenaming && handleSelect(c.id)}
                   >
-                    <MessageSquare
-                      size={14}
-                      className={active ? 'text-[#FF6B1A]' : 'text-[#999]'}
-                    />
+                    {c.pinned ? (
+                      <Pin
+                        size={12}
+                        className={
+                          active
+                            ? 'text-[#FF6B1A] fill-[#FF6B1A]'
+                            : 'text-[#FF6B1A]/70 fill-[#FF6B1A]/70'
+                        }
+                      />
+                    ) : (
+                      <MessageSquare
+                        size={14}
+                        className={active ? 'text-[#FF6B1A]' : 'text-[#999]'}
+                      />
+                    )}
                     {isRenaming ? (
                       <input
                         autoFocus
@@ -307,6 +330,24 @@ export default function ConversationSidebar({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            setMenuOpenId(null);
+                            void togglePinConversation(c.id);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-[#666] hover:bg-[#F7F6F3]"
+                        >
+                          {c.pinned ? (
+                            <>
+                              <PinOff size={13} /> 取消置顶
+                            </>
+                          ) : (
+                            <>
+                              <Pin size={13} /> 置顶
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             startRename(c.id, c.title);
                           }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-[#666] hover:bg-[#F7F6F3]"
@@ -327,8 +368,35 @@ export default function ConversationSidebar({
                     )}
                   </div>
                 );
-              })}
-            </div>
+              };
+              return (
+                <>
+                  {pinnedConversations.length > 0 && (
+                    <div className="mb-2">
+                      <div className="px-2 pt-1 pb-1 text-[10px] uppercase tracking-wider text-[#BBB] font-medium flex items-center gap-1">
+                        <Pin size={10} className="fill-[#BBB]" />
+                        置顶
+                      </div>
+                      <div className="space-y-0.5">
+                        {pinnedConversations.map(renderItem)}
+                      </div>
+                    </div>
+                  )}
+                  {regularConversations.length > 0 && (
+                    <div>
+                      {pinnedConversations.length > 0 && (
+                        <div className="px-2 pt-1 pb-1 text-[10px] uppercase tracking-wider text-[#BBB] font-medium">
+                          最近
+                        </div>
+                      )}
+                      <div className="space-y-0.5">
+                        {regularConversations.map(renderItem)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()
           )}
         </div>
 
