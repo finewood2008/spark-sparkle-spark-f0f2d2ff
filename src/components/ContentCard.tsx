@@ -165,6 +165,167 @@ function AIFloatingToolbar({
   );
 }
 
+/**
+ * 编辑态正文：把 markdown 按"图片块"切分。
+ * - 文字段：可编辑的 textarea（自动撑高），共享同一个 ref（最后一段）以兼容 AI 工具栏选区。
+ * - 图片段：直接渲染图片缩略图 + 删除/重生按钮，不再以 `![](...)` 文本形式暴露给用户。
+ * value 仍是完整的 markdown 字符串，onChange 只把"文字段"的修改回写到对应位置，
+ * 保证图片 markdown 永远不会被用户误改成乱码。
+ */
+function EditableArticleBody({
+  value,
+  onChange,
+  textareaRef,
+  onSelect,
+  imageActions,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  onSelect: () => void;
+  imageActions: {
+    onDelete: (url: string, alt: string) => void;
+    onRegenerate: (url: string, alt: string) => void;
+    regeneratingUrls: Set<string>;
+  };
+}) {
+  // 切分：把图片 / 占位 / 失败提示作为"块",其余作为可编辑文字段。
+  type Seg =
+    | { kind: 'text'; text: string; start: number; end: number }
+    | { kind: 'image'; alt: string; url: string; raw: string }
+    | { kind: 'placeholder'; label: string; raw: string }
+    | { kind: 'failure'; msg: string; raw: string };
+  const segs: Seg[] = [];
+  const re = /(!\[([^\]]*)\]\(([^)]+)\))|(\[\[SPARK_ILLUSTRATING:([^\]]+)\]\])|(^> ⚠️ [^\n]+$)/gm;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > lastIndex) {
+      segs.push({ kind: 'text', text: value.substring(lastIndex, m.index), start: lastIndex, end: m.index });
+    }
+    if (m[1]) segs.push({ kind: 'image', alt: m[2], url: m[3], raw: m[1] });
+    else if (m[4]) segs.push({ kind: 'placeholder', label: m[5], raw: m[4] });
+    else if (m[6]) segs.push({ kind: 'failure', msg: m[6].replace(/^> /, ''), raw: m[6] });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < value.length) {
+    segs.push({ kind: 'text', text: value.substring(lastIndex), start: lastIndex, end: value.length });
+  }
+  if (segs.length === 0) {
+    segs.push({ kind: 'text', text: '', start: 0, end: 0 });
+  }
+
+  // 把"文字段索引"映射到原始 value 区间，便于回写
+  const textSegs = segs.filter((s): s is Extract<Seg, { kind: 'text' }> => s.kind === 'text');
+  const lastTextSegIdx = textSegs.length - 1;
+
+  const updateTextSeg = (segIdx: number, nextText: string) => {
+    const seg = segs[segIdx];
+    if (seg.kind !== 'text') return;
+    const before = value.substring(0, seg.start);
+    const after = value.substring(seg.end);
+    onChange(before + nextText + after);
+  };
+
+  let textCounter = 0;
+  return (
+    <div className="space-y-2 border border-[#E5E4E2] rounded-lg p-2 focus-within:border-spark-orange">
+      {segs.map((seg, i) => {
+        if (seg.kind === 'text') {
+          const isLast = textCounter === lastTextSegIdx;
+          textCounter += 1;
+          return (
+            <textarea
+              key={`t-${i}`}
+              ref={isLast ? textareaRef : undefined}
+              value={seg.text}
+              onChange={(e) => {
+                const ta = e.target;
+                updateTextSeg(i, ta.value);
+                ta.style.height = 'auto';
+                ta.style.height = `${ta.scrollHeight}px`;
+              }}
+              onSelect={isLast ? onSelect : undefined}
+              onMouseUp={isLast ? onSelect : undefined}
+              onInput={(e) => {
+                const ta = e.currentTarget;
+                ta.style.height = 'auto';
+                ta.style.height = `${ta.scrollHeight}px`;
+              }}
+              ref-callback={undefined}
+              rows={Math.max(1, seg.text.split('\n').length)}
+              className="w-full text-[14px] text-[#555] leading-[1.6] outline-none resize-none bg-transparent px-1 py-0.5"
+              placeholder={isLast && segs.length === 1 ? '在这里写内容…' : ''}
+            />
+          );
+        }
+        if (seg.kind === 'image') {
+          const isRegenerating = imageActions.regeneratingUrls.has(seg.url);
+          return (
+            <figure
+              key={`i-${i}`}
+              className="my-1 rounded-lg overflow-hidden border border-[#EDECE8] relative group/img"
+            >
+              <img src={seg.url} alt={seg.alt} className="w-full h-auto block" loading="lazy" />
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-[12px] text-spark-orange">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-spark-orange/30 border-t-spark-orange animate-spin" />
+                    重新生成中...
+                  </div>
+                </div>
+              )}
+              {!isRegenerating && (
+                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); imageActions.onRegenerate(seg.url, seg.alt); }}
+                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-spark-orange text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                    title="重新生成这张图"
+                    aria-label="重新生成这张图"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); imageActions.onDelete(seg.url, seg.alt); }}
+                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                    title="删除这张图"
+                    aria-label="删除这张图"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+              {seg.alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{seg.alt}</figcaption>}
+            </figure>
+          );
+        }
+        if (seg.kind === 'placeholder') {
+          return (
+            <div
+              key={`p-${i}`}
+              className="my-1 rounded-lg border border-spark-orange/30 bg-spark-orange/5 px-3 py-3 flex items-center gap-2"
+            >
+              <span className="inline-block animate-pulse text-base">🎨</span>
+              <span className="text-[12px] text-spark-orange font-medium">正在配{seg.label}插图...</span>
+              <span className="ml-auto inline-block w-3 h-3 rounded-full border-2 border-spark-orange/30 border-t-spark-orange animate-spin" />
+            </div>
+          );
+        }
+        return (
+          <div
+            key={`f-${i}`}
+            className="my-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600"
+          >
+            {seg.msg}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function InlineActionError({
   label,
   message,
