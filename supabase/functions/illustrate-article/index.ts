@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   AuthError,
   getCorsHeaders,
@@ -7,6 +8,56 @@ import {
   validatePayloadSize,
   checkRateLimit,
 } from "../_shared/auth.ts";
+
+const STORAGE_BUCKET = "article-images";
+
+/**
+ * 把 base64 图片上传到 Storage，返回公开 URL。
+ * 路径：{userId}/{ts}-{rand}.{ext}，符合 RLS（用户子目录）。
+ * 失败时回退返回原 data URL（不阻塞流程）。
+ */
+async function uploadBase64ToStorage(
+  dataUrl: string,
+  userId: string,
+): Promise<string> {
+  try {
+    const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!m) return dataUrl;
+    const mime = m[1];
+    const b64 = m[2];
+    const ext = mime.split("/")[1]?.split("+")[0] || "png";
+
+    // base64 -> Uint8Array
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.error("[illustrate] missing SUPABASE_URL / SERVICE_ROLE_KEY");
+      return dataUrl;
+    }
+
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    const path = `${userId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const { error } = await admin.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (error) {
+      console.error("[illustrate] storage upload failed", error.message);
+      return dataUrl;
+    }
+    const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    return data.publicUrl || dataUrl;
+  } catch (e) {
+    console.error("[illustrate] upload exception", e);
+    return dataUrl;
+  }
+}
 
 /**
  * illustrate-article (SSE 流式版)
