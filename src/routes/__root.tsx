@@ -46,6 +46,8 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "icon", type: "image/png", href: "/spark-logo.png" },
+      { rel: "apple-touch-icon", href: "/spark-logo.png" },
     ],
   }),
   shellComponent: RootShell,
