@@ -201,7 +201,12 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   };
 
   // Step 3: real generation, optionally with intent brief from analyze-intent
-  const runGenerate = async (text: string, brief?: IntentBrief, chosenAngle?: string) => {
+  const runGenerate = async (
+    text: string,
+    brief?: IntentBrief,
+    chosenAngle?: string,
+    dialogue?: { history: Array<{ role: 'user' | 'assistant'; content: string }>; turns: number },
+  ) => {
     const statusId = (Date.now() + 1).toString();
     addMessage({
       id: statusId,
