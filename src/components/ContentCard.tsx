@@ -680,6 +680,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         if (event === 'plan') {
           const items = (payload.items as Array<{ index: number; anchorSnippet: string; alt: string }>) || [];
           totalPlanned = (payload.total as number) || items.length;
+          setIllustrateProgress({ done: 0, total: totalPlanned });
           // 在每个锚点处插入占位（按 index 顺序，从后往前插以避免位置漂移）
           let next = working;
           // 先生成所有 token
