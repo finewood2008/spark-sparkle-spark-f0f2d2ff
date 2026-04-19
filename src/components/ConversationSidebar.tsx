@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -12,6 +12,8 @@ import {
   Brain,
   User,
   MoreHorizontal,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { useConversationStore } from '@/store/conversationStore';
