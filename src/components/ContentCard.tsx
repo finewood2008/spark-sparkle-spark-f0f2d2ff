@@ -769,7 +769,87 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     setIllustrateLoading(false);
   };
 
-  const handleSave = () => {
+  /** 删除单张已配图：把对应的 ![alt](url) 从正文里移除，同时同步到 store。 */
+  const handleDeleteImage = useCallback((url: string, alt: string) => {
+    const current = editing ? editContent : item.content;
+    // 转义 URL 中的正则元字符
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 匹配 ![alt](url)，前后多余空行也一并清理
+    const pattern = new RegExp(`\\n*!\\[${esc(alt)}\\]\\(${esc(url)}\\)\\n*`, 'g');
+    const next = current.replace(pattern, '\n\n');
+    if (next === current) return;
+    if (editing) setEditContent(next);
+    setUndoStack(prev => [...prev, current]);
+    const updated = contents.map(c =>
+      c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
+    );
+    setContents(updated);
+    imagePromptsRef.current.delete(url);
+    toast.success('已删除这张图');
+  }, [editing, editContent, item.content, item.id, contents, setContents]);
+
+  /** 重新生成单张图：用记录的 prompt（或 alt 兜底）调 illustrate-article 的 single 模式，
+   *  完成后把正文里的 url 替换成新的 url。 */
+  const handleRegenerateImage = useCallback(async (url: string, alt: string) => {
+    const meta = imagePromptsRef.current.get(url);
+    const prompt = meta?.prompt || alt; // 刷新后丢失则用 alt 兜底
+    if (!prompt) {
+      toast.error('找不到这张图的生成提示，无法重新生成');
+      return;
+    }
+    setRegeneratingUrls(prev => {
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+    try {
+      const authToken = await getAuthToken();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          mode: 'single',
+          imagePrompt: prompt,
+          alt,
+          platform: item.platform,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '重新生成失败' }));
+        toast.error(err.error || '重新生成失败');
+        return;
+      }
+      const data = await resp.json() as { imageUrl: string; alt: string; imagePrompt: string };
+      const newUrl = data.imageUrl;
+      if (!newUrl) {
+        toast.error('图片为空，请重试');
+        return;
+      }
+      // 把正文里这张图的 url 换成新的 url（alt 保持不变）
+      const current = editing ? editContent : item.content;
+      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`!\\[${esc(alt)}\\]\\(${esc(url)}\\)`, 'g');
+      const next = current.replace(pattern, `![${alt}](${newUrl})`);
+      setUndoStack(prev => [...prev, current]);
+      if (editing) setEditContent(next);
+      const updated = contents.map(c =>
+        c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
+      );
+      setContents(updated);
+      // 转移 prompt 记录到新 url
+      imagePromptsRef.current.delete(url);
+      imagePromptsRef.current.set(newUrl, { prompt: data.imagePrompt || prompt, alt });
+      toast.success('已重新生成 ✨');
+    } catch {
+      toast.error('网络异常，重新生成失败');
+    } finally {
+      setRegeneratingUrls(prev => {
+        const next = new Set(prev);
+        next.delete(url);
+        return next;
+      });
+    }
+  }, [editing, editContent, item.content, item.id, item.platform, contents, setContents]);
     const updated = contents.map(c =>
       c.id === item.id
         ? {
