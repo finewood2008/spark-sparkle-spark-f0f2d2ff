@@ -317,6 +317,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             content: '📋 你可以直接提交审核，我也在想几个新方向…',
             timestamp: new Date().toISOString(),
             choices: initialChoices,
+            loadingChoices: true,
           });
 
           setIsGenerating(false);
@@ -335,7 +336,11 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
               const cur = useAppStore.getState().messages;
               const next = cur.map(m =>
                 m.id === suggestId
-                  ? { ...m, content: '📋 你可以直接提交审核，或继续告诉我想怎么改：' }
+                  ? {
+                      ...m,
+                      content: '📋 你可以直接提交审核，或继续告诉我想怎么改：',
+                      loadingChoices: false,
+                    }
                   : m
               );
               useAppStore.setState({ messages: next });
@@ -354,6 +359,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
                     ...m,
                     content: '💡 基于这篇文章，我想到几个可以试试的新方向：',
                     choices: [...initialChoices, ...angleChoices].slice(0, 5),
+                    loadingChoices: false,
                   }
                 : m
             );

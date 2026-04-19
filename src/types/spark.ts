@@ -57,6 +57,9 @@ export interface ChatMessage {
   actions?: QuickAction[];
   options?: OptionCard[];
   choices?: ChoiceOption[];
+  /** When true, render shimmer skeleton placeholders below choices to indicate
+   *  more suggestions are loading asynchronously (e.g. suggest-angles call). */
+  loadingChoices?: boolean;
   image?: string;
   contentItem?: ContentItem;
   reportData?: Record<string, unknown>;

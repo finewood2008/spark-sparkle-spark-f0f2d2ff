@@ -281,3 +281,12 @@
 .animate-badge-pop {
   animation: badge-pop 0.4s ease-out;
 }
+
+@keyframes spark-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-spark-shimmer {
+  animation: spark-shimmer 1.6s linear infinite;
+}
