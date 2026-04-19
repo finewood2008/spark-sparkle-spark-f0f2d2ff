@@ -36,7 +36,7 @@ export interface IntentAnalysis {
   risks: string[];
   clarifyQuestion: {
     question: string;
-    options: Array<{ id: string; label: string; anglePrompt: string }>;
+    options: Array<{ id: string; label: string; anglePrompt: string; emoji?: string; description?: string }>;
   } | null;
   skipClarify: boolean;
 }
