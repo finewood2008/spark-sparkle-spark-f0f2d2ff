@@ -1394,7 +1394,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               className="content-card-btn text-spark-orange"
             >
               {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
-              {illustrateLoading ? '配图中...' : '全文配图'}
+              {illustrateLoading
+                ? illustrateProgress.total > 0
+                  ? `配图中 ${illustrateProgress.done}/${illustrateProgress.total} ✨`
+                  : '规划配图位置...'
+                : '全文配图'}
             </button>
 
             <span className="ml-auto" aria-hidden />
