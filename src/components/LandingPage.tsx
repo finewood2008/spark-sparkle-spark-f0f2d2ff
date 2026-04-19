@@ -432,8 +432,97 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className="text-center text-[12px] text-[#BBB] py-6">
-        © 2026 火花 Spark · AI 驱动的新媒体营销引擎
+      <footer className="border-t border-[#EEEDEB] mt-16 bg-white/40">
+        <div className="max-w-[1080px] mx-auto px-6 pt-14 pb-10">
+          {/* Top: logo + 3 link columns */}
+          <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 md:gap-8">
+            {/* Brand */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5">
+                <SparkLogo size={28} />
+                <span className="text-[17px] font-bold tracking-tight text-[#1A1816]">
+                  火花 <span className="text-[#FF6B1A]">Spark</span>
+                </span>
+              </div>
+              <p className="text-[12.5px] leading-[1.7] text-[#8A8680] max-w-[260px]">
+                AI 驱动的品牌营销引擎，为创作者与品牌打造可持续的内容增长系统。
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium text-[#8A8680] bg-[#F5F3EF] border border-[#EEEDEB] rounded-full px-2.5 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+                  All systems operational
+                </span>
+              </div>
+            </div>
+
+            {/* Product */}
+            <div>
+              <h4 className="text-[10.5px] font-semibold tracking-[0.14em] uppercase text-[#B8B5B0] mb-4">
+                产品
+              </h4>
+              <ul className="space-y-2.5">
+                {['对话创作', '智能排期', '数据复盘', '品牌记忆'].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="group inline-flex items-center gap-1.5 text-[13px] text-[#3A3733] hover:text-[#FF6B1A] transition-colors">
+                      <span>{item}</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h4 className="text-[10.5px] font-semibold tracking-[0.14em] uppercase text-[#B8B5B0] mb-4">
+                资源
+              </h4>
+              <ul className="space-y-2.5">
+                {['更新日志', '使用指南', '案例研究', '联系我们'].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="group inline-flex items-center gap-1.5 text-[13px] text-[#3A3733] hover:text-[#FF6B1A] transition-colors">
+                      <span>{item}</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h4 className="text-[10.5px] font-semibold tracking-[0.14em] uppercase text-[#B8B5B0] mb-4">
+                法务
+              </h4>
+              <ul className="space-y-2.5">
+                {['服务条款', '隐私政策', 'Cookie 设置', '数据安全'].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="group inline-flex items-center gap-1.5 text-[13px] text-[#3A3733] hover:text-[#FF6B1A] transition-colors">
+                      <span>{item}</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Divider with accent */}
+          <div className="relative mt-12 mb-6">
+            <div className="h-px bg-[#EEEDEB]" />
+            <div className="absolute left-0 top-0 h-px w-16" style={{ background: 'linear-gradient(to right, #FF6B1A, transparent)' }} />
+          </div>
+
+          {/* Bottom: copyright */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-[11.5px] text-[#B8B5B0] tracking-wide">
+              © 2026 火花 Spark Studio · Crafted for brand storytellers
+            </p>
+            <p className="text-[10.5px] text-[#C8C5C0] tracking-[0.12em] uppercase">
+              Made with <span className="text-[#FF6B1A]">●</span> in Shenzhen
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   );
