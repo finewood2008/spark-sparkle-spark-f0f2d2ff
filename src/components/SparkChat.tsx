@@ -3,8 +3,7 @@ import { useAppStore } from '../store/appStore';
 import { streamChat, analyzeIntent, type IntentBrief } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
-import { useAuthStore } from '../store/authStore';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ScheduleCardData, ReviewTaskData } from '../types/spark';
+import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
 
 // Extracted sub-components
 import { TypingIndicator } from './chat/ChatAtoms';
