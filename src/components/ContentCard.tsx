@@ -464,7 +464,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   // 全文配图相关状态由 useIllustrate hook 管理（在下方初始化，避免引用循环）
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
-  type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
+  type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate' | 'restyle' | 'expand' | 'simplify';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
     setActionErrors(prev => {
@@ -636,6 +636,53 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       },
       onError: (err) => {
         setActionError('polish', err || '润色失败');
+        setAiLoading(null);
+      },
+    });
+  };
+
+  /**
+   * 全文级 AI 改写：换风格 / 扩写 / 精简
+   * 直接修改卡片正文，不走对话生成；与 handlePolish 行为一致：
+   * - 进入编辑态 + 展开
+   * - 流式覆盖 editContent
+   * - 失败显示行内 InlineActionError 可重试
+   */
+  const handleFullEdit = async (kind: 'restyle' | 'expand' | 'simplify') => {
+    const source = editing ? editContent : item.content;
+    if (!source.trim()) return;
+
+    const labelMap = { restyle: '换风格', expand: '扩写全文', simplify: '精简全文' } as const;
+    const actionMap = { restyle: 'restyle', expand: 'expand_full', simplify: 'simplify_full' } as const;
+
+    setActionError(kind, null);
+    setUndoStack(prev => [...prev, source]);
+    setAiLoading(kind);
+    if (!editing) {
+      setEditing(true);
+      setExpanded(true);
+      setEditContent(source);
+    }
+
+    let result = '';
+    await streamEdit({
+      action: actionMap[kind],
+      text: source,
+      fullContent: source,
+      platform: item.platform,
+      onDelta: (chunk) => { result += chunk; },
+      onDone: () => {
+        if (!result.trim()) {
+          setActionError(kind, 'AI 没有返回内容，请重试');
+          setAiLoading(null);
+          return;
+        }
+        setEditContent(result);
+        setAiLoading(null);
+        toast.success(`AI ${labelMap[kind]}完成`);
+      },
+      onError: (err) => {
+        setActionError(kind, err || `${labelMap[kind]}失败`);
         setAiLoading(null);
       },
     });
@@ -1169,7 +1216,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       )}
 
       {/* Inline action errors with retry */}
-      {(actionErrors.cover || actionErrors.polish || actionErrors.title || actionErrors.illustrate) && (
+      {(actionErrors.cover || actionErrors.polish || actionErrors.title || actionErrors.illustrate || actionErrors.restyle || actionErrors.expand || actionErrors.simplify) && (
         <div className="mt-3 space-y-1.5">
           {actionErrors.cover && (
             <InlineActionError
@@ -1187,6 +1234,33 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               loading={aiLoading === 'polish'}
               onRetry={handlePolish}
               onDismiss={() => setActionError('polish', null)}
+            />
+          )}
+          {actionErrors.restyle && (
+            <InlineActionError
+              label="换风格"
+              message={actionErrors.restyle}
+              loading={aiLoading === 'restyle'}
+              onRetry={() => handleFullEdit('restyle')}
+              onDismiss={() => setActionError('restyle', null)}
+            />
+          )}
+          {actionErrors.expand && (
+            <InlineActionError
+              label="扩写全文"
+              message={actionErrors.expand}
+              loading={aiLoading === 'expand'}
+              onRetry={() => handleFullEdit('expand')}
+              onDismiss={() => setActionError('expand', null)}
+            />
+          )}
+          {actionErrors.simplify && (
+            <InlineActionError
+              label="精简全文"
+              message={actionErrors.simplify}
+              loading={aiLoading === 'simplify'}
+              onRetry={() => handleFullEdit('simplify')}
+              onDismiss={() => setActionError('simplify', null)}
             />
           )}
           {actionErrors.title && (
@@ -1231,9 +1305,9 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               }
               items={[
                 { id: 'polish', label: '润色（保留原意）', icon: <Sparkles size={12} />, hint: '微调用词', onClick: handlePolish, loading: aiLoading === 'polish' },
-                { id: 'restyle', label: '换风格（活泼/专业/极简）', icon: <Palette size={12} />, hint: '换调性', onClick: () => onAction?.('restyle', item) },
-                { id: 'expand', label: '扩写全文', icon: <ChevronDown size={12} />, hint: '更详细', onClick: () => onAction?.('expand', item) },
-                { id: 'simplify', label: '精简全文', icon: <ChevronUp size={12} />, hint: '更简洁', onClick: () => onAction?.('simplify', item) },
+                { id: 'restyle', label: '换风格（活泼/专业/极简）', icon: <Palette size={12} />, hint: '换调性', onClick: () => handleFullEdit('restyle'), loading: aiLoading === 'restyle' },
+                { id: 'expand', label: '扩写全文', icon: <ChevronDown size={12} />, hint: '更详细', onClick: () => handleFullEdit('expand'), loading: aiLoading === 'expand' },
+                { id: 'simplify', label: '精简全文', icon: <ChevronUp size={12} />, hint: '更简洁', onClick: () => handleFullEdit('simplify'), loading: aiLoading === 'simplify' },
               ]}
             />
 
@@ -1299,7 +1373,9 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               }
               items={[
                 { id: 'polish', label: '润色（保留原意）', icon: <Sparkles size={12} />, onClick: handlePolish, loading: aiLoading === 'polish' },
-                { id: 'restyle', label: '换风格', icon: <Palette size={12} />, onClick: () => onAction?.('restyle', item) },
+                { id: 'restyle', label: '换风格', icon: <Palette size={12} />, onClick: () => handleFullEdit('restyle'), loading: aiLoading === 'restyle' },
+                { id: 'expand', label: '扩写全文', icon: <ChevronDown size={12} />, onClick: () => handleFullEdit('expand'), loading: aiLoading === 'expand' },
+                { id: 'simplify', label: '精简全文', icon: <ChevronUp size={12} />, onClick: () => handleFullEdit('simplify'), loading: aiLoading === 'simplify' },
               ]}
             />
 

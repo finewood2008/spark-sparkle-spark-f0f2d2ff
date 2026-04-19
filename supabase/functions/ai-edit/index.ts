@@ -97,6 +97,30 @@ serve(async (req) => {
       case "polish":
         systemPrompt = `你是专业的${platformName}内容编辑。请润色整篇文章。直接返回完整文章。${brandContext || ""}`;
         userPrompt = fullContent || text; break;
+      case "restyle":
+        systemPrompt = `你是专业的${platformName}内容编辑。请把整篇文章换一种调性重写一遍：在【活泼 / 专业 / 极简】三种风格里，选一种与原文当前风格**明显不同**的风格来重写。
+- 保留原文的核心信息、事实和结构骨架
+- 标题、CTA、Tag 不输出，只返回正文
+- 字数与原文相近（±20%）
+- 直接返回完整文章正文，不要任何解释或前后缀
+${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
+      case "expand_full":
+        systemPrompt = `你是专业的${platformName}内容编辑。请扩写整篇文章：在保留原文结构和核心观点的前提下，增加细节、案例、数据或情感共鸣，让文章更详实。
+- 不要改变文章主题
+- 保持原文的语气和风格
+- 字数控制在原文的 1.3-1.6 倍
+- 直接返回扩写后的完整正文，不要任何解释
+${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
+      case "simplify_full":
+        systemPrompt = `你是专业的${platformName}内容编辑。请精简整篇文章：去除冗余表达、合并重复观点，让文章更紧凑有力。
+- 保留所有核心信息和关键案例
+- 保持原文的语气和风格
+- 字数控制在原文的 0.5-0.7 倍
+- 直接返回精简后的完整正文，不要任何解释
+${brandContext || ""}`;
+        userPrompt = fullContent || text; break;
       case "continue":
         systemPrompt = `你是专业的${platformName}内容创作者。请根据现有内容继续撰写。直接返回续写的内容。${brandContext || ""}`;
         userPrompt = `已有内容：\n${fullContent || text}\n\n请续写：`; break;
