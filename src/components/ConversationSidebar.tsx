@@ -179,7 +179,20 @@ export default function ConversationSidebar({
             </Tooltip>
           );
         })}
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-1 items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => navigate({ to: isAuthenticated ? '/settings' : '/auth' })}
+                onMouseEnter={preloadAccount}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#333] hover:bg-[#EEEDEB]"
+                aria-label="系统设置"
+              >
+                <Settings size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">系统设置</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
