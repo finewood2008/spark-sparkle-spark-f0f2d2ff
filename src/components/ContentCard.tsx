@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw, Lightbulb, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw, Lightbulb, Copy, Check, Images } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
@@ -18,6 +18,43 @@ interface ContentCardProps {
 interface ToolbarPos {
   top: number;
   left: number;
+}
+
+/**
+ * 把含 ![alt](url) markdown 的正文渲染成 React 节点（图片用 <img> 标签）。
+ * 不引入 markdown 库，只识别图片语法，其它部分按 whitespace-pre-wrap 文本渲染。
+ */
+function renderContentWithImages(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = re.exec(text)) !== null) {
+    const [full, alt, url] = match;
+    if (match.index > lastIndex) {
+      nodes.push(
+        <span key={`t-${key++}`} className="whitespace-pre-wrap">
+          {text.substring(lastIndex, match.index)}
+        </span>,
+      );
+    }
+    nodes.push(
+      <figure key={`i-${key++}`} className="my-3 rounded-lg overflow-hidden border border-[#EDECE8]">
+        <img src={url} alt={alt} className="w-full h-auto block" loading="lazy" />
+        {alt && <figcaption className="text-[11px] text-[#999] px-2 py-1 bg-[#FAFAF8]">{alt}</figcaption>}
+      </figure>,
+    );
+    lastIndex = match.index + full.length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(
+      <span key={`t-${key++}`} className="whitespace-pre-wrap">
+        {text.substring(lastIndex)}
+      </span>,
+    );
+  }
+  return nodes;
 }
 
 function AIFloatingToolbar({
@@ -95,6 +132,81 @@ function InlineActionError({
   );
 }
 
+/**
+ * 通用下拉菜单按钮 — 点外关闭、Esc 关闭。
+ * 用于"AI 改写"、"封面图"等多操作合并入口。
+ */
+function MenuButton({
+  trigger,
+  items,
+  align = 'left',
+}: {
+  trigger: React.ReactNode;
+  items: Array<{
+    id: string;
+    label: string;
+    icon?: React.ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+    hint?: string;
+    danger?: boolean;
+  }>;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="content-card-btn"
+      >
+        {trigger}
+        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className={`absolute z-40 top-full mt-1 min-w-[160px] rounded-lg border border-[#E5E4E2] bg-white shadow-lg py-1 ${
+            align === 'right' ? 'right-0' : 'left-0'
+          }`}
+        >
+          {items.map(it => (
+            <button
+              key={it.id}
+              onClick={() => { if (!it.disabled && !it.loading) { it.onClick(); setOpen(false); } }}
+              disabled={it.disabled || it.loading}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors disabled:opacity-40 ${
+                it.danger ? 'text-red-600 hover:bg-red-50' : 'text-[#555] hover:bg-spark-orange/8 hover:text-spark-orange'
+              }`}
+            >
+              {it.loading ? <Loader2 size={12} className="animate-spin" /> : it.icon}
+              <span className="flex-1">{it.label}</span>
+              {it.hint && <span className="text-[10px] text-[#BBB]">{it.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
   const { contents, setContents, addMessage } = useAppStore();
   // v2 memory learning — extracts preference rules from edit diffs
@@ -117,9 +229,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  const [illustrateLoading, setIllustrateLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
-  type ActionKey = 'cover' | 'polish' | 'title';
+  type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
     setActionErrors(prev => {
@@ -411,6 +524,61 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       setActionError('title', '网络异常，标题生成失败');
     }
     setTitleLoading(false);
+  };
+
+  /**
+   * 全文智能配图：调 illustrate-article 让 AI 自己挑插图位置 + 生成图片，
+   * 把返回的 markdown 图片插回正文。
+   */
+  const handleIllustrate = async () => {
+    const currentContent = editing ? editContent : item.content;
+    const currentTitle = editing ? editTitle : item.title;
+    if (currentContent.length < 50) {
+      toast.error('正文太短（少于 50 字），无法智能配图');
+      return;
+    }
+    setActionError('illustrate', null);
+    setIllustrateLoading(true);
+    setUndoStack(prev => [...prev, currentContent]);
+    if (!editing) {
+      setEditing(true);
+      setExpanded(true);
+      setEditContent(currentContent);
+    }
+    try {
+      const authToken = await getAuthToken();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          title: currentTitle,
+          content: currentContent,
+          platform: item.platform,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '配图失败' }));
+        setActionError('illustrate', err.error || '全文配图失败，请重试');
+        setIllustrateLoading(false);
+        return;
+      }
+      const data = await resp.json();
+      if (data.content) {
+        setEditContent(data.content);
+        const updated = contents.map(c =>
+          c.id === item.id
+            ? { ...c, content: data.content, updatedAt: new Date().toISOString() }
+            : c
+        );
+        setContents(updated);
+        toast.success(`已为正文配 ${data.count} 张插图 ✨`);
+      } else {
+        setActionError('illustrate', '未能生成插图，请重试');
+      }
+    } catch {
+      setActionError('illustrate', '网络异常，全文配图失败');
+    }
+    setIllustrateLoading(false);
   };
 
   const handleSave = () => {
@@ -713,9 +881,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           <p className="text-[11px] text-[#CCC] mt-1">💡 选中文字后可使用 AI 改写、扩写或精简</p>
         </div>
       ) : (
-        <div className="text-[14px] text-[#555] leading-[1.6] whitespace-pre-wrap">
-          {expanded ? item.content : previewText}
-          {!expanded && item.content.split('\n').length > 3 && '...'}
+        <div className="text-[14px] text-[#555] leading-[1.6]">
+          {renderContentWithImages(expanded ? item.content : previewText)}
+          {!expanded && item.content.split('\n').length > 3 && (
+            <span className="text-[#999]">...</span>
+          )}
         </div>
       )}
 
@@ -789,11 +959,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       )}
 
       {/* Inline action errors with retry */}
-      {(actionErrors.cover || actionErrors.polish || actionErrors.title) && (
+      {(actionErrors.cover || actionErrors.polish || actionErrors.title || actionErrors.illustrate) && (
         <div className="mt-3 space-y-1.5">
           {actionErrors.cover && (
             <InlineActionError
-              label="AI 配图"
+              label="封面图"
               message={actionErrors.cover}
               loading={coverLoading}
               onRetry={handleGenerateCover}
@@ -818,77 +988,131 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
               onDismiss={() => setActionError('title', null)}
             />
           )}
+          {actionErrors.illustrate && (
+            <InlineActionError
+              label="全文配图"
+              message={actionErrors.illustrate}
+              loading={illustrateLoading}
+              onRetry={handleIllustrate}
+              onDismiss={() => setActionError('illustrate', null)}
+            />
+          )}
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[#F0EFED] flex-wrap">
+      {/* Actions — 分三组：📝 内容编辑 | 🎨 图片 | ✅ 流程（右靠） */}
+      <div className="flex items-center gap-1 mt-3 pt-3 border-t border-[#F0EFED] flex-wrap">
         {!editing ? (
           <>
+            {/* —— 组 1：内容编辑 —— */}
             <button onClick={() => setExpanded(!expanded)} className="content-card-btn">
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              {expanded ? '收起' : '展开全文'}
+              {expanded ? '收起' : '展开'}
             </button>
             <button onClick={enterEditMode} className="content-card-btn">
               <Pencil size={13} /> 编辑
             </button>
-            <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
-              {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {aiLoading === 'polish' ? '润色中...' : '润色'}
-            </button>
+            <MenuButton
+              trigger={
+                <>
+                  {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <Sparkles size={13} className="text-spark-orange" />}
+                  <span className="text-spark-orange">AI 改写</span>
+                </>
+              }
+              items={[
+                { id: 'polish', label: '润色（保留原意）', icon: <Sparkles size={12} />, hint: '微调用词', onClick: handlePolish, loading: aiLoading === 'polish' },
+                { id: 'restyle', label: '换风格（活泼/专业/极简）', icon: <Palette size={12} />, hint: '换调性', onClick: () => onAction?.('restyle', item) },
+                { id: 'expand', label: '扩写全文', icon: <ChevronDown size={12} />, hint: '更详细', onClick: () => onAction?.('expand', item) },
+                { id: 'simplify', label: '精简全文', icon: <ChevronUp size={12} />, hint: '更简洁', onClick: () => onAction?.('simplify', item) },
+              ]}
+            />
+
+            {/* 分组分隔符 */}
+            <span className="w-px h-4 bg-[#E5E4E2] mx-1" aria-hidden />
+
+            {/* —— 组 2：图片 —— */}
+            <MenuButton
+              trigger={
+                <>
+                  {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                  <span>封面图</span>
+                </>
+              }
+              items={[
+                { id: 'gen', label: 'AI 生成封面', icon: <Sparkles size={12} />, onClick: handleGenerateCover, loading: coverLoading },
+                { id: 'upload', label: '上传封面', icon: <ImageUp size={12} />, onClick: () => fileInputRef.current?.click() },
+              ]}
+            />
             <button
-              onClick={handleGenerateCover}
-              disabled={coverLoading}
+              onClick={handleIllustrate}
+              disabled={illustrateLoading}
               className="content-card-btn text-spark-orange"
+              title="AI 分析全文，在合适段落自动插图"
             >
-              {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {coverLoading ? '生成中...' : 'AI配图'}
+              {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
+              {illustrateLoading ? '配图中...' : '全文配图'}
             </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="content-card-btn"
-            >
-              <ImageUp size={13} /> 上传封面
-            </button>
-            <button onClick={() => onAction?.('restyle', item)} className="content-card-btn">
-              <Palette size={13} /> 换风格
-            </button>
-            <button
-              onClick={handleSubmitReview}
-              disabled={submitLoading}
-              className="content-card-btn text-spark-orange"
-            >
-              {submitLoading ? <Loader2 size={13} className="animate-spin" /> : <ClipboardCheck size={13} />}
-              {submitLoading ? '提交中...' : '提交审核'}
-            </button>
+
+            {/* 流程组：右靠 */}
+            <span className="ml-auto" aria-hidden />
             <button
               onClick={() => { toast.success('已存入草稿箱'); }}
               className="content-card-btn"
             >
               <BookmarkPlus size={13} /> 存稿
             </button>
+            <button
+              onClick={handleSubmitReview}
+              disabled={submitLoading}
+              className="content-card-btn bg-spark-orange text-white hover:bg-spark-orange/90 border-transparent"
+            >
+              {submitLoading ? <Loader2 size={13} className="animate-spin" /> : <ClipboardCheck size={13} />}
+              {submitLoading ? '提交中...' : '提交审核'}
+            </button>
           </>
         ) : (
           <>
-            <button onClick={handleSave} className="content-card-btn text-spark-orange font-medium">保存</button>
-            <button onClick={handlePolish} disabled={!!aiLoading} className="content-card-btn text-spark-orange">
-              {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {aiLoading === 'polish' ? '润色中...' : '润色'}
+            {/* —— 编辑态：保存 + AI 改写 + 图片 + 撤销/取消 —— */}
+            <button onClick={handleSave} className="content-card-btn bg-spark-orange text-white hover:bg-spark-orange/90 border-transparent font-medium">
+              保存
             </button>
+            <MenuButton
+              trigger={
+                <>
+                  {aiLoading === 'polish' ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <Sparkles size={13} className="text-spark-orange" />}
+                  <span className="text-spark-orange">AI 改写</span>
+                </>
+              }
+              items={[
+                { id: 'polish', label: '润色（保留原意）', icon: <Sparkles size={12} />, onClick: handlePolish, loading: aiLoading === 'polish' },
+                { id: 'restyle', label: '换风格', icon: <Palette size={12} />, onClick: () => onAction?.('restyle', item) },
+              ]}
+            />
+
+            <span className="w-px h-4 bg-[#E5E4E2] mx-1" aria-hidden />
+
+            <MenuButton
+              trigger={
+                <>
+                  {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                  <span>封面图</span>
+                </>
+              }
+              items={[
+                { id: 'gen', label: 'AI 生成封面', icon: <Sparkles size={12} />, onClick: handleGenerateCover, loading: coverLoading },
+                { id: 'upload', label: '上传封面', icon: <ImageUp size={12} />, onClick: () => fileInputRef.current?.click() },
+              ]}
+            />
             <button
-              onClick={handleGenerateCover}
-              disabled={coverLoading}
+              onClick={handleIllustrate}
+              disabled={illustrateLoading}
               className="content-card-btn text-spark-orange"
             >
-              {coverLoading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {coverLoading ? '生成中...' : 'AI配图'}
+              {illustrateLoading ? <Loader2 size={13} className="animate-spin" /> : <Images size={13} />}
+              {illustrateLoading ? '配图中...' : '全文配图'}
             </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="content-card-btn"
-            >
-              <ImageUp size={13} /> 上传
-            </button>
+
+            <span className="ml-auto" aria-hidden />
             {undoStack.length > 0 && (
               <button onClick={handleUndo} disabled={!!aiLoading} className="content-card-btn text-[#999]">
                 <Undo2 size={13} /> 撤销
