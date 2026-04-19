@@ -96,6 +96,20 @@ export async function touchConversation(id: string): Promise<void> {
     .eq('user_id', userId);
 }
 
+export async function setConversationPinned(
+  id: string,
+  pinned: boolean,
+): Promise<void> {
+  const userId = getUserId();
+  if (!userId) return;
+  const { error } = await (supabase as ReturnType<typeof Object>)
+    .from('conversations')
+    .update({ pinned })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) console.error('[conversations] pin failed', error);
+}
+
 // ---------------- Messages ----------------
 
 export async function loadMessages(conversationId: string): Promise<ChatMessage[]> {
