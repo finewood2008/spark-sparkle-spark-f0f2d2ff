@@ -117,7 +117,29 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
-  const [dialogueOpen, setDialogueOpen] = useState(false);
+  // Dialogue review expand state — persisted per article id in localStorage so
+  // returning to a content card preserves the user's last expand/collapse choice.
+  const dialogueStorageKey = `spark.dialogueOpen.${item.id}`;
+  const [dialogueOpen, setDialogueOpenState] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(dialogueStorageKey) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setDialogueOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    setDialogueOpenState((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      try {
+        if (value) window.localStorage.setItem(dialogueStorageKey, '1');
+        else window.localStorage.removeItem(dialogueStorageKey);
+      } catch {
+        /* storage unavailable — keep in-memory state only */
+      }
+      return value;
+    });
+  };
   type ActionKey = 'cover' | 'polish' | 'title';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
