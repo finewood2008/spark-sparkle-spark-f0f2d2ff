@@ -432,8 +432,22 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className="border-t border-[#EEEDEB] mt-16 bg-white/40">
-        <div className="max-w-[1080px] mx-auto px-6 pt-14 pb-10">
+      <footer className="relative border-t border-[#EEEDEB] mt-16 bg-white/40 overflow-hidden">
+        {/* 超大背景描边水印 */}
+        <div
+          aria-hidden
+          className="pointer-events-none select-none absolute -bottom-8 -right-4 md:-bottom-14 md:-right-8 leading-none font-black tracking-tighter"
+          style={{
+            fontSize: 'clamp(180px, 26vw, 360px)',
+            color: 'transparent',
+            WebkitTextStroke: '1.5px rgba(255, 107, 26, 0.18)',
+            opacity: 0.35,
+          }}
+        >
+          SPARK
+        </div>
+
+        <div className="relative max-w-[1080px] mx-auto px-6 pt-14 pb-10">
           {/* Top: logo + 3 link columns */}
           <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 md:gap-8">
             {/* Brand */}
