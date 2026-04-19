@@ -36,6 +36,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     messages, addMessage, isGenerating, setIsGenerating,
     setContents, setSelectedContentId,
   } = useAppStore();
+  const { persistEntry } = useMemoryV2();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
