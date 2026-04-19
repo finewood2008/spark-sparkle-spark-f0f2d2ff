@@ -28,7 +28,7 @@ function formatNumber(n: number): string {
 
 export default function MetricsCard({ data }: MetricsCardProps) {
   const { metrics } = data;
-  const { brand, addMessage, contents, setContents, setSelectedContentId } = useAppStore();
+  const { addMessage, contents, setContents, setSelectedContentId } = useAppStore();
   const [reusing, setReusing] = useState(false);
 
   const engagementRate =
@@ -73,20 +73,13 @@ export default function MetricsCard({ data }: MetricsCardProps) {
         return;
       }
 
-      // 2) Brand context for consistent voice
-      const brandCtx =
-        brand && brand.initialized
-          ? `\n品牌名: ${brand.name}\n行业: ${brand.industry}\n主营: ${brand.mainBusiness}\n语气: ${brand.toneOfVoice}\n关键词: ${brand.keywords.join(', ')}\n禁用词: ${brand.tabooWords.join(', ')}`
-          : undefined;
-
       toast.info('火花正在基于高互动主题创作新内容...');
 
-      // 3) Generate new article
+      // Brand context auto-resolved by ai-stream from Memory v2 store (generate mode)
       const result = await generateArticle({
         platform,
         topic,
         style: '在前作基础上换角度切入，保持高互动元素',
-        brandContext: brandCtx,
       });
 
       const newId = `reuse-${Date.now()}`;

@@ -145,30 +145,7 @@ export interface ScheduleConfig {
   nextRunAt?: string;
 }
 
-export interface BrandMemory {
-  name: string;
-  industry: string;
-  mainBusiness: string;
-  targetCustomer: string;
-  differentiation: string;
-  toneOfVoice: string;
-  keywords: string[];
-  tabooWords: string[];
-  initialized: boolean;
-  initStep: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface LearningEntry {
-  id: string;
-  type: 'edit' | 'feedback' | 'performance' | 'preference';
-  category: string;
-  insight: string;
-  evidence: string;
-  confidence: number;
-  timestamp: string;
-}
+// BrandMemory / LearningEntry removed — replaced by Memory v2 (see src/types/memory.ts).
 
 export interface Suggestion {
   icon: string;
