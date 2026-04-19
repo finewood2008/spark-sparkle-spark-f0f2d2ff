@@ -247,6 +247,9 @@ export default function ChatLayout() {
                   const { isAuthenticated } = useAuthStore.getState();
                   navigate({ to: isAuthenticated ? '/account' : '/auth' });
                 }}
+                onMouseEnter={preloadAccount}
+                onFocus={preloadAccount}
+                onTouchStart={preloadAccount}
                 aria-label="个人中心"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >
