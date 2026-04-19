@@ -269,6 +269,54 @@ export async function suggestAngles(args: {
   }
 }
 
+/**
+ * Prewarm the chat edge function before the user actually sends.
+ *
+ * Triggered on hover/focus/touch of quick-action chips so that by the time
+ * the user finishes typing the topic and hits Enter, the heavy stuff is
+ * already done:
+ *   - DNS / TLS / HTTP connection to the supabase functions origin
+ *   - Edge worker cold-start
+ *   - Auth token resolved (may trigger a session refresh)
+ *   - Brand context computed and cached in memory
+ *
+ * Throttled to once every 30s — repeated hovers are no-ops. Failures are
+ * silent (this is best-effort warming, never a blocker).
+ */
+let lastPrewarmAt = 0;
+let inflightPrewarm: Promise<void> | null = null;
+export function prewarmChat(mode: 'chat' | 'generate' = 'generate'): Promise<void> {
+  if (inflightPrewarm) return inflightPrewarm;
+  const now = Date.now();
+  if (now - lastPrewarmAt < 30_000) return Promise.resolve();
+  lastPrewarmAt = now;
+
+  inflightPrewarm = (async () => {
+    try {
+      // 1) Resolve brandContext synchronously from the in-memory store
+      //    (this also pulls memoryStore selectors so React subtrees stay warm)
+      void resolveBrandContext(mode);
+      // 2) Resolve auth token (may refresh session)
+      const token = await getAuthToken();
+      // 3) Send a CORS preflight to wake the edge worker + prime the connection.
+      //    OPTIONS responses are cheap and never count against rate limits.
+      await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
+        method: 'OPTIONS',
+        headers: {
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'authorization,content-type',
+          Origin: typeof window !== 'undefined' ? window.location.origin : '',
+          Authorization: `Bearer ${token}`,
+        },
+      }).catch(() => { /* ignore */ });
+    } catch { /* swallow — best-effort only */ }
+    finally {
+      inflightPrewarm = null;
+    }
+  })();
+  return inflightPrewarm;
+}
+
 export async function streamChat({
   messages,
   mode = 'chat',
