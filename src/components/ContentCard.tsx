@@ -493,6 +493,8 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       toast.error('复制失败，请手动选择文字复制');
     }
   };
+
+  const handleSubmitReview = async () => {
     setSubmitLoading(true);
     // 如果在编辑态，先把编辑内容合并进来
     const finalItem: ContentItem = {
