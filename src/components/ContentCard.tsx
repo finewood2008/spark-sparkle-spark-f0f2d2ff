@@ -9,6 +9,7 @@ import { getAuthToken } from '@/lib/auth-helpers';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import { useMemoryStore } from '@/store/memoryStore';
 import { SUPABASE_URL } from '@/lib/env';
+import { useIllustrate } from '@/hooks/useIllustrate';
 
 interface ContentCardProps {
   item: ContentItem;
@@ -300,9 +301,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const [coverLoading, setCoverLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
-  const [illustrateLoading, setIllustrateLoading] = useState(false);
-  /** 全文配图进度：{done, total}，total=0 表示规划中（尚未拿到 plan） */
-  const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  // 全文配图相关状态由 useIllustrate hook 管理（在下方初始化，避免引用循环）
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
   type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
@@ -316,10 +315,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  /** 每张已生成插图对应的英文 prompt（key=imageUrl）。会话级，刷新后丢失则用 alt 兜底。 */
-  const imagePromptsRef = useRef<Map<string, { prompt: string; alt: string }>>(new Map());
-  /** 正在重新生成的图片 URL 集合，用于在 figure 上盖一层 spinner */
-  const [regeneratingUrls, setRegeneratingUrls] = useState<Set<string>>(new Set());
+  // 全文配图状态由 useIllustrate 提供（imagePromptsRef / regeneratingUrls 都在 hook 内部）
 
   const enterEditMode = () => {
     setEditTitle(item.title);
@@ -604,259 +600,29 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   };
 
   /**
-   * 全文智能配图（SSE 流式）：
-   * 1) plan 事件：拿到所有插图位置，先在原文锚点处插入"🎨 正在配第 N/总 张..."占位
-   * 2) image 事件：每张图完成立即把对应占位换成真实 markdown 图片
-   * 3) image_failed：换成"⚠️ 第 N 张配图失败"提示
-   * 4) done：清理 + toast
+   * 全文配图、删单图、重生单图全部由 useIllustrate 提供。
+   * Hook 内部维护 illustrateLoading / illustrateProgress / regeneratingUrls / imagePrompts。
    */
-  const handleIllustrate = async () => {
-    const startContent = editing ? editContent : item.content;
-    const currentTitle = editing ? editTitle : item.title;
-    if (startContent.length < 50) {
-      toast.error('正文太短（少于 50 字），无法智能配图');
-      return;
-    }
-    setActionError('illustrate', null);
-    setIllustrateLoading(true);
-    setIllustrateProgress({ done: 0, total: 0 });
-    setUndoStack(prev => [...prev, startContent]);
-    if (!editing) {
-      setEditing(true);
-      setExpanded(true);
-      setEditContent(startContent);
-    }
-
-    // 占位 token：用人类可读 + 渲染器可识别的格式
-    // 形如 [[SPARK_ILLUSTRATING:第 1/3 张]]
-    const placeholderFor = (i: number, total: number) => `[[SPARK_ILLUSTRATING:第 ${i + 1}/${total} 张]]`;
-    const tokens: string[] = [];
-    let working = startContent;
-
-    const syncToStore = (next: string) => {
-      const updated = contents.map(c =>
-        c.id === item.id
-          ? { ...c, content: next, updatedAt: new Date().toISOString() }
-          : c
-      );
-      setContents(updated);
-    };
-
-    const insertAtAnchor = (text: string, anchor: string, payload: string): string => {
-      const a = anchor.trim().substring(0, 30);
-      const idx = text.indexOf(a);
-      if (idx === -1) return text + payload; // 锚点丢失：追加到末尾
-      const lineEnd = text.indexOf('\n', idx + a.length);
-      const insertAt = lineEnd === -1 ? text.length : lineEnd;
-      return text.substring(0, insertAt) + payload + text.substring(insertAt);
-    };
-
-    try {
-      const authToken = await getAuthToken();
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ title: currentTitle, content: startContent, platform: item.platform }),
-      });
-      if (!resp.ok || !resp.body) {
-        const err = await resp.json().catch(() => ({ error: '配图失败' }));
-        setActionError('illustrate', err.error || '全文配图失败，请重试');
-        setIllustrateLoading(false);
-        return;
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
-      let totalPlanned = 0;
-      let succeeded = 0;
-      let streamDone = false;
-
-      const handleEvent = (event: string, data: string) => {
-        let payload: Record<string, unknown>;
-        try { payload = JSON.parse(data); } catch { return; }
-
-        if (event === 'plan') {
-          const items = (payload.items as Array<{ index: number; anchorSnippet: string; alt: string }>) || [];
-          totalPlanned = (payload.total as number) || items.length;
-          setIllustrateProgress({ done: 0, total: totalPlanned });
-          // 在每个锚点处插入占位（按 index 顺序，从后往前插以避免位置漂移）
-          let next = working;
-          // 先生成所有 token
-          for (let i = 0; i < items.length; i++) tokens[items[i].index] = placeholderFor(items[i].index, totalPlanned);
-          // 按文中出现位置降序插入，保证插入不互相影响
-          const sorted = [...items].sort((a, b) => {
-            const ai = next.indexOf(a.anchorSnippet.trim().substring(0, 30));
-            const bi = next.indexOf(b.anchorSnippet.trim().substring(0, 30));
-            return bi - ai;
-          });
-          for (const it of sorted) {
-            const placeholder = `\n\n${tokens[it.index]}\n\n`;
-            next = insertAtAnchor(next, it.anchorSnippet, placeholder);
-          }
-          working = next;
-          setEditContent(next);
-          syncToStore(next);
-        } else if (event === 'image') {
-          const idx = payload.index as number;
-          const url = payload.imageUrl as string;
-          const alt = (payload.alt as string) || '';
-          const prompt = (payload.imagePrompt as string) || '';
-          const token = tokens[idx];
-          // 记录每张图的 prompt，用于"重新生成单张"
-          if (url && prompt) {
-            imagePromptsRef.current.set(url, { prompt, alt });
-          }
-          if (token && working.includes(token)) {
-            working = working.replace(token, `![${alt}](${url})`);
-            setEditContent(working);
-            syncToStore(working);
-          }
-          succeeded += 1;
-          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
-        } else if (event === 'image_failed') {
-          const idx = payload.index as number;
-          const token = tokens[idx];
-          if (token && working.includes(token)) {
-            working = working.replace(token, `> ⚠️ 第 ${idx + 1} 张配图失败`);
-            setEditContent(working);
-            syncToStore(working);
-          }
-          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
-        } else if (event === 'done') {
-          if (succeeded > 0) {
-            toast.success(`已为正文配 ${succeeded} 张插图 ✨`);
-          } else {
-            setActionError('illustrate', '所有插图都生成失败，请重试');
-          }
-        } else if (event === 'error') {
-          setActionError('illustrate', (payload.message as string) || '全文配图失败');
-        }
-      };
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buffer.indexOf('\n')) !== -1) {
-          let line = buffer.slice(0, nl);
-          buffer = buffer.slice(nl + 1);
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line === '') {
-            // 事件分隔符 — 这里我们已经在 data: 时直接 dispatch 了
-            currentEvent = '';
-            continue;
-          }
-          if (line.startsWith('event: ')) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith('data: ')) {
-            handleEvent(currentEvent || 'message', line.slice(6));
-            if (currentEvent === 'done' || currentEvent === 'error') streamDone = true;
-          }
-        }
-      }
-      // 兜底：清理任何残留占位
-      let cleaned = working;
-      for (const t of tokens) {
-        if (t && cleaned.includes(t)) {
-          cleaned = cleaned.replace(t, '');
-        }
-      }
-      if (cleaned !== working) {
-        setEditContent(cleaned);
-        syncToStore(cleaned);
-      }
-      void totalPlanned; // 仅用于调试
-    } catch {
-      setActionError('illustrate', '网络异常，全文配图失败');
-    }
-    setIllustrateLoading(false);
-    setIllustrateProgress({ done: 0, total: 0 });
-  };
-
-  /** 删除单张已配图：把对应的 ![alt](url) 从正文里移除，同时同步到 store。 */
-  const handleDeleteImage = useCallback((url: string, alt: string) => {
-    const current = editing ? editContent : item.content;
-    // 转义 URL 中的正则元字符
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // 匹配 ![alt](url)，前后多余空行也一并清理
-    const pattern = new RegExp(`\\n*!\\[${esc(alt)}\\]\\(${esc(url)}\\)\\n*`, 'g');
-    const next = current.replace(pattern, '\n\n');
-    if (next === current) return;
-    if (editing) setEditContent(next);
-    setUndoStack(prev => [...prev, current]);
-    const updated = contents.map(c =>
-      c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
-    );
-    setContents(updated);
-    imagePromptsRef.current.delete(url);
-    toast.success('已删除这张图');
-  }, [editing, editContent, item.content, item.id, contents, setContents]);
-
-  /** 重新生成单张图：用记录的 prompt（或 alt 兜底）调 illustrate-article 的 single 模式，
-   *  完成后把正文里的 url 替换成新的 url。 */
-  const handleRegenerateImage = useCallback(async (url: string, alt: string) => {
-    const meta = imagePromptsRef.current.get(url);
-    const prompt = meta?.prompt || alt; // 刷新后丢失则用 alt 兜底
-    if (!prompt) {
-      toast.error('找不到这张图的生成提示，无法重新生成');
-      return;
-    }
-    setRegeneratingUrls(prev => {
-      const next = new Set(prev);
-      next.add(url);
-      return next;
-    });
-    try {
-      const authToken = await getAuthToken();
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/illustrate-article`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({
-          mode: 'single',
-          imagePrompt: prompt,
-          alt,
-          platform: item.platform,
-        }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: '重新生成失败' }));
-        toast.error(err.error || '重新生成失败');
-        return;
-      }
-      const data = await resp.json() as { imageUrl: string; alt: string; imagePrompt: string };
-      const newUrl = data.imageUrl;
-      if (!newUrl) {
-        toast.error('图片为空，请重试');
-        return;
-      }
-      // 把正文里这张图的 url 换成新的 url（alt 保持不变）
-      const current = editing ? editContent : item.content;
-      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(`!\\[${esc(alt)}\\]\\(${esc(url)}\\)`, 'g');
-      const next = current.replace(pattern, `![${alt}](${newUrl})`);
-      setUndoStack(prev => [...prev, current]);
-      if (editing) setEditContent(next);
-      const updated = contents.map(c =>
-        c.id === item.id ? { ...c, content: next, updatedAt: new Date().toISOString() } : c,
-      );
-      setContents(updated);
-      // 转移 prompt 记录到新 url
-      imagePromptsRef.current.delete(url);
-      imagePromptsRef.current.set(newUrl, { prompt: data.imagePrompt || prompt, alt });
-      toast.success('已重新生成 ✨');
-    } catch {
-      toast.error('网络异常，重新生成失败');
-    } finally {
-      setRegeneratingUrls(prev => {
-        const next = new Set(prev);
-        next.delete(url);
-        return next;
-      });
-    }
-  }, [editing, editContent, item.content, item.id, item.platform, contents, setContents]);
+  const {
+    illustrateLoading,
+    illustrateProgress,
+    regeneratingUrls,
+    handleIllustrate,
+    handleDeleteImage,
+    handleRegenerateImage,
+  } = useIllustrate({
+    item,
+    editing,
+    editContent,
+    editTitle,
+    setEditContent,
+    setEditing,
+    setExpanded,
+    setUndoStack,
+    setActionError,
+    contents,
+    setContents,
+  });
 
   const handleSave = () => {
     const updated = contents.map(c =>
