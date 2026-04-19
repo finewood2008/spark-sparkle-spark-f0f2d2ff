@@ -264,14 +264,14 @@ serve(async (req) => {
             })),
           });
 
-          // 2) 并行生成图片，每张完成立即推送
+          // 2) 并行生成图片，生成完立即上传到 Storage 拿公开 URL，再推给前端
           let okCount = 0;
           await Promise.all(
             plans.map(async (p, i) => {
-              const imageUrl = await generateOneImage(p.imagePrompt, KEY);
-              if (imageUrl) {
+              const dataUrl = await generateOneImage(p.imagePrompt, KEY);
+              if (dataUrl) {
+                const imageUrl = await uploadBase64ToStorage(dataUrl, userId);
                 okCount += 1;
-                // imagePrompt 一并推给前端，用于"重新生成单张"
                 send("image", { index: i, alt: p.alt, imageUrl, imagePrompt: p.imagePrompt });
               } else {
                 send("image_failed", { index: i, alt: p.alt, imagePrompt: p.imagePrompt });
