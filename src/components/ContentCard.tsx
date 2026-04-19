@@ -579,10 +579,10 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       setEditContent(startContent);
     }
 
-    // 占位 token：唯一、不会出现在正文里
-    const placeholderToken = (i: number) => `__SPARK_ILLUSTRATE_${Date.now()}_${i}__`;
+    // 占位 token：用人类可读 + 渲染器可识别的格式
+    // 形如 [[SPARK_ILLUSTRATING:第 1/3 张]]
+    const placeholderFor = (i: number, total: number) => `[[SPARK_ILLUSTRATING:第 ${i + 1}/${total} 张]]`;
     const tokens: string[] = [];
-    // 当前流式拼装的正文（每次 image/failed 事件都基于这个改）
     let working = startContent;
 
     const syncToStore = (next: string) => {
