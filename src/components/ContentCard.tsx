@@ -314,10 +314,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  /** 每张已生成插图对应的英文 prompt（key=imageUrl）。会话级，刷新后丢失则用 alt 兜底。 */
-  const imagePromptsRef = useRef<Map<string, { prompt: string; alt: string }>>(new Map());
-  /** 正在重新生成的图片 URL 集合，用于在 figure 上盖一层 spinner */
-  const [regeneratingUrls, setRegeneratingUrls] = useState<Set<string>>(new Set());
+  // 全文配图状态由 useIllustrate 提供（imagePromptsRef / regeneratingUrls 都在 hook 内部）
 
   const enterEditMode = () => {
     setEditTitle(item.title);
