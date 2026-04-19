@@ -203,7 +203,7 @@ export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
                   {msg.choices.map((c, idx) => (
                     <button
                       key={c.id}
-                      onClick={() => onSend(c.label)}
+                      onClick={() => onSend(c.anglePrompt || c.label)}
                       className="group relative text-left rounded-2xl border border-[#EAE7E0] bg-white hover:border-spark-orange hover:shadow-[0_4px_20px_-8px_rgba(255,140,66,0.4)] transition-all px-4 py-3.5 flex gap-3 items-start"
                     >
                       <div className="shrink-0 w-9 h-9 rounded-xl bg-spark-orange/8 group-hover:bg-spark-orange/15 transition-colors flex items-center justify-center text-[18px] leading-none">
