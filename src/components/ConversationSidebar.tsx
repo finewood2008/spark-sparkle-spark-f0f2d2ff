@@ -120,6 +120,7 @@ export default function ConversationSidebar({
 
   const preloadAccount = () => {
     router.preloadRoute({ to: '/account' }).catch(() => {});
+    router.preloadRoute({ to: '/settings' }).catch(() => {});
     router.preloadRoute({ to: '/auth' }).catch(() => {});
   };
 
