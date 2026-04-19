@@ -619,6 +619,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
     }
     setActionError('illustrate', null);
     setIllustrateLoading(true);
+    setIllustrateProgress({ done: 0, total: 0 });
     setUndoStack(prev => [...prev, startContent]);
     if (!editing) {
       setEditing(true);
