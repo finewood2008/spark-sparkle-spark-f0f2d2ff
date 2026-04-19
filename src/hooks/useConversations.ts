@@ -25,7 +25,7 @@ import type { ChatMessage } from '@/types/spark';
  * - Update conversation title from the first user message
  */
 export function useConversations() {
-  const { user, isAuthenticated, isInitializing } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const {
     conversations,
     activeId,
@@ -110,7 +110,6 @@ export function useConversations() {
 
   // ---------- Bootstrap on auth ----------
   useEffect(() => {
-    if (isInitializing) return;
     const authKey = isAuthenticated && user?.id ? user.id : '__anon__';
     if (bootstrappedForUserRef.current === authKey) return;
     bootstrappedForUserRef.current = authKey;
