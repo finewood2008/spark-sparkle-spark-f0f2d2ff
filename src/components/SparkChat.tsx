@@ -21,6 +21,9 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Stash the in-flight intent brief between clarify-question render and user choice
+  const pendingBriefRef = useRef<IntentBrief | null>(null);
+  const pendingPromptRef = useRef<string>('');
 
   const hasMessages = messages.length > 0;
 
