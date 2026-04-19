@@ -7,6 +7,7 @@ import {
   createConversation as apiCreate,
   renameConversation as apiRename,
   deleteConversation as apiDelete,
+  setConversationPinned as apiSetPinned,
   loadMessages,
   saveMessage,
   touchConversation,
