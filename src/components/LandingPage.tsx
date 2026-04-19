@@ -228,7 +228,7 @@ export default function LandingPage() {
 
             {/* Logo 与标题并列：左 logo + 右 wordmark */}
             <div className="flex items-center gap-4 sm:gap-5">
-              <SparkLogo size={64} />
+              <SparkLogo size={88} />
               <div className="relative">
                 {/* 大字「火花」— 渐变填充 + 微描边 + 字距收紧 */}
                 <h1
