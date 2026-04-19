@@ -698,7 +698,12 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           const idx = payload.index as number;
           const url = payload.imageUrl as string;
           const alt = (payload.alt as string) || '';
+          const prompt = (payload.imagePrompt as string) || '';
           const token = tokens[idx];
+          // 记录每张图的 prompt，用于"重新生成单张"
+          if (url && prompt) {
+            imagePromptsRef.current.set(url, { prompt, alt });
+          }
           if (token && working.includes(token)) {
             working = working.replace(token, `![${alt}](${url})`);
             setEditContent(working);
