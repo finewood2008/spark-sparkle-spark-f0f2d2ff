@@ -48,7 +48,6 @@ function AccountPage() {
       return;
     }
     getBindingStatus(user!.id).then(setBindings);
-    syncPrefsFromCloud().then(setPrefs);
     // 通过 user_metadata.has_password 标记位判断（注册成功后写入）
     supabase.auth.getUser().then(({ data }) => {
       setHasPassword(!!data.user?.user_metadata?.has_password);
