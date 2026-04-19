@@ -294,8 +294,8 @@ function AuthPage() {
       <div className="w-full max-w-[420px] rounded-2xl bg-card shadow-lg border border-border p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Logo */}
         <div className="flex flex-col items-center mb-7">
-          <div className="w-14 h-14 rounded-2xl spark-gradient flex items-center justify-center mb-4 spark-shadow">
-            <SparkLogo size={30} className="text-primary-foreground" />
+          <div className="mb-4">
+            <SparkLogo size={56} />
           </div>
           <h1 className="text-xl font-bold text-foreground">欢迎来到火花</h1>
           <p className="text-sm text-muted-foreground mt-1">

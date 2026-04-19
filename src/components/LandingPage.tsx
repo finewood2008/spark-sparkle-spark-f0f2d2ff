@@ -178,11 +178,8 @@ export default function LandingPage() {
               animationDelay: '0ms',
             }}
           >
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 spark-shadow"
-              style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
-            >
-              <SparkLogo size={34} className="text-white" />
+            <div className="mb-6 flex items-center justify-center">
+              <SparkLogo size={72} />
             </div>
             <h1 className="text-5xl sm:text-6xl font-bold text-[#1F1F1F] tracking-tight">
               火花
