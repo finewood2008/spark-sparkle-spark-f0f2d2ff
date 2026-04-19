@@ -411,6 +411,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
     ];
     state.history = nextHistory;
     state.turn = state.turn + 1;
+    setDialogueTurn(state.turn);
 
     if (turn.ready && turn.brief) {
       // Render closing reply (no escape button — we're already moving on)
