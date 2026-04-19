@@ -187,6 +187,18 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
+      {/* Top progress bar — instant feedback while route chunk loads */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-[2px] overflow-hidden">
+          <div
+            className="h-full w-1/3"
+            style={{
+              background: 'linear-gradient(90deg, transparent, #FF6B1A, transparent)',
+              animation: 'spark-nav-progress 1s ease-in-out infinite',
+            }}
+          />
+        </div>
+      )}
       {/* Background decorations */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Subtle grid */}
