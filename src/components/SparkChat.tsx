@@ -419,9 +419,16 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         clarifyQuestion: null,
         skipClarify: true,
       };
+      // Snapshot dialogue (excluding the very first user prompt — it's the
+      // article topic itself, already shown as the article title context)
+      const transcript = nextHistory.slice(1);
+      const turns = state.turn;
       dialogueRef.current = null;
       setIsGenerating(true);
-      await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle);
+      await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle, {
+        history: transcript,
+        turns,
+      });
       return;
     }
 
