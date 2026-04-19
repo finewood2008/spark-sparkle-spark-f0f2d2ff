@@ -33,11 +33,49 @@ function resolveBrandContext(
   }
 }
 
+/** Brief returned by analyze-intent edge function */
+export interface IntentBrief {
+  intentType: string;
+  matchedAssets: string[];
+  matchedRules: string[];
+  risks: string[];
+  clarifyQuestion: {
+    question: string;
+    options: Array<{ id: string; label: string; anglePrompt: string }>;
+  } | null;
+  skipClarify: boolean;
+}
+
+/**
+ * Call analyze-intent to get a structured pre-generation brief.
+ * Returns null on failure — caller should fall back to direct generation.
+ */
+export async function analyzeIntent(userPrompt: string): Promise<IntentBrief | null> {
+  try {
+    const brandContext = resolveBrandContext('analyze') ?? '';
+    const token = await getAuthToken();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/analyze-intent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userPrompt, brandContext }),
+    });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as IntentBrief;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function streamChat({
   messages,
   mode = 'chat',
   platform,
   brandContext,
+  intent,
   onDelta,
   onDone,
   onError,
@@ -46,6 +84,8 @@ export async function streamChat({
   mode?: 'chat' | 'generate';
   platform?: string;
   brandContext?: string;
+  /** Pre-generation brief — injected into prompt by chat edge function */
+  intent?: { matchedAssets?: string[]; matchedRules?: string[]; risks?: string[]; chosenAngle?: string };
   onDelta: (text: string) => void;
   onDone: () => void;
   onError?: (error: string) => void;
@@ -65,6 +105,7 @@ export async function streamChat({
       platform,
       brandContext: effectiveBrandContext,
       presetId,
+      intent,
     }),
   });
 
