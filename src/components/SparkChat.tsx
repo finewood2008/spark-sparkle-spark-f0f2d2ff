@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import {
   streamChat,
+  streamEdit,
   creativeDialogue,
   suggestAngles,
   type IntentBrief,
@@ -10,7 +11,7 @@ import {
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
-import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
+import type { ChatMessage, ContentItem, ContentVersion, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
 import type { MemoryEntry } from '../types/memory';
 
 // Extracted sub-components
@@ -22,6 +23,10 @@ import { tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
 const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
+
+/** Sentinel prefix for "apply this angle to an existing article" choice clicks.
+ *  Format: __angle_revise__::<itemId>::<angle prompt> */
+const ANGLE_REVISE_PREFIX = '__angle_revise__::';
 
 /** State of an in-flight pre-creation dialogue */
 interface DialogueState {
@@ -125,6 +130,159 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       },
     });
   }, [addMessage, setContents]);
+
+  /**
+   * Apply a directional "angle" to an existing article: call ai-edit with
+   * action=revise_with_angle, then update the SAME ContentItem in place
+   * (current title/content/cta/tags become a new entry in `versions`).
+   * Does NOT create a new card — the user is iterating on one piece.
+   */
+  const applyAngleToArticle = useCallback(async (itemId: string, anglePrompt: string, label: string) => {
+    const all = useAppStore.getState().contents;
+    const target = all.find(c => c.id === itemId);
+    if (!target) {
+      addMessage({
+        id: `${Date.now()}-angle-missing`,
+        role: 'assistant',
+        content: '咦，找不到对应的文章了，可能已经被关掉了。',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    addMessage({
+      id: `${Date.now()}-angle-user`,
+      role: 'user',
+      content: label,
+      timestamp: new Date().toISOString(),
+    });
+
+    const statusId = `${Date.now() + 1}-angle-status`;
+    addMessage({
+      id: statusId,
+      role: 'assistant',
+      content: `✨ 正在按这个方向重写「${target.title}」…`,
+      timestamp: new Date().toISOString(),
+    });
+    setIsGenerating(true);
+
+    let raw = '';
+    const articleJson = JSON.stringify({
+      title: target.title,
+      content: target.content,
+      cta: target.cta || '',
+      tags: target.tags || [],
+    });
+
+    try {
+      await streamEdit({
+        action: 'revise_with_angle',
+        text: anglePrompt,
+        fullContent: articleJson,
+        platform: target.platform,
+        brandContext: getBrandContext(),
+        onDelta: (chunk) => { raw += chunk; },
+        onDone: () => {
+          let parsed: { title?: string; content?: string; cta?: string; tags?: string[] };
+          try {
+            let cleaned = raw.trim();
+            if (cleaned.startsWith('```')) {
+              cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+            parsed = JSON.parse(cleaned);
+          } catch {
+            parsed = { content: raw };
+          }
+
+          if (!parsed.content || !parsed.content.trim()) {
+            const cur = useAppStore.getState().messages;
+            useAppStore.setState({
+              messages: cur.map(m =>
+                m.id === statusId
+                  ? {
+                      ...m,
+                      content: '重写失败了',
+                      error: { message: 'AI 没有返回有效内容', retryPrompt: '', retryMode: 'chat' as const },
+                    }
+                  : m
+              ),
+            });
+            setIsGenerating(false);
+            return;
+          }
+
+          // Stash previous state as a new version
+          const previousVersion: ContentVersion = {
+            id: `${target.id}-v${(target.versions?.length || 0) + 1}`,
+            title: target.title,
+            content: target.content,
+            cta: target.cta,
+            tags: target.tags,
+            coverImage: target.coverImage,
+            savedAt: new Date().toISOString(),
+            label: `重写前（${(target.versions?.length || 0) + 1}）`,
+          };
+
+          const updatedItem: ContentItem = {
+            ...target,
+            title: parsed.title?.trim() || target.title,
+            content: parsed.content.trim(),
+            cta: parsed.cta?.trim() ?? target.cta,
+            tags: Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : target.tags,
+            updatedAt: new Date().toISOString(),
+            versions: [...(target.versions || []), previousVersion],
+          };
+
+          const latest = useAppStore.getState().contents;
+          setContents(latest.map(c => (c.id === target.id ? updatedItem : c)));
+
+          const cur = useAppStore.getState().messages;
+          useAppStore.setState({
+            messages: cur.map(m =>
+              m.id === statusId
+                ? {
+                    ...m,
+                    content: '✅ 已按你的方向重写完成（原版本已存为历史，可在卡片里切换）：',
+                    contentItem: updatedItem,
+                  }
+                : m
+            ),
+          });
+          setIsGenerating(false);
+        },
+        onError: (errMsg) => {
+          const cur = useAppStore.getState().messages;
+          useAppStore.setState({
+            messages: cur.map(m =>
+              m.id === statusId
+                ? {
+                    ...m,
+                    content: '重写失败了',
+                    error: { message: errMsg, retryPrompt: '', retryMode: 'chat' as const },
+                  }
+                : m
+            ),
+          });
+          setIsGenerating(false);
+        },
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : '网络请求失败';
+      const cur = useAppStore.getState().messages;
+      useAppStore.setState({
+        messages: cur.map(m =>
+          m.id === statusId
+            ? {
+                ...m,
+                content: '连接 AI 服务失败',
+                error: { message: errMsg, retryPrompt: '', retryMode: 'chat' as const },
+              }
+            : m
+        ),
+      });
+      setIsGenerating(false);
+    }
+  }, [addMessage, getBrandContext, setContents, setIsGenerating]);
 
   const handleChat = async (text: string) => {
     const currentMessages = useAppStore.getState().messages;
@@ -346,11 +504,13 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
               useAppStore.setState({ messages: next });
               return;
             }
+            // Encode the target article id into anglePrompt so sendMessage can
+            // route the click to "revise existing article" instead of generate.
             const angleChoices: ChoiceOption[] = angles.map(a => ({
               id: a.id,
               label: a.label,
               emoji: a.emoji,
-              anglePrompt: a.anglePrompt,
+              anglePrompt: `${ANGLE_REVISE_PREFIX}${newItem.id}::${a.anglePrompt}`,
             }));
             const cur = useAppStore.getState().messages;
             const next = cur.map(m =>
@@ -566,6 +726,27 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const sendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
     setInput('');
+
+    // Special-case: angle-revise sentinel — modify the linked article instead
+    // of starting a new chat/generate cycle. Format:
+    //   __angle_revise__::<itemId>::<angle prompt>
+    if (text.startsWith(ANGLE_REVISE_PREFIX)) {
+      const rest = text.slice(ANGLE_REVISE_PREFIX.length);
+      const sepIdx = rest.indexOf('::');
+      if (sepIdx > 0) {
+        const itemId = rest.slice(0, sepIdx);
+        const anglePrompt = rest.slice(sepIdx + 2);
+        // Find a friendly label from the most recent message's choices
+        const msgs = useAppStore.getState().messages;
+        let label = anglePrompt.slice(0, 20);
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          const choice = msgs[i].choices?.find(c => c.anglePrompt === text);
+          if (choice) { label = choice.label; break; }
+        }
+        await applyAngleToArticle(itemId, anglePrompt, label);
+        return;
+      }
+    }
 
     // Special-case: "提交审核" choice — skip AI, submit current draft
     if (text.trim() === '提交审核') {

@@ -109,6 +109,35 @@ serve(async (req) => {
       case "generate_cta":
         systemPrompt = `你是专业的${platformName}内容运营。请生成一条有号召力的 CTA。${brandContext || ""}`;
         userPrompt = fullContent || text; break;
+      case "revise_with_angle":
+        // text = the angle/direction prompt; fullContent = JSON-stringified existing article {title,content,cta,tags}
+        // Returns a NEW full article in the same JSON shape — caller replaces the original.
+        systemPrompt = `你是专业的${platformName}内容编辑。用户给你一篇现有文章和一个修改方向，请基于现有文章按照这个方向**重写**成一篇新版本。
+
+【重要原则】
+- **不是从零开始写新文章**，而是基于原文修改、增强、调整
+- 保留原文的核心主题和价值主张
+- 严格按照用户给的方向去改（比如"加一个真实案例"就要真的加案例，而不是只调措辞）
+- 输出必须比原文更好、更有针对性
+- 字数与原文相近（±30%）
+
+【输出格式 — 严格 JSON】
+{
+  "title": "标题（可以微调）",
+  "content": "正文",
+  "cta": "CTA",
+  "tags": ["标签1", "标签2"]
+}
+只输出 JSON，不要 markdown 代码块、不要任何额外文字。
+${brandContext || ""}`;
+        userPrompt = `【原文 JSON】
+${fullContent || "{}"}
+
+【修改方向】
+${text}
+
+请按方向重写，输出新的 JSON。`;
+        break;
       case "learn_from_edit": {
         const learnPrompt = `分析用户对内容的修改，总结写作偏好。
 原始：${text}
