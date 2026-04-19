@@ -51,18 +51,28 @@ const QUICK_PROMPTS: Array<{
 const CAPABILITIES = [
   {
     icon: Brain,
+    eyebrow: 'MEMORY',
     title: '品牌记忆',
     desc: '记住你的调性、风格、禁忌词，越用越懂你',
+    /** 卡片悬停时高亮的指标 — 像 case study 的关键数据 */
+    metric: '∞',
+    metricLabel: '记忆容量',
   },
   {
     icon: CalendarClock,
+    eyebrow: 'AUTOMATION',
     title: '自动排期',
     desc: '定时生成、审核、发布，全流程自动化',
+    metric: '24/7',
+    metricLabel: '不间断运转',
   },
   {
     icon: TrendingUp,
+    eyebrow: 'INSIGHTS',
     title: '数据驱动',
     desc: '真实数据回流，AI 分析表现，持续优化内容',
+    metric: '+38%',
+    metricLabel: '平均互动提升',
   },
 ];
 
