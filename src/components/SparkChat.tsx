@@ -41,8 +41,12 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Multi-turn pre-creation dialogue state
+  // Multi-turn pre-creation dialogue state. The ref holds canonical state used
+  // by async handlers; `dialogueTurn` mirrors it to drive the progress banner
+  // (null = no dialogue in flight, number = current round, 1-based after first
+  // assistant reply).
   const dialogueRef = useRef<DialogueState | null>(null);
+  const [dialogueTurn, setDialogueTurn] = useState<number | null>(null);
 
   const hasMessages = messages.length > 0;
 
