@@ -8,7 +8,9 @@ import {
 } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
+import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import type { ChatMessage, ContentItem, ChoiceOption, DistributionData, ReviewTaskData } from '../types/spark';
+import type { MemoryEntry } from '../types/memory';
 
 // Extracted sub-components
 import { TypingIndicator } from './chat/ChatAtoms';
