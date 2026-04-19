@@ -54,6 +54,7 @@ export function useIllustrate(args: UseIllustrateArgs) {
    * 4) done：清理 + toast
    */
   const handleIllustrate = useCallback(async () => {
+    const startedInEditing = editing;
     const startContent = editing ? editContent : item.content;
     const currentTitle = editing ? editTitle : item.title;
     if (startContent.length < 50) {
@@ -64,7 +65,7 @@ export function useIllustrate(args: UseIllustrateArgs) {
     setIllustrateLoading(true);
     setIllustrateProgress({ done: 0, total: 0 });
     setUndoStack(prev => [...prev, startContent]);
-    if (!editing) {
+    if (!startedInEditing) {
       setEditing(true);
       setExpanded(true);
       setEditContent(startContent);
@@ -208,6 +209,9 @@ export function useIllustrate(args: UseIllustrateArgs) {
       }
     } catch {
       setActionError('illustrate', '网络异常，全文配图失败');
+    }
+    if (!startedInEditing) {
+      setEditing(false);
     }
     setIllustrateLoading(false);
     setIllustrateProgress({ done: 0, total: 0 });
