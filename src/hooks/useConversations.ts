@@ -114,6 +114,19 @@ export function useConversations() {
     [activeId, removeConversation, openConversation, newConversation],
   );
 
+  /** Toggle pinned state for a conversation (optimistic). */
+  const togglePinConversation = useCallback(
+    async (id: string) => {
+      const cur = useConversationStore
+        .getState()
+        .conversations.find((c) => c.id === id);
+      const next = !cur?.pinned;
+      patchConversation(id, { pinned: next });
+      await apiSetPinned(id, next);
+    },
+    [patchConversation],
+  );
+
   // ---------- Bootstrap on auth ----------
   useEffect(() => {
     const authKey = isAuthenticated && user?.id ? user.id : '__anon__';
