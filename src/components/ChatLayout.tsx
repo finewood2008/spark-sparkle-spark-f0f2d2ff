@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { FileText, User, Brain, ClipboardCheck, MessageSquarePlus, Zap, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
@@ -40,8 +40,28 @@ export default function ChatLayout() {
   const [reviewingCount, setReviewingCount] = useState(0);
   const [confirmNewChatOpen, setConfirmNewChatOpen] = useState(false);
   const navigate = useNavigate();
+  const router = useRouter();
   const [pulseKey, setPulseKey] = useState(0);
   const prevCountRef = useRef(0);
+
+  // Preload /account chunk on idle so opening "个人中心" feels instant
+  useEffect(() => {
+    const preload = () => {
+      router.preloadRoute({ to: '/account' }).catch(() => { /* ignore */ });
+      router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
+    };
+    if ('requestIdleCallback' in window) {
+      const id = (window as Window & typeof globalThis).requestIdleCallback(preload, { timeout: 2000 });
+      return () => (window as Window & typeof globalThis).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(preload, 800);
+    return () => clearTimeout(t);
+  }, [router]);
+
+  const preloadAccount = () => {
+    router.preloadRoute({ to: '/account' }).catch(() => { /* ignore */ });
+    router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
+  };
 
   // v2 unified memory system — panel + chat context both read from memoryStore.
   useMemoryV2();
@@ -227,6 +247,9 @@ export default function ChatLayout() {
                   const { isAuthenticated } = useAuthStore.getState();
                   navigate({ to: isAuthenticated ? '/account' : '/auth' });
                 }}
+                onMouseEnter={preloadAccount}
+                onFocus={preloadAccount}
+                onTouchStart={preloadAccount}
                 aria-label="个人中心"
                 className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#666] hover:bg-[#F0EFED] transition-colors"
               >

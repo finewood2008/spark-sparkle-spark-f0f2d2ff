@@ -299,3 +299,8 @@
 .animate-spark-watermark-breathe {
   animation: spark-watermark-breathe 8s ease-in-out infinite;
 }
+
+@keyframes spark-nav-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}

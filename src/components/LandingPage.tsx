@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Brain, CalendarClock, TrendingUp, Send, ArrowRight, Flame, BarChart3, Sparkles, CalendarRange } from 'lucide-react';
 import SparkLogo from './SparkLogo';
 
@@ -109,11 +109,26 @@ function useTypewriter(phrases: string[]) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const router = useRouter();
   const placeholder = useTypewriter(TYPING_PHRASES);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const blob1Ref = useRef<HTMLDivElement>(null);
   const blob2Ref = useRef<HTMLDivElement>(null);
   const blob3Ref = useRef<HTMLDivElement>(null);
+
+  // Preload /auth chunk on idle so first navigation feels instant
+  useEffect(() => {
+    const preload = () => {
+      router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
+    };
+    if ('requestIdleCallback' in window) {
+      const id = (window as Window & typeof globalThis).requestIdleCallback(preload, { timeout: 1500 });
+      return () => (window as Window & typeof globalThis).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(preload, 600);
+    return () => clearTimeout(t);
+  }, [router]);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -161,11 +176,29 @@ export default function LandingPage() {
         /* ignore storage errors */
       }
     }
+    setIsNavigating(true);
     navigate({ to: '/auth' });
+  };
+
+  // Trigger preload on hover/focus — gives users near-instant nav after first interaction
+  const preloadAuth = () => {
+    router.preloadRoute({ to: '/auth' }).catch(() => { /* ignore */ });
   };
 
   return (
     <div className="relative min-h-screen bg-[#FAFAF8] flex flex-col overflow-hidden">
+      {/* Top progress bar — instant feedback while route chunk loads */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-[2px] overflow-hidden">
+          <div
+            className="h-full w-1/3"
+            style={{
+              background: 'linear-gradient(90deg, transparent, #FF6B1A, transparent)',
+              animation: 'spark-nav-progress 1s ease-in-out infinite',
+            }}
+          />
+        </div>
+      )}
       {/* Background decorations */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Subtle grid */}
@@ -306,6 +339,9 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={() => goAuth()}
+              onMouseEnter={preloadAuth}
+              onFocus={preloadAuth}
+              onTouchStart={preloadAuth}
               aria-label="开始对话"
               className="group w-full bg-white border border-[#EEEDEB] rounded-3xl flex items-center pl-5 pr-2 py-2 hover:border-[#FFCBA8] hover:shadow-md transition-all"
             >
@@ -338,6 +374,9 @@ export default function LandingPage() {
                 key={prompt}
                 type="button"
                 onClick={() => goAuth(prompt)}
+                onMouseEnter={preloadAuth}
+                onFocus={preloadAuth}
+                onTouchStart={preloadAuth}
                 className="group relative flex items-center gap-2 pl-2 pr-4 py-2 rounded-full bg-white border border-[#EEEDEB] text-[13px] text-[#3F3A35] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-[#FFCBA8] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
               >
                 {/* 彩色图标徽章 */}
@@ -427,6 +466,9 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={() => goAuth()}
+              onMouseEnter={preloadAuth}
+              onFocus={preloadAuth}
+              onTouchStart={preloadAuth}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-full text-white font-medium spark-shadow hover:opacity-95 hover:scale-[1.02] transition-all"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #FF6B1A)' }}
             >
