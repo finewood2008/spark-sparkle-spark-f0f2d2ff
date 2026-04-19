@@ -477,6 +477,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
       }
 
       dialogueRef.current = null;
+      setDialogueTurn(null);
       setIsGenerating(true);
       await runGenerate(state.originalPrompt, finalBrief, turn.brief.chosenAngle, {
         history: transcript,
