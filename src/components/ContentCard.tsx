@@ -714,6 +714,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             syncToStore(working);
           }
           succeeded += 1;
+          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
         } else if (event === 'image_failed') {
           const idx = payload.index as number;
           const token = tokens[idx];
@@ -722,6 +723,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             setEditContent(working);
             syncToStore(working);
           }
+          setIllustrateProgress(p => ({ done: p.done + 1, total: p.total || totalPlanned }));
         } else if (event === 'done') {
           if (succeeded > 0) {
             toast.success(`已为正文配 ${succeeded} 张插图 ✨`);
