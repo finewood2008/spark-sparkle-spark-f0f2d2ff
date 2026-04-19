@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   AuthError,
   getCorsHeaders,
@@ -7,6 +8,56 @@ import {
   validatePayloadSize,
   checkRateLimit,
 } from "../_shared/auth.ts";
+
+const STORAGE_BUCKET = "article-images";
+
+/**
+ * 把 base64 图片上传到 Storage，返回公开 URL。
+ * 路径：{userId}/{ts}-{rand}.{ext}，符合 RLS（用户子目录）。
+ * 失败时回退返回原 data URL（不阻塞流程）。
+ */
+async function uploadBase64ToStorage(
+  dataUrl: string,
+  userId: string,
+): Promise<string> {
+  try {
+    const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!m) return dataUrl;
+    const mime = m[1];
+    const b64 = m[2];
+    const ext = mime.split("/")[1]?.split("+")[0] || "png";
+
+    // base64 -> Uint8Array
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.error("[illustrate] missing SUPABASE_URL / SERVICE_ROLE_KEY");
+      return dataUrl;
+    }
+
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    const path = `${userId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const { error } = await admin.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (error) {
+      console.error("[illustrate] storage upload failed", error.message);
+      return dataUrl;
+    }
+    const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    return data.publicUrl || dataUrl;
+  } catch (e) {
+    console.error("[illustrate] upload exception", e);
+    return dataUrl;
+  }
+}
 
 /**
  * illustrate-article (SSE 流式版)
@@ -127,7 +178,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return optionsCors(req);
 
   try {
-    await requireUser(req);
+    const userId = await requireUser(req);
     validatePayloadSize(req, 200_000);
     checkRateLimit(req, { maxRequests: 5, windowSec: 60, keyPrefix: "illustrate" });
 
@@ -146,7 +197,6 @@ serve(async (req) => {
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     // ---- Single-image regeneration mode ----
-    // 用于单图重新生成：直接用前端传来的 imagePrompt 生成 1 张图，避免重新规划。
     if (mode === "single") {
       if (!imagePrompt || typeof imagePrompt !== "string") {
         return new Response(
@@ -154,19 +204,20 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      // 给一个统一风格 vibe（与全文配图保持一致），如果前端传了 key 用 key，否则用 platform
       const vibe =
         platformVibe[platformVibeKey || platform || "xiaohongshu"] || platformVibe.xiaohongshu;
       const prompt = imagePrompt.includes("CRITICAL: NO text")
         ? imagePrompt
         : `${imagePrompt}. Style: ${vibe}. CRITICAL: NO text, NO letters, NO words, NO watermarks, NO logos. Pure visual imagery only.`;
-      const imageUrl = await generateOneImage(prompt, KEY);
-      if (!imageUrl) {
+      const dataUrl = await generateOneImage(prompt, KEY);
+      if (!dataUrl) {
         return new Response(
           JSON.stringify({ error: "图片生成失败，请重试" }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+      // 上传到 Storage 拿公开 URL（避免把 base64 塞进正文）
+      const imageUrl = await uploadBase64ToStorage(dataUrl, userId);
       return new Response(
         JSON.stringify({ imageUrl, alt: alt || "", imagePrompt: prompt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -213,14 +264,14 @@ serve(async (req) => {
             })),
           });
 
-          // 2) 并行生成图片，每张完成立即推送
+          // 2) 并行生成图片，生成完立即上传到 Storage 拿公开 URL，再推给前端
           let okCount = 0;
           await Promise.all(
             plans.map(async (p, i) => {
-              const imageUrl = await generateOneImage(p.imagePrompt, KEY);
-              if (imageUrl) {
+              const dataUrl = await generateOneImage(p.imagePrompt, KEY);
+              if (dataUrl) {
+                const imageUrl = await uploadBase64ToStorage(dataUrl, userId);
                 okCount += 1;
-                // imagePrompt 一并推给前端，用于"重新生成单张"
                 send("image", { index: i, alt: p.alt, imageUrl, imagePrompt: p.imagePrompt });
               } else {
                 send("image_failed", { index: i, alt: p.alt, imagePrompt: p.imagePrompt });
