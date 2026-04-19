@@ -178,7 +178,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return optionsCors(req);
 
   try {
-    await requireUser(req);
+    const userId = await requireUser(req);
     validatePayloadSize(req, 200_000);
     checkRateLimit(req, { maxRequests: 5, windowSec: 60, keyPrefix: "illustrate" });
 
@@ -197,7 +197,6 @@ serve(async (req) => {
     if (!KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     // ---- Single-image regeneration mode ----
-    // 用于单图重新生成：直接用前端传来的 imagePrompt 生成 1 张图，避免重新规划。
     if (mode === "single") {
       if (!imagePrompt || typeof imagePrompt !== "string") {
         return new Response(
@@ -205,19 +204,20 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      // 给一个统一风格 vibe（与全文配图保持一致），如果前端传了 key 用 key，否则用 platform
       const vibe =
         platformVibe[platformVibeKey || platform || "xiaohongshu"] || platformVibe.xiaohongshu;
       const prompt = imagePrompt.includes("CRITICAL: NO text")
         ? imagePrompt
         : `${imagePrompt}. Style: ${vibe}. CRITICAL: NO text, NO letters, NO words, NO watermarks, NO logos. Pure visual imagery only.`;
-      const imageUrl = await generateOneImage(prompt, KEY);
-      if (!imageUrl) {
+      const dataUrl = await generateOneImage(prompt, KEY);
+      if (!dataUrl) {
         return new Response(
           JSON.stringify({ error: "图片生成失败，请重试" }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+      // 上传到 Storage 拿公开 URL（避免把 base64 塞进正文）
+      const imageUrl = await uploadBase64ToStorage(dataUrl, userId);
       return new Response(
         JSON.stringify({ imageUrl, alt: alt || "", imagePrompt: prompt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
