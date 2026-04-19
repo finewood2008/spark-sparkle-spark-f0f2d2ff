@@ -1,13 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Pencil, ClipboardCheck, Sparkles, Loader2, Undo2, Palette, BookmarkPlus, ImagePlus, ImageUp, RefreshCw, X, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { ContentItem, LearningEntry } from '../types/spark';
+import type { ContentItem } from '../types/spark';
 import { toast } from 'sonner';
 import { streamEdit } from '../lib/ai-stream';
 import { saveReviewItem } from '../lib/review-persistence';
 import { getAuthToken } from '@/lib/auth-helpers';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/store/authStore';
 import { useMemoryV2 } from '@/hooks/useMemoryV2';
 import { useMemoryStore } from '@/store/memoryStore';
 import { SUPABASE_URL } from '@/lib/env';
@@ -98,7 +96,7 @@ function InlineActionError({
 }
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
-  const { contents, setContents, setLearnings, addMessage } = useAppStore();
+  const { contents, setContents, addMessage } = useAppStore();
   // v2 memory learning — extracts preference rules from edit diffs
   const { learnFromEdit } = useMemoryV2();
   const memoryV2Enabled = useMemoryStore((s) => s.memoryEnabled);
@@ -435,9 +433,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       const diff = Math.abs(editContent.length - originalContent.length);
       const ratio = diff / Math.max(originalContent.length, 1);
       if (ratio > 0.05 || editContent !== originalContent) {
-        // v1 learning (legacy analyze-edit → learning_entries)
-        learnFromEdits(originalContent, editContent);
-        // v2 learning (learn-from-edit → memories.preference) — fire & forget
+        // 自动学习：v2 learn-from-edit → memories.preference (fire & forget)
         if (memoryV2Enabled) {
           learnFromEdit(originalContent, editContent, item.title).then((rules) => {
             if (rules.length > 0) {
@@ -455,59 +451,6 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
       }
     }
     setOriginalContent(editContent);
-  };
-
-  const learnFromEdits = async (original: string, edited: string) => {
-    try {
-      // 调用新版 analyze-edit：服务端会做 diff 分析、生成 insight 并写入 learning_entries
-      const { user, isAuthenticated } = useAuthStore.getState();
-      const userId = isAuthenticated && user?.id ? user.id : null;
-
-      const { data, error } = await supabase.functions.invoke('analyze-edit', {
-        body: {
-          original,
-          edited,
-          deviceId: 'default',
-          userId,
-        },
-      });
-
-      if (error || !data?.ok) return;
-
-      const analysis = data.analysis as
-        | { insights?: string[]; entries?: Array<{ insight: string; category?: string; confidence?: number }> }
-        | undefined;
-
-      // 兼容两种返回结构：insights 数组 或 entries 完整对象数组
-      const insights: string[] = analysis?.entries?.map(e => e.insight).filter(Boolean) as string[]
-        ?? analysis?.insights
-        ?? [];
-
-      if (insights.length === 0) return;
-
-      // 同步前端 learning store（服务端已写库，这里只是为了立即在 UI 上反映）
-      const newEntries: LearningEntry[] = insights.map((insight, i) => ({
-        id: `learn-${Date.now()}-${i}`,
-        type: 'edit' as const,
-        category: 'edit',
-        insight,
-        evidence: `从「${item.title}」的编辑中学到`,
-        confidence: 0.8,
-        timestamp: new Date().toISOString(),
-      }));
-
-      const currentLearnings = useAppStore.getState().learnings;
-      setLearnings([...currentLearnings, ...newEntries]);
-
-      addMessage({
-        id: `learn-${Date.now()}`,
-        role: 'assistant',
-        content: `📝 我从你的编辑中学到了：\n${insights.map(i => `• ${i}`).join('\n')}\n\n这些偏好会在后续创作中自动应用。`,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn('[learn-from-edit] failed:', err);
-    }
   };
 
   const handleSubmitReview = async () => {
