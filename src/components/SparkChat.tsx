@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
-import { streamChat } from '../lib/ai-stream';
+import { streamChat, analyzeIntent, type IntentBrief } from '../lib/ai-stream';
 import { loadUserPrefs, getUserPrefsContext } from '../lib/user-prefs';
 import { saveReviewItem } from '../lib/review-persistence';
 import { useAuthStore } from '../store/authStore';
