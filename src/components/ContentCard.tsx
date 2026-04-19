@@ -464,7 +464,7 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
   // 全文配图相关状态由 useIllustrate hook 管理（在下方初始化，避免引用循环）
   const [copied, setCopied] = useState(false);
   const [dialogueOpen, setDialogueOpen] = useState(false);
-  type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate';
+  type ActionKey = 'cover' | 'polish' | 'title' | 'illustrate' | 'restyle' | 'expand' | 'simplify';
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionKey, string>>>({});
   const setActionError = (key: ActionKey, msg: string | null) =>
     setActionErrors(prev => {
