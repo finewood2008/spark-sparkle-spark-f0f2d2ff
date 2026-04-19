@@ -398,6 +398,7 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
         skipClarify: true,
       };
       dialogueRef.current = null;
+      setDialogueTurn(null);
       setIsGenerating(true);
       await runGenerate(state.originalPrompt, fallbackBrief, userReply);
       return;
