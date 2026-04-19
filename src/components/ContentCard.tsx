@@ -658,6 +658,14 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
           >
             {titleLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           </button>
+          <button
+            onClick={handleCopyAll}
+            className="shrink-0 p-1.5 rounded-lg text-[#999] hover:text-spark-orange hover:bg-spark-orange/10 transition-colors"
+            title="复制全文（标题 + 正文 + CTA + 标签）"
+            aria-label="复制全文"
+          >
+            {copied ? <Check size={14} className="text-spark-orange" /> : <Copy size={14} />}
+          </button>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 mb-2 group">
@@ -669,6 +677,16 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
             title="重新生成标题"
           >
             {titleLoading ? <Loader2 size={13} className="animate-spin text-spark-orange" /> : <RefreshCw size={13} />}
+          </button>
+          <button
+            onClick={handleCopyAll}
+            className={`shrink-0 p-1 rounded-md hover:text-spark-orange hover:bg-spark-orange/10 transition-colors ${
+              copied ? 'opacity-100 text-spark-orange' : 'opacity-0 group-hover:opacity-100 text-[#CCC]'
+            }`}
+            title="复制全文（标题 + 正文 + CTA + 标签）"
+            aria-label="复制全文"
+          >
+            {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </div>
       )}
