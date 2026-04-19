@@ -380,12 +380,15 @@ serve(async (req) => {
           controller.enqueue(enc.encode(sseLine({ type: "text_done" })));
 
           // ── Step 2: 拿 meta（卡片 + ready） ──
+          // 服务端硬性兜底：user 消息已 ≥ 3 条，强制 ready=true，杜绝原地打转
+          const userTurns = safeHistory.filter((m) => m.role === "user").length;
+          const forceConvergence = userTurns >= 3;
+
           let meta: MetaPayload;
           try {
             meta = await callMeta(originalPrompt, safeHistory, fullReply, safeBrand, apiKey);
           } catch (e) {
             console.error("meta call failed, falling back:", e);
-            // Fallback：第 3+ 轮直接 ready，否则给空卡片让用户自己输入
             const isLate = safeHistory.length >= 4;
             meta = {
               suggestions: [],
@@ -393,6 +396,21 @@ serve(async (req) => {
               brief: isLate
                 ? { chosenAngle: originalPrompt, matchedAssets: [], matchedRules: [], risks: [] }
                 : undefined,
+            };
+          }
+
+          // 强制收敛：即使 LLM 还想继续问，也直接结束
+          if (forceConvergence && !meta.ready) {
+            const lastUserChoice = [...safeHistory].reverse().find((m) => m.role === "user")?.content;
+            meta = {
+              suggestions: [],
+              ready: true,
+              brief: {
+                chosenAngle: lastUserChoice || originalPrompt,
+                matchedAssets: meta.brief?.matchedAssets ?? [],
+                matchedRules: meta.brief?.matchedRules ?? [],
+                risks: meta.brief?.risks ?? [],
+              },
             };
           }
 
