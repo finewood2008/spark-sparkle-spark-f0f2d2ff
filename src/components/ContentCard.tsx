@@ -1152,7 +1152,11 @@ export default function ContentCard({ item: itemProp, onAction }: ContentCardPro
         </div>
       ) : (
         <div className="text-[14px] text-[#555] leading-[1.6]">
-          {renderContentWithImages(expanded ? item.content : previewText)}
+          {renderContentWithImages(expanded ? item.content : previewText, expanded ? {
+            onDelete: handleDeleteImage,
+            onRegenerate: handleRegenerateImage,
+            regeneratingUrls,
+          } : undefined)}
           {!expanded && item.content.split('\n').length > 3 && (
             <span className="text-[#999]">...</span>
           )}
