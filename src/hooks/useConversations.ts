@@ -11,6 +11,7 @@ import {
   saveMessage,
   touchConversation,
   deriveTitle,
+  generateAITitle,
   type ConversationSummary,
 } from '@/lib/conversation-persistence';
 import type { ChatMessage } from '@/types/spark';
