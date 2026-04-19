@@ -433,31 +433,31 @@ export default function LandingPage() {
       </main>
 
       <footer className="relative border-t border-[#EEEDEB] mt-16 bg-white/40 overflow-hidden">
-        {/* 超大背景描边水印 — SVG 实现真正的渐变描边 */}
+        {/* 超大背景描边水印 — SVG 渐变描边，贴右下角 */}
         <svg
           aria-hidden
-          className="pointer-events-none select-none absolute -bottom-10 -right-6 md:-bottom-16 md:-right-10 w-[120%] md:w-[95%] h-auto"
-          viewBox="0 0 800 260"
+          className="pointer-events-none select-none absolute -bottom-6 -right-4 md:-bottom-10 md:-right-6 w-[70%] md:w-[55%] h-auto"
+          viewBox="0 0 800 220"
           preserveAspectRatio="xMaxYMax meet"
-          style={{ opacity: 0.55 }}
+          style={{ opacity: 0.32 }}
         >
           <defs>
             <linearGradient id="spark-watermark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FF6B1A" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#FFB37A" stopOpacity="0.35" />
+              <stop offset="0%" stopColor="#FF6B1A" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#FFB37A" stopOpacity="0.25" />
             </linearGradient>
           </defs>
           <text
             x="800"
-            y="240"
+            y="200"
             textAnchor="end"
-            fontSize="260"
+            fontSize="220"
             fontWeight="900"
             fontFamily="Inter, system-ui, sans-serif"
-            letterSpacing="-12"
+            letterSpacing="-10"
             fill="none"
             stroke="url(#spark-watermark-grad)"
-            strokeWidth="1.5"
+            strokeWidth="1.2"
           >
             SPARK
           </text>
