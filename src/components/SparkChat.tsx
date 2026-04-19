@@ -556,6 +556,8 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
             cta: parsed.cta,
             tags: Array.isArray(parsed.tags) ? parsed.tags : [],
             platform,
+            iteration: 1,
+            usedAngles: [],
           }).then((angles) => {
             const articleTags = Array.isArray(parsed.tags) ? parsed.tags : [];
             // Drop any angle the user already dismissed for a similar topic
