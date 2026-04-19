@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 const categoryLabels: Record<ContextCategory, string> = {
   recent_content: '近期内容',
   active_schedule: '进行中计划',
-  session_summary: '会话摘要',
+  session_summary: '最近聊过的创作',
 };
 
 const categoryIcons: Record<ContextCategory, typeof Clock> = {
@@ -16,6 +16,12 @@ const categoryIcons: Record<ContextCategory, typeof Clock> = {
   active_schedule: Calendar,
   session_summary: MessageSquare,
 };
+
+/**
+ * Display order for categories — session_summary first so users immediately
+ * see "what spark remembers from our recent creative chats".
+ */
+const categoryOrder: ContextCategory[] = ['session_summary', 'recent_content', 'active_schedule'];
 
 function formatCountdown(expiresAt?: string): { text: string; urgent: boolean } {
   if (!expiresAt) return { text: '永久', urgent: false };
@@ -127,59 +133,140 @@ export function ContextTab() {
         </button>
       </div>
 
-      {[...grouped.entries()].map(([category, entries]) => {
-        const Icon = categoryIcons[category];
-        return (
-          <section key={category}>
-            <div className="text-[13px] font-medium text-[#666] mb-2 flex items-center gap-1.5">
-              <Icon size={13} className="text-[#999]" />
-              <span>{categoryLabels[category]}</span>
-              <span className="text-[11px] text-[#999]">({entries.length})</span>
-            </div>
+      {categoryOrder
+        .filter((category) => grouped.has(category))
+        .map((category) => {
+          const entries = grouped.get(category)!;
+          const Icon = categoryIcons[category];
+          return (
+            <section key={category}>
+              <div className="text-[13px] font-medium text-[#666] mb-2 flex items-center gap-1.5">
+                <Icon size={13} className="text-[#999]" />
+                <span>{categoryLabels[category]}</span>
+                <span className="text-[11px] text-[#999]">({entries.length})</span>
+                {category === 'session_summary' && (
+                  <span className="text-[11px] text-[#BBB] ml-1">· 火花记得你们聊过的角度</span>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              {entries.map((entry) => {
-                const content = entry.content as Record<string, unknown>;
-                const summary =
-                  (content.summary as string) ||
-                  (content.title as string) ||
-                  JSON.stringify(content);
-                const countdown = formatCountdown(entry.expiresAt);
+              <div className="space-y-2">
+                {entries.map((entry) => {
+                  const content = entry.content as Record<string, unknown>;
+                  const countdown = formatCountdown(entry.expiresAt);
 
-                return (
-                  <div
-                    key={entry.id}
-                    className="border border-[#E5E4E2] rounded-xl p-3 bg-white hover:border-[#D5D4D2] transition-colors"
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] text-[#333] line-clamp-3">{summary}</div>
-                        <div className="flex items-center gap-3 text-[11px] text-[#999] mt-1.5">
-                          <span>{formatTimestamp(entry.createdAt)}</span>
-                          <span
-                            className={
-                              countdown.urgent ? 'text-orange-500' : 'text-[#BBB]'
-                            }
+                  // Rich rendering for session_summary: show topic + chosen
+                  // angle + matched assets in a structured layout instead of
+                  // dumping the raw summary string.
+                  if (category === 'session_summary') {
+                    const topic = (content.topic as string) || '未命名主题';
+                    const chosenAngle = content.chosenAngle as string | undefined;
+                    const matchedAssets = Array.isArray(content.matchedAssets)
+                      ? (content.matchedAssets as string[])
+                      : [];
+                    const turns = content.turns as number | undefined;
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className="border border-[#E5E4E2] rounded-xl p-3 bg-white hover:border-spark-orange/40 transition-colors"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex items-start gap-1.5">
+                              <span className="text-[11px] text-[#999] shrink-0 mt-0.5">主题</span>
+                              <span className="text-[13px] font-medium text-[#333] line-clamp-2">
+                                {topic}
+                              </span>
+                            </div>
+                            {chosenAngle && (
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-[11px] text-[#999] shrink-0 mt-0.5">角度</span>
+                                <span className="text-[12px] text-spark-orange line-clamp-2">
+                                  {chosenAngle}
+                                </span>
+                              </div>
+                            )}
+                            {matchedAssets.length > 0 && (
+                              <div className="flex items-start gap-1.5 flex-wrap">
+                                <span className="text-[11px] text-[#999] shrink-0 mt-0.5">用到</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {matchedAssets.map((a) => (
+                                    <span
+                                      key={a}
+                                      className="text-[11px] text-[#666] bg-[#F5F4F1] px-1.5 py-0.5 rounded"
+                                    >
+                                      {a}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 text-[11px] text-[#999] pt-0.5">
+                              <span>{formatTimestamp(entry.createdAt)}</span>
+                              {typeof turns === 'number' && turns > 0 && (
+                                <span className="text-[#BBB]">聊了 {turns} 轮</span>
+                              )}
+                              <span
+                                className={
+                                  countdown.urgent ? 'text-orange-500' : 'text-[#BBB]'
+                                }
+                              >
+                                ⏱ {countdown.text}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDelete(entry)}
+                            className="w-7 h-7 rounded-lg bg-white border border-[#E5E4E2] flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                            title="忘掉这次对话"
                           >
-                            ⏱ {countdown.text}
-                          </span>
+                            <Trash2 size={12} />
+                          </button>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDelete(entry)}
-                        className="w-7 h-7 rounded-lg bg-white border border-[#E5E4E2] flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
-                        title="删除"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                    );
+                  }
+
+                  // Default rendering for other context categories
+                  const summary =
+                    (content.summary as string) ||
+                    (content.title as string) ||
+                    JSON.stringify(content);
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className="border border-[#E5E4E2] rounded-xl p-3 bg-white hover:border-[#D5D4D2] transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] text-[#333] line-clamp-3">{summary}</div>
+                          <div className="flex items-center gap-3 text-[11px] text-[#999] mt-1.5">
+                            <span>{formatTimestamp(entry.createdAt)}</span>
+                            <span
+                              className={
+                                countdown.urgent ? 'text-orange-500' : 'text-[#BBB]'
+                              }
+                            >
+                              ⏱ {countdown.text}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDelete(entry)}
+                          className="w-7 h-7 rounded-lg bg-white border border-[#E5E4E2] flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                          title="删除"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
     </div>
   );
 }
