@@ -95,6 +95,81 @@ function InlineActionError({
   );
 }
 
+/**
+ * 通用下拉菜单按钮 — 点外关闭、Esc 关闭。
+ * 用于"AI 改写"、"封面图"等多操作合并入口。
+ */
+function MenuButton({
+  trigger,
+  items,
+  align = 'left',
+}: {
+  trigger: React.ReactNode;
+  items: Array<{
+    id: string;
+    label: string;
+    icon?: React.ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+    hint?: string;
+    danger?: boolean;
+  }>;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="content-card-btn"
+      >
+        {trigger}
+        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className={`absolute z-40 top-full mt-1 min-w-[160px] rounded-lg border border-[#E5E4E2] bg-white shadow-lg py-1 ${
+            align === 'right' ? 'right-0' : 'left-0'
+          }`}
+        >
+          {items.map(it => (
+            <button
+              key={it.id}
+              onClick={() => { if (!it.disabled && !it.loading) { it.onClick(); setOpen(false); } }}
+              disabled={it.disabled || it.loading}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors disabled:opacity-40 ${
+                it.danger ? 'text-red-600 hover:bg-red-50' : 'text-[#555] hover:bg-spark-orange/8 hover:text-spark-orange'
+              }`}
+            >
+              {it.loading ? <Loader2 size={12} className="animate-spin" /> : it.icon}
+              <span className="flex-1">{it.label}</span>
+              {it.hint && <span className="text-[10px] text-[#BBB]">{it.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
   const { contents, setContents, addMessage } = useAppStore();
   // v2 memory learning — extracts preference rules from edit diffs
