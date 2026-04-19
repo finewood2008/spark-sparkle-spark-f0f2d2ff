@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore';
 import {
   streamChat,
   creativeDialogue,
+  suggestAngles,
   type IntentBrief,
   type DialogueTurn,
 } from '../lib/ai-stream';
@@ -17,7 +18,7 @@ import { TypingIndicator } from './chat/ChatAtoms';
 import { WelcomeState } from './chat/WelcomeState';
 import { MessageBubble } from './chat/MessageBubble';
 import { ChatInput } from './chat/ChatInput';
-import { generateSuggestions, tryDetectScheduleIntent } from './chat/chat-utils';
+import { tryDetectScheduleIntent } from './chat/chat-utils';
 
 /** Sentinel value sent when user clicks the "直接生成" escape button */
 const FORCE_GENERATE_SENTINEL = '__spark_force_generate__';
@@ -296,10 +297,10 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           setContents([newItem, ...currentContents]);
           setSelectedContentId(newItem.id);
 
-          const suggestions: ChoiceOption[] = [
+          // Initial choices: only "提交审核" — angle suggestions load async below
+          const initialChoices: ChoiceOption[] = [
             { id: `submit-review-${newItem.id}`, label: '提交审核', emoji: '✅' },
-            ...generateSuggestions(parsed.title, parsed.content, parsed.tags),
-          ].slice(0, 4);
+          ];
 
           const msgs = useAppStore.getState().messages;
           const updated = msgs.map(m =>
@@ -313,12 +314,52 @@ export default function SparkChat({ getContext }: { getContext?: () => string })
           addMessage({
             id: suggestId,
             role: 'assistant',
-            content: '📋 你可以直接提交审核，或先让我帮你优化：',
+            content: '📋 你可以直接提交审核，我也在想几个新方向…',
             timestamp: new Date().toISOString(),
-            choices: suggestions,
+            choices: initialChoices,
           });
 
           setIsGenerating(false);
+
+          // Async: fetch content-aware angle suggestions and merge them in.
+          // Each angle is a directional, content-specific prompt — NOT a
+          // duplicate of card-level actions (润色/配图/换风格 etc).
+          suggestAngles({
+            title: parsed.title || text,
+            content: parsed.content || rawContent,
+            cta: parsed.cta,
+            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            platform,
+          }).then((angles) => {
+            if (!angles.length) {
+              const cur = useAppStore.getState().messages;
+              const next = cur.map(m =>
+                m.id === suggestId
+                  ? { ...m, content: '📋 你可以直接提交审核，或继续告诉我想怎么改：' }
+                  : m
+              );
+              useAppStore.setState({ messages: next });
+              return;
+            }
+            const angleChoices: ChoiceOption[] = angles.map(a => ({
+              id: a.id,
+              label: a.label,
+              emoji: a.emoji,
+              anglePrompt: a.anglePrompt,
+            }));
+            const cur = useAppStore.getState().messages;
+            const next = cur.map(m =>
+              m.id === suggestId
+                ? {
+                    ...m,
+                    content: '💡 基于这篇文章，我想到几个可以试试的新方向：',
+                    choices: [...initialChoices, ...angleChoices].slice(0, 5),
+                  }
+                : m
+            );
+            useAppStore.setState({ messages: next });
+          });
+
         },
         onError: (errMsg) => {
           const msgs = useAppStore.getState().messages;
