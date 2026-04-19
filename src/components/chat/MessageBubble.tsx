@@ -1,4 +1,4 @@
-import { AlertCircle, RotateCcw } from 'lucide-react';
+import { AlertCircle, RotateCcw, X } from 'lucide-react';
 import { SparkAvatar } from './ChatAtoms';
 import ContentCard from '../ContentCard';
 import DataReportCard, { type ReportData } from '../DataReportCard';
@@ -8,11 +8,12 @@ import ScheduleCard from '../ScheduleCard';
 import MetricsCard from '../MetricsCard';
 import type { ChatMessage, ContentItem } from '../../types/spark';
 
-export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
+export function MessageBubble({ msg, onSend, onCardAction, onRetry, onDismissChoice }: {
   msg: ChatMessage;
   onSend: (text: string) => void;
   onCardAction: (action: string, item?: ContentItem) => void;
   onRetry: (msg: ChatMessage) => void;
+  onDismissChoice?: (messageId: string, choiceId: string) => void;
 }) {
   const isUser = msg.role === 'user';
 
@@ -230,14 +231,31 @@ export function MessageBubble({ msg, onSend, onCardAction, onRetry }: {
             return (
               <div className="flex flex-wrap gap-2 mt-2">
                 {msg.choices.map(c => (
-                  <button
+                  <div
                     key={c.id}
-                    onClick={() => onSend(c.anglePrompt || c.label)}
-                    className="px-4 py-1.5 rounded-full border border-spark-orange/40 text-[13px] text-spark-orange hover:bg-spark-orange/5 transition-colors"
+                    className="group relative inline-flex items-stretch rounded-full border border-spark-orange/40 hover:bg-spark-orange/5 transition-colors overflow-hidden"
                   >
-                    {c.emoji && <span className="mr-1">{c.emoji}</span>}
-                    {c.label}
-                  </button>
+                    <button
+                      onClick={() => onSend(c.anglePrompt || c.label)}
+                      className="px-4 py-1.5 text-[13px] text-spark-orange"
+                    >
+                      {c.emoji && <span className="mr-1">{c.emoji}</span>}
+                      {c.label}
+                    </button>
+                    {c.dismissable && onDismissChoice && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDismissChoice(msg.id, c.id);
+                        }}
+                        aria-label={`不再推荐：${c.label}`}
+                        title="不再推荐这个方向"
+                        className="px-2 flex items-center justify-center text-spark-orange/50 hover:text-spark-orange hover:bg-spark-orange/10 border-l border-spark-orange/20 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             );
