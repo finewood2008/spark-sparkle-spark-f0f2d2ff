@@ -265,13 +265,14 @@ export default function LandingPage() {
                     return (
                       <span
                         key={i}
-                        className="flex-1 rounded-full transition-all"
+                        className="flex-1 rounded-full transition-all animate-spark-watermark-breathe"
                         style={{
                           height: `${(h * 100).toFixed(1)}%`,
                           background: isAccent
                             ? 'linear-gradient(to top, #FF6B1A, #FF8C42)'
                             : 'rgba(255,107,26,0.28)',
                           opacity: isAccent ? 0.95 : 0.7,
+                          animationDelay: `${(i * 80).toFixed(0)}ms`,
                         }}
                       />
                     );
