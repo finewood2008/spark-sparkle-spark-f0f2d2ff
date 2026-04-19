@@ -170,7 +170,7 @@ export default function LandingPage() {
 
       <main className="relative flex-1 flex flex-col items-center px-6 pt-16 pb-12 sm:pt-24">
         <div className="w-full max-w-2xl flex flex-col items-center">
-          {/* 1. Hero */}
+          {/* 1. Hero — 品牌化排版 */}
           <section
             className="flex flex-col items-center text-center opacity-0"
             style={{
@@ -178,17 +178,55 @@ export default function LandingPage() {
               animationDelay: '0ms',
             }}
           >
-            <div className="mb-6 flex items-center justify-center">
-              <SparkLogo size={72} />
+            {/* Eyebrow：极细的品牌副线 */}
+            <div className="mb-5 inline-flex items-center gap-2 text-[11px] tracking-[0.32em] uppercase text-[#B8755A]">
+              <span className="w-6 h-px bg-[#E8C4A8]" />
+              <span>Spark · AI Marketing Studio</span>
+              <span className="w-6 h-px bg-[#E8C4A8]" />
             </div>
-            <h1 className="text-5xl sm:text-6xl font-bold text-[#1F1F1F] tracking-tight">
-              火花
-            </h1>
-            <p className="mt-4 text-lg sm:text-xl text-[#444] font-medium">
-              你的新媒体 AI 员工，越用越懂你
+
+            {/* Logo 与标题并列：左 logo + 右 wordmark */}
+            <div className="flex items-center gap-4 sm:gap-5">
+              <SparkLogo size={64} />
+              <div className="relative">
+                {/* 大字「火花」— 渐变填充 + 微描边 + 字距收紧 */}
+                <h1
+                  className="font-extrabold leading-[0.9] tracking-[-0.04em] select-none"
+                  style={{
+                    fontSize: 'clamp(64px, 11vw, 112px)',
+                    background:
+                      'linear-gradient(135deg, #FF8C42 0%, #FF6B1A 45%, #E04E00 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    filter: 'drop-shadow(0 6px 18px rgba(255, 107, 26, 0.18))',
+                  }}
+                >
+                  火花
+                </h1>
+                {/* 标题下的小工业刻度线，呼应"Studio" tagging */}
+                <div className="absolute -bottom-2 left-0 right-0 flex items-center gap-[3px] opacity-60">
+                  {Array.from({ length: 16 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="h-[3px] flex-1 rounded-full"
+                      style={{
+                        background:
+                          i % 4 === 0 ? '#FF6B1A' : 'rgba(255,107,26,0.18)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Tagline：主副两行，主行有强调橘 */}
+            <p className="mt-10 text-xl sm:text-2xl text-[#1F1F1F] font-semibold tracking-tight">
+              你的新媒体 AI 员工，
+              <span className="text-[#FF6B1A]">越用越懂你</span>
             </p>
-            <p className="mt-2 text-sm text-[#999]">
-              从选题到发布，全自动管理你的内容增长
+            <p className="mt-3 text-[13px] sm:text-sm text-[#8A8580] tracking-wide">
+              从选题 · 创作 · 排期 · 发布 · 复盘 — 全自动管理你的内容增长
             </p>
           </section>
 
