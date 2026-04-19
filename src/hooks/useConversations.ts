@@ -61,6 +61,8 @@ export function useConversations() {
     async (id: string) => {
       setActiveId(id);
       persistedIdsRef.current = new Set();
+      // Existing conversation already has whatever title it has — don't AI-rename it
+      aiTitledRef.current.add(id);
       const msgs = await loadMessages(id);
       msgs.forEach((m) => persistedIdsRef.current.add(m.id));
       setMessagesStore({ messages: msgs });
