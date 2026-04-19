@@ -11,6 +11,7 @@ import {
   saveMessage,
   touchConversation,
   deriveTitle,
+  generateAITitle,
   type ConversationSummary,
 } from '@/lib/conversation-persistence';
 import type { ChatMessage } from '@/types/spark';
@@ -43,6 +44,8 @@ export function useConversations() {
   const persistedIdsRef = useRef<Set<string>>(new Set());
   // Track whether we've attempted the initial bootstrap for this auth session
   const bootstrappedForUserRef = useRef<string | null>(null);
+  // Track conversations we've already AI-titled (or are titling) to avoid duplicates
+  const aiTitledRef = useRef<Set<string>>(new Set());
 
   /** Refresh the conversation list from the server. */
   const refresh = useCallback(async () => {
@@ -58,6 +61,8 @@ export function useConversations() {
     async (id: string) => {
       setActiveId(id);
       persistedIdsRef.current = new Set();
+      // Existing conversation already has whatever title it has — don't AI-rename it
+      aiTitledRef.current.add(id);
       const msgs = await loadMessages(id);
       msgs.forEach((m) => persistedIdsRef.current.add(m.id));
       setMessagesStore({ messages: msgs });
@@ -194,6 +199,27 @@ export function useConversations() {
         patchConversation(convId, { lastMessageAt: new Date().toISOString() });
       }
       await touchConversation(convId);
+
+      // ----- AI-refined title (once per conversation, after first AI reply) -----
+      const firstAssistantMsg = messages.find(
+        (m) => m.role === 'assistant' && (m.content || '').trim().length > 0,
+      );
+      if (
+        firstUserMsg &&
+        firstAssistantMsg &&
+        !aiTitledRef.current.has(convId)
+      ) {
+        aiTitledRef.current.add(convId);
+        void (async () => {
+          const aiTitle = await generateAITitle(
+            firstUserMsg.content,
+            firstAssistantMsg.content,
+          );
+          if (!aiTitle) return;
+          patchConversation(convId!, { title: aiTitle });
+          await apiRename(convId!, aiTitle);
+        })();
+      }
     })();
   }, [
     messages,
