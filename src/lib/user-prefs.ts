@@ -15,6 +15,8 @@ export interface UserPreferences {
   coverStyle: string;
   /** 火花的语气预设：专业 / 活泼 / 极简 */
   tonePreset: TonePresetId;
+  /** 图片生成模型：标准（更快）/ 高清（更好） */
+  imageModel: 'standard' | 'hd';
 }
 
 export const defaultPrefs: UserPreferences = {
@@ -26,6 +28,7 @@ export const defaultPrefs: UserPreferences = {
   autoCta: true,
   coverStyle: '简约清新',
   tonePreset: 'lively',
+  imageModel: 'standard',
 };
 
 const STORAGE_KEY = 'spark-user-prefs';
@@ -97,6 +100,7 @@ export async function syncPrefsFromCloud(): Promise<UserPreferences> {
       autoCta: (data as any).auto_cta ?? defaultPrefs.autoCta,
       coverStyle: (data as any).cover_style || defaultPrefs.coverStyle,
       tonePreset: loadUserPrefs().tonePreset, // 仅本地存储（数据库暂未加列）
+      imageModel: loadUserPrefs().imageModel, // 仅本地存储（数据库暂未加列）
     };
     saveLocal(prefs);
     return prefs;

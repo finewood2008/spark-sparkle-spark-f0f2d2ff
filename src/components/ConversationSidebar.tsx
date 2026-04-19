@@ -11,6 +11,7 @@ import {
   Zap,
   Brain,
   User,
+  Settings,
   MoreHorizontal,
   Pin,
   PinOff,
@@ -119,6 +120,7 @@ export default function ConversationSidebar({
 
   const preloadAccount = () => {
     router.preloadRoute({ to: '/account' }).catch(() => {});
+    router.preloadRoute({ to: '/settings' }).catch(() => {});
     router.preloadRoute({ to: '/auth' }).catch(() => {});
   };
 
@@ -178,7 +180,20 @@ export default function ConversationSidebar({
             </Tooltip>
           );
         })}
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-1 items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => navigate({ to: isAuthenticated ? '/settings' : '/auth' })}
+                onMouseEnter={preloadAccount}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[#999] hover:text-[#333] hover:bg-[#EEEDEB]"
+                aria-label="系统设置"
+              >
+                <Settings size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">系统设置</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -428,7 +443,15 @@ export default function ConversationSidebar({
         </div>
 
         {/* User footer */}
-        <div className="border-t border-[#E5E4E2] px-2 py-2">
+        <div className="border-t border-[#E5E4E2] px-2 py-2 space-y-0.5">
+          <button
+            onClick={() => navigate({ to: isAuthenticated ? '/settings' : '/auth' })}
+            onMouseEnter={preloadAccount}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-[#666] hover:bg-[#EEEDEB] hover:text-[#333] transition-colors"
+          >
+            <Settings size={15} />
+            <span className="flex-1 text-left">系统设置</span>
+          </button>
           <button
             onClick={() => navigate({ to: isAuthenticated ? '/account' : '/auth' })}
             onMouseEnter={preloadAccount}
