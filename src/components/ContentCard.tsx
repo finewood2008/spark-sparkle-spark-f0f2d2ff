@@ -96,7 +96,7 @@ function InlineActionError({
 }
 
 export default function ContentCard({ item: itemProp, onAction }: ContentCardProps) {
-  const { contents, setContents, setLearnings, addMessage } = useAppStore();
+  const { contents, setContents, addMessage } = useAppStore();
   // v2 memory learning — extracts preference rules from edit diffs
   const { learnFromEdit } = useMemoryV2();
   const memoryV2Enabled = useMemoryStore((s) => s.memoryEnabled);
