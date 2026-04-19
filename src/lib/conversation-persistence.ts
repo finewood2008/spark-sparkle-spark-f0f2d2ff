@@ -141,3 +141,30 @@ export function deriveTitle(text: string): string {
   if (!clean) return '新对话';
   return clean.length > 24 ? clean.slice(0, 24) + '…' : clean;
 }
+
+/**
+ * Ask the AI to generate a concise title for a conversation, based on
+ * the first user message and (optionally) the assistant's reply.
+ * Returns null on any failure — caller should keep the existing title.
+ */
+export async function generateAITitle(
+  userMessage: string,
+  assistantMessage?: string,
+): Promise<string | null> {
+  const userId = getUserId();
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke('title-conversation', {
+      body: { userMessage, assistantMessage },
+    });
+    if (error) {
+      console.warn('[conversations] AI title failed', error);
+      return null;
+    }
+    const title = (data as { title?: string } | null)?.title?.trim();
+    return title && title.length > 0 ? title : null;
+  } catch (e) {
+    console.warn('[conversations] AI title threw', e);
+    return null;
+  }
+}
