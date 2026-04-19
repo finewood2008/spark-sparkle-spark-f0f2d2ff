@@ -78,6 +78,15 @@ export default function ConversationSidebar({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
+  const pinnedConversations = useMemo(
+    () => conversations.filter((c) => c.pinned),
+    [conversations],
+  );
+  const regularConversations = useMemo(
+    () => conversations.filter((c) => !c.pinned),
+    [conversations],
+  );
+
   const handleNew = async () => {
     onChangeView('chat');
     await newConversation();
